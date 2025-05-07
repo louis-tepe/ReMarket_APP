@@ -1,0 +1,30 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+**ReMarket projet informations**
+
+**1. Concept Central :**
+   - ReMarket : Marketplace web de seconde main.
+   - **Mission :** Offrir une expérience d'achat de type "produit neuf" pour des articles d'occasion en standardisant les annonces et les processus.
+   - **Différenciation :** Coupe les liens directs acheteur/vendeur. Pas de contact entre eux.
+
+**2. Structure des Annonces :**
+   - **Uniformité :** Annonces standardisées (image, titre, description, prix fixe), style professionnel.
+   - **Annonce Unique par Produit :** 1 modèle de produit = 1 annonce unique sur la plateforme.
+   - **Regroupement des Offres :** Les articles similaires de différents vendeurs sont listés sous cette annonce unique.
+**3. Processus Utilisateurs :**
+   - **Vendeur :** Soumet infos produit -> IA analyse/liste -> Notification si vente -> Envoi vers point relais.
+   - **Acheteur :** Recherche produit -> Sélectionne options (parmi offres regroupées) -> Achète -> Récupère au point relais.
+
+**4. Stack Technique & Conventions Clés :**
+   - **Environnement :** Node.js
+   - **Framework :** Next.js (App Router)
+   - **Langage :** TypeScript
+   - **Base de Données :** MongoDB (sur Atlas via Mongoose)
+   - **Styling :** Tailwind CSS & shadcn/ui
+     - Style **minimaliste et sobre** (inspiration : backmarket.com).
+   - **Authentification :** NextAuth.js
+
+**Objectif :** Comprendre et utiliser ces informations (concept, processus, stack technique, conventions) pour développer le projet ReMarket de manière cohérente et précise.
