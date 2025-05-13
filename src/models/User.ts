@@ -2,6 +2,7 @@ import mongoose, { Schema, Document, models, Model } from 'mongoose';
 
 // Interface pour typer les documents User (pour TypeScript)
 export interface IUser extends Document {
+  _id: mongoose.Schema.Types.ObjectId;
   email: string;
   name?: string; // Nom optionnel pour l'instant
   password?: string; // Le mot de passe est requis mais peut ne pas être sélectionné par défaut

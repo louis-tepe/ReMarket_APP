@@ -14,10 +14,10 @@
      * Évite de recréer des connexions à chaque appel de fonction Next.js en mode développement.
      * En production, les fonctions serverless peuvent s'exécuter dans des contextes différents.
      */
-    let cached = global.mongoose;
+    let cached = global.mongooseCache;
 
     if (!cached) {
-      cached = global.mongoose = { conn: null, promise: null };
+      cached = global.mongooseCache = { conn: null, promise: null };
     }
 
     async function dbConnect() {

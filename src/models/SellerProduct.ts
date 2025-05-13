@@ -1,11 +1,11 @@
 import { Schema, model, models, Document, Types } from 'mongoose';
-import { IScrapedProduct } from './ScrapedProduct'; // Assurez-vous que le chemin est correct
+import { IProductModel } from './ProductModel'; // Nouvelle importation
 import { IUser } from './User'; // Assurez-vous que le chemin est correct
 
 export type SellerProductStatus = 'available' | 'sold' | 'pending_approval' | 'rejected';
 
 interface ISellerProduct extends Document {
-  scrapedProductId: Types.ObjectId | IScrapedProduct;
+  productModelId: Types.ObjectId | IProductModel;
   sellerId: Types.ObjectId | IUser;
   condition: string; // Ex: "Comme neuf", "Très bon état", "Bon état", "Usé"
   price: number;
@@ -22,10 +22,10 @@ interface ISellerProduct extends Document {
 
 const SellerProductSchema = new Schema<ISellerProduct>(
   {
-    scrapedProductId: {
+    productModelId: {
       type: Schema.Types.ObjectId,
-      ref: 'ScrapedProduct',
-      required: [true, "L'ID du produit scrapé est obligatoire."],
+      ref: 'ProductModel',
+      required: [true, "L'ID du modèle de produit ReMarket est obligatoire."],
     },
     sellerId: {
       type: Schema.Types.ObjectId,
@@ -62,7 +62,7 @@ const SellerProductSchema = new Schema<ISellerProduct>(
         values: ['available', 'sold', 'pending_approval', 'rejected'],
         message: "La valeur du statut n'est pas valide.",
       },
-      default: 'pending_approval', // Les produits sont en attente d'approbation par défaut
+      default: 'available', // Changé de 'pending_approval' à 'available'
     },
     listedAt: {
       type: Date,
@@ -83,7 +83,7 @@ const SellerProductSchema = new Schema<ISellerProduct>(
 );
 
 // Index pour améliorer les performances de recherche
-SellerProductSchema.index({ scrapedProductId: 1 });
+SellerProductSchema.index({ productModelId: 1 });
 SellerProductSchema.index({ sellerId: 1 });
 SellerProductSchema.index({ status: 1, condition: 1 });
 

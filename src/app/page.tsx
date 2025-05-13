@@ -1,103 +1,141 @@
-import Image from "next/image";
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import ProductCard, { ProductCardProps } from '@/components/shared/ProductCard';
+import { ShieldCheck, Repeat, PackageCheck } from 'lucide-react'; // Icônes pour la section explicative
+import { Suspense } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { fetchFeaturedProductData } from "@/lib/product-service"; // Importer la fonction directe
 
-export default function Home() {
+// Fonction pour récupérer les produits vedettes côté serveur
+async function getFeaturedProducts(): Promise<ProductCardProps[]> {
+  try {
+    // Appel direct à la logique métier au lieu de fetch HTTP
+    const products = await fetchFeaturedProductData();
+    return products;
+  } catch (error: unknown) {
+    console.error("Error fetching featured products directly:", error);
+    if (error instanceof Error && error.cause) {
+      console.error("Cause of error:", error.cause);
+    }
+    return [];
+  }
+}
+
+// Composant séparé pour la liste des produits vedettes pour utiliser Suspense
+async function FeaturedProductsList() {
+  const products = await getFeaturedProducts();
+
+  if (!products || products.length === 0) {
+    return <p className="text-center text-muted-foreground">Aucun produit vedette à afficher pour le moment.</p>;
+  }
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {products.map((product) => (
+        <ProductCard key={product.id} {...product} />
+      ))}
     </div>
+  );
+}
+
+function FeaturedProductsSkeleton() {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className="border rounded-lg p-0 overflow-hidden shadow-sm">
+          <Skeleton className="aspect-square w-full bg-gray-200" />
+          <div className="p-4">
+            <Skeleton className="h-5 w-3/4 mb-2 bg-gray-200" />
+            <Skeleton className="h-4 w-1/2 mb-3 bg-gray-200" />
+            <div className="flex justify-between items-center">
+              <Skeleton className="h-6 w-1/3 bg-gray-200" />
+              <Skeleton className="h-8 w-1/4 bg-gray-200" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <>
+      {/* Section Hero */}
+      <section className="py-12 md:py-20 lg:py-28 bg-gradient-to-b from-background to-blue-50 dark:from-gray-900 dark:to-blue-950/30">
+        <div className="container mx-auto px-4 text-center">
+          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl mb-6">
+            ReMarket: Le Seconde Main, <span className="text-primary">Réinventé</span>.
+          </h1>
+          <p className="text-lg text-muted-foreground mb-10 max-w-2xl mx-auto">
+            Accédez à des milliers de produits d&apos;occasion vérifiés, comme neufs, et contribuez à une consommation plus durable.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button size="lg" asChild className="bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Link href="/search">Trouver une perle</Link>
+            </Button>
+            <Button size="lg" variant="outline" asChild>
+              <Link href="/vendre">Vendre un article</Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Section Produits Vedettes */}
+      <section className="py-12 md:py-16">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl font-bold text-center mb-10">Nos Pépites du Moment</h2>
+          <Suspense fallback={<FeaturedProductsSkeleton />}>
+            <FeaturedProductsList />
+          </Suspense>
+          <div className="text-center mt-10">
+            <Button variant="outline" asChild>
+              <Link href="/search">Voir tous les produits</Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Section Comment ça marche ? (Concept ReMarket) */}
+      <section id="comment-ca-marche" className="py-12 md:py-16 bg-muted/50 dark:bg-card">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl font-bold text-center mb-4">ReMarket Simplifie le Seconde Main</h2>
+          <p className="text-muted-foreground text-center max-w-3xl mx-auto mb-12">
+            Nous standardisons l&apos;expérience d&apos;achat et de vente pour vous offrir la qualité du neuf, au prix de l&apos;occasion. Pas de contact direct, pas de tracas.
+          </p>
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="flex flex-col items-center text-center p-6 bg-background dark:bg-gray-800/50 rounded-lg shadow-sm">
+              <div className="p-3 bg-primary/10 rounded-full mb-4">
+                <PackageCheck className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">1. Vendez Facilement</h3>
+              <p className="text-sm text-muted-foreground">
+                Soumettez votre produit. Notre IA l&apos;analyse et le liste. Une fois vendu, envoyez-le simplement à notre point relais.
+              </p>
+            </div>
+            <div className="flex flex-col items-center text-center p-6 bg-background dark:bg-gray-800/50 rounded-lg shadow-sm">
+              <div className="p-3 bg-primary/10 rounded-full mb-4">
+                <ShieldCheck className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">2. Achetez en Confiance</h3>
+              <p className="text-sm text-muted-foreground">
+                Trouvez votre bonheur parmi des annonces standardisées. Chaque article est vérifié avant de vous être expédié.
+              </p>
+            </div>
+            <div className="flex flex-col items-center text-center p-6 bg-background dark:bg-gray-800/50 rounded-lg shadow-sm">
+              <div className="p-3 bg-primary/10 rounded-full mb-4">
+                <Repeat className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">3. Processus Simplifié</h3>
+              <p className="text-sm text-muted-foreground">
+                ReMarket gère la logistique et la communication. Plus besoin de négocier ou de rencontrer des inconnus.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* TODO: Ajouter d'autres sections: Catégories populaires, Témoignages, etc. */}
+    </>
   );
 }

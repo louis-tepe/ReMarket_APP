@@ -1,0 +1,154 @@
+{
+  "usableSessionsCount": 2,
+  "retiredSessionsCount": 0,
+  "sessions": [
+    {
+      "id": "session_Hb7RnE2g8n",
+      "cookieJar": {
+        "version": "tough-cookie@5.1.2",
+        "storeType": "MemoryCookieStore",
+        "rejectPublicSuffixes": true,
+        "enableLooseMode": false,
+        "allowSpecialUseDomain": true,
+        "prefixSecurity": "silent",
+        "cookies": [
+          {
+            "key": "session-id",
+            "value": "130-3283933-8402329",
+            "expires": "2026-05-13T12:30:01.000Z",
+            "domain": "amazon.com",
+            "path": "/",
+            "secure": true,
+            "hostOnly": false,
+            "creation": "2025-05-13T12:30:02.434Z",
+            "lastAccessed": "2025-05-13T12:30:02.434Z"
+          },
+          {
+            "key": "session-id-time",
+            "value": "2082787201l",
+            "expires": "2026-05-13T12:30:01.000Z",
+            "domain": "amazon.com",
+            "path": "/",
+            "secure": true,
+            "hostOnly": false,
+            "creation": "2025-05-13T12:30:02.434Z",
+            "lastAccessed": "2025-05-13T12:30:02.434Z"
+          },
+          {
+            "key": "i18n-prefs",
+            "value": "USD",
+            "expires": "2026-05-13T12:30:01.000Z",
+            "domain": "amazon.com",
+            "path": "/",
+            "hostOnly": false,
+            "creation": "2025-05-13T12:30:02.435Z",
+            "lastAccessed": "2025-05-13T12:30:02.435Z"
+          },
+          {
+            "key": "lc-main",
+            "value": "en_US",
+            "expires": "2026-05-13T12:30:01.000Z",
+            "domain": "amazon.com",
+            "path": "/",
+            "hostOnly": false,
+            "creation": "2025-05-13T12:30:02.435Z",
+            "lastAccessed": "2025-05-13T12:30:02.435Z"
+          },
+          {
+            "key": "sp-cdn",
+            "value": "\"L5Z9:JP\"",
+            "expires": "2026-05-13T12:30:01.000Z",
+            "maxAge": 31536000,
+            "domain": "amazon.com",
+            "path": "/",
+            "secure": true,
+            "httpOnly": true,
+            "extensions": [
+              "Version=1"
+            ],
+            "hostOnly": false,
+            "creation": "2025-05-13T12:30:02.435Z",
+            "lastAccessed": "2025-05-13T12:30:02.435Z"
+          }
+        ]
+      },
+      "userData": {},
+      "maxErrorScore": 3,
+      "errorScoreDecrement": 0.5,
+      "expiresAt": "2025-05-13T13:20:00.233Z",
+      "createdAt": "2025-05-13T12:30:00.233Z",
+      "usageCount": 0,
+      "maxUsageCount": 50,
+      "errorScore": 0
+    },
+    {
+      "id": "session_oqmtQKRgnx",
+      "cookieJar": {
+        "version": "tough-cookie@5.1.2",
+        "storeType": "MemoryCookieStore",
+        "rejectPublicSuffixes": true,
+        "enableLooseMode": false,
+        "allowSpecialUseDomain": true,
+        "prefixSecurity": "silent",
+        "cookies": [
+          {
+            "key": "session-id",
+            "value": "144-2657456-5941436",
+            "expires": "2026-05-13T12:30:03.000Z",
+            "domain": "amazon.com",
+            "path": "/",
+            "secure": true,
+            "hostOnly": false,
+            "creation": "2025-05-13T12:30:05.194Z",
+            "lastAccessed": "2025-05-13T12:30:05.194Z"
+          },
+          {
+            "key": "session-id-time",
+            "value": "2082787201l",
+            "expires": "2026-05-13T12:30:03.000Z",
+            "domain": "amazon.com",
+            "path": "/",
+            "secure": true,
+            "hostOnly": false,
+            "creation": "2025-05-13T12:30:05.194Z",
+            "lastAccessed": "2025-05-13T12:30:05.194Z"
+          },
+          {
+            "key": "i18n-prefs",
+            "value": "USD",
+            "expires": "2026-05-13T12:30:03.000Z",
+            "domain": "amazon.com",
+            "path": "/",
+            "hostOnly": false,
+            "creation": "2025-05-13T12:30:05.194Z",
+            "lastAccessed": "2025-05-13T12:30:05.194Z"
+          },
+          {
+            "key": "sp-cdn",
+            "value": "\"L5Z9:JP\"",
+            "expires": "2026-05-13T12:30:03.000Z",
+            "maxAge": 31536000,
+            "domain": "amazon.com",
+            "path": "/",
+            "secure": true,
+            "httpOnly": true,
+            "extensions": [
+              "Version=1"
+            ],
+            "hostOnly": false,
+            "creation": "2025-05-13T12:30:05.194Z",
+            "lastAccessed": "2025-05-13T12:30:05.194Z"
+          }
+        ]
+      },
+      "userData": {},
+      "maxErrorScore": 3,
+      "errorScoreDecrement": 0.5,
+      "expiresAt": "2025-05-13T13:20:02.673Z",
+      "createdAt": "2025-05-13T12:30:02.673Z",
+      "usageCount": 1,
+      "maxUsageCount": 50,
+      "errorScore": 0
+    }
+  ]
+}
