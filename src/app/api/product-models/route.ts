@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { scrapeAmazonProduct, AmazonProductDetails } from '@/lib/scraper';
 import dbConnect from '@/lib/db.Connect';
-import ScrapedProduct, { IScrapedProduct } from '@/models/ScrapedProduct';
+import ScrapedProduct from '@/models/ScrapedProduct';
 import ProductModel from '@/models/ProductModel';
 import CategoryModel, { ICategory } from '@/models/CategoryModel';
 import BrandModel, { IBrand } from '@/models/BrandModel';

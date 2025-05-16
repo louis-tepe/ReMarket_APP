@@ -4,17 +4,20 @@ import { useState, FormEvent } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "sonner"; // Pour les notifications
 
 export default function ConnexionPage() {
     const router = useRouter();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
     const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        setError(null);
         setIsLoading(true);
 
         try {
@@ -25,96 +28,78 @@ export default function ConnexionPage() {
             });
 
             if (result?.error) {
-                setError(result.error === "CredentialsSignin" ? "Email ou mot de passe incorrect." : "Une erreur est survenue. Veuillez réessayer.");
+                const errorMessage = result.error === "CredentialsSignin" ? "Email ou mot de passe incorrect." : "Une erreur est survenue. Veuillez réessayer.";
+                toast.error("Erreur de connexion", { description: errorMessage });
                 setIsLoading(false);
             } else if (result?.ok) {
-                // Redirection vers la page d'accueil ou une page de tableau de bord
+                toast.success("Connexion réussie!", { description: "Vous allez être redirigé." });
                 router.push('/');
             } else {
-                // Cas inattendu
-                setError("Une erreur de connexion inattendue est survenue.");
+                toast.error("Erreur inattendue", { description: "Une erreur de connexion inattendue est survenue." });
                 setIsLoading(false);
             }
         } catch (err) {
             console.error("Erreur lors de la tentative de connexion:", err);
-            setError("Une erreur serveur est survenue.");
+            toast.error("Erreur Serveur", { description: "Une erreur serveur est survenue." });
             setIsLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-md w-full space-y-8 bg-white p-8 sm:p-10 rounded-lg shadow-md">
-                <div>
-                    <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-                        Connexion à votre compte
-                    </h2>
-                </div>
-                <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-                    <input type="hidden" name="remember" defaultValue="true" />
-                    <div className="rounded-md shadow-sm -space-y-px">
-                        <div>
-                            <label htmlFor="email-address" className="sr-only">
-                                Adresse email
-                            </label>
-                            <input
-                                id="email-address"
+        <div className="min-h-screen flex flex-col items-center justify-center bg-background py-12 px-4 sm:px-6 lg:px-8">
+            <Card className="w-full max-w-md">
+                <CardHeader className="space-y-1 text-center">
+                    <CardTitle className="text-3xl font-bold tracking-tight">Connexion</CardTitle>
+                    <CardDescription>
+                        Accédez à votre compte ReMarket.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <div className="space-y-2">
+                            <Label htmlFor="email">Adresse email</Label>
+                            <Input
+                                id="email"
                                 name="email"
                                 type="email"
                                 autoComplete="email"
+                                placeholder="votre@email.com"
                                 required
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                                placeholder="Adresse email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 disabled={isLoading}
+                                className="bg-input"
                             />
                         </div>
-                        <div>
-                            <label htmlFor="password" className="sr-only">
-                                Mot de passe
-                            </label>
-                            <input
+                        <div className="space-y-2">
+                            <Label htmlFor="password">Mot de passe</Label>
+                            <Input
                                 id="password"
                                 name="password"
                                 type="password"
                                 autoComplete="current-password"
+                                placeholder="Votre mot de passe"
                                 required
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                                placeholder="Mot de passe"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 disabled={isLoading}
+                                className="bg-input"
                             />
                         </div>
-                    </div>
-
-                    {error && (
-                        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-                            <span className="block sm:inline">{error}</span>
-                        </div>
-                    )}
-
-                    <div>
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-300"
-                        >
+                        <Button type="submit" className="w-full" disabled={isLoading}>
                             {isLoading ? 'Connexion en cours...' : 'Se connecter'}
-                        </button>
-                    </div>
-                </form>
-                <div className="text-sm text-center">
-                    <p className="text-gray-600">
-                        Pas encore de compte ?{
-                            ' '}
-                        <Link href="/auth/inscription" className="font-medium text-indigo-600 hover:text-indigo-500">
+                        </Button>
+                    </form>
+                </CardContent>
+                <CardFooter className="flex flex-col items-center space-y-2">
+                    <div className="text-sm text-muted-foreground">
+                        Pas encore de compte ?{' '}
+                        <Link href="/signup" className="font-medium text-primary hover:underline">
                             Inscrivez-vous
                         </Link>
-                    </p>
-                </div>
-            </div>
+                    </div>
+                </CardFooter>
+            </Card>
         </div>
     );
 } 

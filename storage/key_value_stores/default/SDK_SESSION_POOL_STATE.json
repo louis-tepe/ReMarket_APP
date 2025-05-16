@@ -3,7 +3,7 @@
   "retiredSessionsCount": 0,
   "sessions": [
     {
-      "id": "session_Hb7RnE2g8n",
+      "id": "session_QehCa77EIp",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -14,50 +14,50 @@
         "cookies": [
           {
             "key": "session-id",
-            "value": "130-3283933-8402329",
-            "expires": "2026-05-13T12:30:01.000Z",
+            "value": "145-8217667-5031963",
+            "expires": "2026-05-16T06:38:11.000Z",
             "domain": "amazon.com",
             "path": "/",
             "secure": true,
             "hostOnly": false,
-            "creation": "2025-05-13T12:30:02.434Z",
-            "lastAccessed": "2025-05-13T12:30:02.434Z"
+            "creation": "2025-05-16T06:38:12.527Z",
+            "lastAccessed": "2025-05-16T06:38:12.527Z"
           },
           {
             "key": "session-id-time",
             "value": "2082787201l",
-            "expires": "2026-05-13T12:30:01.000Z",
+            "expires": "2026-05-16T06:38:11.000Z",
             "domain": "amazon.com",
             "path": "/",
             "secure": true,
             "hostOnly": false,
-            "creation": "2025-05-13T12:30:02.434Z",
-            "lastAccessed": "2025-05-13T12:30:02.434Z"
+            "creation": "2025-05-16T06:38:12.528Z",
+            "lastAccessed": "2025-05-16T06:38:12.528Z"
           },
           {
             "key": "i18n-prefs",
             "value": "USD",
-            "expires": "2026-05-13T12:30:01.000Z",
+            "expires": "2026-05-16T06:38:11.000Z",
             "domain": "amazon.com",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-05-13T12:30:02.435Z",
-            "lastAccessed": "2025-05-13T12:30:02.435Z"
+            "creation": "2025-05-16T06:38:12.528Z",
+            "lastAccessed": "2025-05-16T06:38:12.528Z"
           },
           {
             "key": "lc-main",
             "value": "en_US",
-            "expires": "2026-05-13T12:30:01.000Z",
+            "expires": "2026-05-16T06:38:11.000Z",
             "domain": "amazon.com",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-05-13T12:30:02.435Z",
-            "lastAccessed": "2025-05-13T12:30:02.435Z"
+            "creation": "2025-05-16T06:38:12.528Z",
+            "lastAccessed": "2025-05-16T06:38:12.528Z"
           },
           {
             "key": "sp-cdn",
             "value": "\"L5Z9:JP\"",
-            "expires": "2026-05-13T12:30:01.000Z",
+            "expires": "2026-05-16T06:38:11.000Z",
             "maxAge": 31536000,
             "domain": "amazon.com",
             "path": "/",
@@ -67,22 +67,22 @@
               "Version=1"
             ],
             "hostOnly": false,
-            "creation": "2025-05-13T12:30:02.435Z",
-            "lastAccessed": "2025-05-13T12:30:02.435Z"
+            "creation": "2025-05-16T06:38:12.528Z",
+            "lastAccessed": "2025-05-16T06:38:12.528Z"
           }
         ]
       },
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-05-13T13:20:00.233Z",
-      "createdAt": "2025-05-13T12:30:00.233Z",
+      "expiresAt": "2025-05-16T07:28:09.800Z",
+      "createdAt": "2025-05-16T06:38:09.800Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_oqmtQKRgnx",
+      "id": "session_3XnCbIZ8cS",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -93,40 +93,40 @@
         "cookies": [
           {
             "key": "session-id",
-            "value": "144-2657456-5941436",
-            "expires": "2026-05-13T12:30:03.000Z",
+            "value": "140-8564123-2681754",
+            "expires": "2026-05-16T06:38:13.000Z",
             "domain": "amazon.com",
             "path": "/",
             "secure": true,
             "hostOnly": false,
-            "creation": "2025-05-13T12:30:05.194Z",
-            "lastAccessed": "2025-05-13T12:30:05.194Z"
+            "creation": "2025-05-16T06:38:15.580Z",
+            "lastAccessed": "2025-05-16T06:38:15.580Z"
           },
           {
             "key": "session-id-time",
             "value": "2082787201l",
-            "expires": "2026-05-13T12:30:03.000Z",
+            "expires": "2026-05-16T06:38:13.000Z",
             "domain": "amazon.com",
             "path": "/",
             "secure": true,
             "hostOnly": false,
-            "creation": "2025-05-13T12:30:05.194Z",
-            "lastAccessed": "2025-05-13T12:30:05.194Z"
+            "creation": "2025-05-16T06:38:15.580Z",
+            "lastAccessed": "2025-05-16T06:38:15.580Z"
           },
           {
             "key": "i18n-prefs",
             "value": "USD",
-            "expires": "2026-05-13T12:30:03.000Z",
+            "expires": "2026-05-16T06:38:13.000Z",
             "domain": "amazon.com",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-05-13T12:30:05.194Z",
-            "lastAccessed": "2025-05-13T12:30:05.194Z"
+            "creation": "2025-05-16T06:38:15.580Z",
+            "lastAccessed": "2025-05-16T06:38:15.580Z"
           },
           {
             "key": "sp-cdn",
             "value": "\"L5Z9:JP\"",
-            "expires": "2026-05-13T12:30:03.000Z",
+            "expires": "2026-05-16T06:38:13.000Z",
             "maxAge": 31536000,
             "domain": "amazon.com",
             "path": "/",
@@ -136,16 +136,16 @@
               "Version=1"
             ],
             "hostOnly": false,
-            "creation": "2025-05-13T12:30:05.194Z",
-            "lastAccessed": "2025-05-13T12:30:05.194Z"
+            "creation": "2025-05-16T06:38:15.580Z",
+            "lastAccessed": "2025-05-16T06:38:15.580Z"
           }
         ]
       },
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-05-13T13:20:02.673Z",
-      "createdAt": "2025-05-13T12:30:02.673Z",
+      "expiresAt": "2025-05-16T07:28:12.856Z",
+      "createdAt": "2025-05-16T06:38:12.856Z",
       "usageCount": 1,
       "maxUsageCount": 50,
       "errorScore": 0

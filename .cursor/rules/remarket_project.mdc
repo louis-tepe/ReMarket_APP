@@ -26,5 +26,6 @@ alwaysApply: true
    - **Styling :** Tailwind CSS & shadcn/ui
      - Style **minimaliste et sobre** (inspiration : backmarket.com).
    - **Authentification :** NextAuth.js
+   - **Langue fichiers/dossiers :** Anglais
 
 **Objectif :** Comprendre et utiliser ces informations (concept, processus, stack technique, conventions) pour développer le projet ReMarket de manière cohérente et précise.
