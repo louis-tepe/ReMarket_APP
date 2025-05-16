@@ -93,7 +93,7 @@ const OfferSchema = new Schema<IOffer>(
     sellerPhotos: [
       {
         type: String,
-        required: [true, "Au moins une photo de votre article est requise."],
+        // required: [true, "Au moins une photo de votre article est requise."], // Commentée ou supprimée
       },
     ],
     dynamicFields: [DynamicFieldSchema],

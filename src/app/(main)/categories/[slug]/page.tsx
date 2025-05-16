@@ -66,18 +66,16 @@ async function getCategoryProducts(slug: string): Promise<CategoryProductCardPro
     }
 }
 
-export default async function CategoryPage({
-    params,
-}: {
-    params: { slug: string };
-}) {
-    const { slug } = params;
-    const categoryName = slug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+export default async function CategoryPage(props: { params: { slug: string } }) {
+    // Explicitly resolve props.params as a promise, then await it.
+    const awaitedParams = await Promise.resolve(props.params);
+    const currentSlug = awaitedParams.slug;
+    const categoryName = currentSlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     let products: CategoryProductCardProps[] = [];
     let fetchError: string | null = null;
 
     try {
-        products = await getCategoryProducts(slug);
+        products = await getCategoryProducts(currentSlug);
     } catch (error) {
         // L'erreur est déjà loggée dans getCategoryProducts
         // On la capture ici pour afficher un message d'erreur plus global si nécessaire

@@ -149,8 +149,8 @@ export async function POST(request: NextRequest) {
     } = body;
     console.log('[API /api/offers LOG] productModelId from body:', productModelId);
 
-    if (!productModelId || !mongoose.Types.ObjectId.isValid(productModelId) || price === undefined || !condition || !sellerPhotos || sellerPhotos.length === 0) {
-      return NextResponse.json({ message: 'Champs requis manquants ou invalides: productModelId, price, condition, sellerPhotos.' }, { status: 400 });
+    if (!productModelId || !mongoose.Types.ObjectId.isValid(productModelId) || price === undefined || !condition /* || !sellerPhotos || sellerPhotos.length === 0 */) {
+      return NextResponse.json({ message: 'Champs requis manquants ou invalides: productModelId, price, condition.' }, { status: 400 });
     }
 
     // Vérifier que le ProductModel existe
@@ -167,8 +167,8 @@ export async function POST(request: NextRequest) {
       condition,
       quantity: parseInt(quantity.toString(), 10),
       sellerDescription: sellerDescription || undefined,
-      sellerPhotos: sellerPhotos || [], 
-      dynamicFields: dynamicFields || [],
+      sellerPhotos: Array.isArray(sellerPhotos) ? sellerPhotos : [], 
+      dynamicFields: Array.isArray(dynamicFields) ? dynamicFields : [],
       status: 'available', // Statut par défaut pour une nouvelle offre
       currency: currency,
     };
