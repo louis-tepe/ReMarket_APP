@@ -3,6 +3,7 @@ import dbConnect from '@/lib/db.Connect'; // Assurez-vous que le chemin est corr
 import ProductModel from '@/models/ProductModel'; 
 import BrandModel, { IBrand } from '@/models/BrandModel';
 import CategoryModel from '@/models/CategoryModel'; // Nécessaire pour trouver le nom de la catégorie par son slug
+import mongoose from 'mongoose';
 
 /**
  * @swagger
@@ -59,33 +60,33 @@ export async function GET(request: NextRequest) {
     if (!category) {
       return NextResponse.json({ message: `Catégorie avec slug '${categorySlug}' non trouvée.` }, { status: 404 });
     }
-    const categoryName = category.name; // Utiliser le vrai nom pour requêter ProductModel
+    // const categoryName = category.name; // Plus besoin de categoryName pour cette requête
 
-    // 2. Récupérer les noms de marques distincts des ProductModel approuvés pour cette catégorie
-    const distinctBrandNamesFromProducts: string[] = await ProductModel.find({
-      category: categoryName, // Filtrer par le nom de la catégorie (ou son _id si ProductModel référence CategoryModel._id)
-      status: 'approved'
+    // 2. Récupérer les ID de marques distincts des ProductModel pour cette catégorie
+    // ProductModel.brand est maintenant un ObjectId référençant BrandModel
+    const distinctBrandIdsFromProducts: mongoose.Types.ObjectId[] = await ProductModel.find({
+      category: category._id, // Filtrer par l'ID de la catégorie
+      // status: 'approved' // Le champ status n'existe plus sur ProductModel
     }).distinct('brand');
 
     let brands: IBrand[] = [];
 
-    if (distinctBrandNamesFromProducts && distinctBrandNamesFromProducts.length > 0) {
-      console.log(`[GET /api/brands] Marques trouvées pour la catégorie '${categoryName}' via ProductModels: ${distinctBrandNamesFromProducts.join(', ')}`);
-      // 3. Récupérer les détails complets de ces marques depuis la collection BrandModel
-      // On suppose que les noms de marques dans ProductModel correspondent aux noms dans BrandModel
+    if (distinctBrandIdsFromProducts && distinctBrandIdsFromProducts.length > 0) {
+      console.log(`[GET /api/brands] IDs de Marques trouvés pour la catégorie '${category.name}' via ProductModels: ${distinctBrandIdsFromProducts.join(', ')}`);
+      // 3. Récupérer les détails complets de ces marques depuis la collection BrandModel en utilisant leurs IDs
       brands = await BrandModel.find({
-        name: { $in: distinctBrandNamesFromProducts }
+        _id: { $in: distinctBrandIdsFromProducts }
       }).sort({ name: 1 });
     } else {
-      // Aucun ProductModel approuvé trouvé pour cette catégorie avec des marques spécifiées.
+      // Aucun ProductModel trouvé pour cette catégorie avec des marques spécifiées.
       // Fallback: Charger toutes les marques pour permettre la sélection et la création/scraping.
-      console.log(`[GET /api/brands] Aucune marque trouvée via ProductModels pour la catégorie '${categoryName}'. Fallback vers toutes les marques.`);
+      console.log(`[GET /api/brands] Aucune marque trouvée via ProductModels pour la catégorie '${category.name}'. Fallback vers toutes les marques.`);
       brands = await BrandModel.find({}).sort({ name: 1 });
     }
 
     if (!brands || brands.length === 0) {
       // Ce cas ne devrait survenir que si la collection BrandModel est vide.
-      return NextResponse.json({ message: `Aucune marque disponible, ni spécifiquement pour la catégorie '${categoryName}', ni globalement.` }, { status: 404 });
+      return NextResponse.json({ message: `Aucune marque disponible, ni spécifiquement pour la catégorie '${category.name}', ni globalement.` }, { status: 404 });
     }
 
     const formattedBrands = brands.map(brand => ({

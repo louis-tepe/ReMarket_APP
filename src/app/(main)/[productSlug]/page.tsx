@@ -15,10 +15,13 @@ import Link from 'next/link';
 // Types (doivent correspondre à ceux de l'API /api/products/[slug])
 interface SellerOffer {
     id: string;
-    sellerName: string;
+    seller: { id: string, name?: string };
     price: number;
-    condition: string;
+    currency: string;
+    quantity: number;
+    condition: 'new' | 'used_likenew' | 'used_good' | 'used_fair';
     sellerDescription?: string;
+    sellerPhotos?: string[];
 }
 
 interface ProductDetails {
@@ -153,7 +156,7 @@ export default function ProductPage({ params }: ProductPageProps) {
         // TODO: Implémenter la logique d'ajout au panier
         // Cela impliquera probablement un contexte de panier ou une API
         console.log("Ajout au panier:", product.title, offer);
-        // toast.success(`${product.title} (Vendeur: ${offer.sellerName}) ajouté au panier!`);
+        // toast.success(`${product.title} (Vendeur: ${offer.seller.name}) ajouté au panier!`);
     };
 
     return (
@@ -230,11 +233,11 @@ export default function ProductPage({ params }: ProductPageProps) {
                                         <CardHeader className="pb-3">
                                             <div className="flex justify-between items-start">
                                                 <div>
-                                                    <CardTitle className="text-xl">{offer.price.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</CardTitle>
-                                                    <CardDescription className="mt-1">Vendu par : <span className="font-medium text-foreground">{offer.sellerName}</span></CardDescription>
+                                                    <CardTitle className="text-xl">{offer.price.toLocaleString('fr-FR', { style: 'currency', currency: offer.currency })}</CardTitle>
+                                                    <CardDescription className="mt-1">Vendu par : <span className="font-medium text-foreground">{offer.seller.name || 'Vendeur anonyme'}</span></CardDescription>
                                                 </div>
-                                                <Badge variant={offer.condition === 'Comme neuf' ? 'default' : 'secondary'} className="capitalize">
-                                                    {offer.condition.replace('_', ' ')}
+                                                <Badge variant={offer.condition === 'new' || offer.condition === 'used_likenew' ? 'default' : 'secondary'} className="capitalize">
+                                                    {offer.condition.replace('used_likenew', 'comme neuf').replace('used_good', 'bon état').replace('used_fair', 'état correct').replace('new', 'neuf')}
                                                 </Badge>
                                             </div>
                                         </CardHeader>

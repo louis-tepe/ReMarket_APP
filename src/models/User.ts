@@ -10,6 +10,7 @@ export interface IUser extends Document {
   emailVerified?: Date | null;
   // Ajoutez d'autres champs selon les besoins de ReMarket
   // par exemple : role, adresses, etc.
+  role: 'user' | 'seller' | 'admin'; // Ajout du champ role
   createdAt: Date;
   updatedAt: Date;
 }
@@ -42,11 +43,12 @@ const UserSchema: Schema<IUser> = new Schema(
       default: null,
     },
     // Ajoutez ici d'autres champs spécifiques à ReMarket
-    // role: {
-    //   type: String,
-    //   enum: ['user', 'seller', 'admin'], // Exemple de rôles
-    //   default: 'user',
-    // },
+    role: {
+      type: String,
+      enum: ['user', 'seller', 'admin'], // Exemple de rôles
+      default: 'user',
+      required: true, // Le rôle est maintenant requis
+    },
   },
   {
     timestamps: true, // Ajoute createdAt et updatedAt automatiquement

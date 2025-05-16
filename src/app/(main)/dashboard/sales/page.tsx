@@ -22,11 +22,13 @@ export interface SellerOffer {
     id: string;
     productModel: ProductModelInfo;
     price: number;
-    condition: string; // ex: 'used_good', 'new', 'used_likenew', 'used_fair'
-    status: 'available' | 'sold' | 'pending_shipment' | 'archived';
+    currency: string;
+    quantity: number;
+    condition: 'new' | 'used_likenew' | 'used_good' | 'used_fair';
+    status: 'available' | 'reserved' | 'sold' | 'pending_shipment' | 'shipped' | 'delivered' | 'cancelled' | 'archived';
+    sellerDescription?: string;
+    sellerPhotos?: string[];
     createdAt: string;
-    // quantity: number;
-    // sellerDescription?: string;
 }
 
 // Fonction pour traduire les conditions en français
@@ -44,8 +46,12 @@ const translateCondition = (condition: string): string => {
 const translateStatus = (status: SellerOffer['status']): string => {
     const statusMap: { [key: string]: string } = {
         'available': 'Disponible',
+        'reserved': 'Réservée',
         'sold': 'Vendu',
         'pending_shipment': 'Envoi en attente',
+        'shipped': 'Expédiée',
+        'delivered': 'Livrée',
+        'cancelled': 'Annulée',
         'archived': 'Archivée',
     };
     return statusMap[status] || status;
@@ -53,8 +59,8 @@ const translateStatus = (status: SellerOffer['status']): string => {
 
 async function fetchSellerOffers(userId: string): Promise<SellerOffer[]> {
     // TODO: Remplacer par un appel réel à GET /api/users/${userId}/offers
-    // Pour l'instant, on simule.
-    if (!userId) return []; // Ne pas fetch si userId est null/undefined
+    // L'API devrait retourner IOffer[] avec productModel peuplé
+    if (!userId) return [];
     console.log(`Appel simulé à fetchSellerOffers pour l'utilisateur ${userId}`);
     return new Promise((resolve) => {
         setTimeout(() => {
@@ -63,32 +69,46 @@ async function fetchSellerOffers(userId: string): Promise<SellerOffer[]> {
                     id: 'offer1',
                     productModel: { id: 'prod1', name: 'iPhone 13 Pro', imageUrl: 'https://via.placeholder.com/80/FFA500/FFFFFF?Text=P1' },
                     price: 700,
+                    currency: 'EUR',
+                    quantity: 1,
                     condition: 'used_good',
                     status: 'available',
+                    sellerDescription: "En très bon état, quelques micro-rayures sur l'écran.",
+                    sellerPhotos: ['https://via.placeholder.com/150'],
                     createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
                 },
                 {
                     id: 'offer2',
                     productModel: { id: 'prod2', name: 'MacBook Air M1', imageUrl: 'https://via.placeholder.com/80/4CAF50/FFFFFF?Text=P2' },
                     price: 900,
+                    currency: 'EUR',
+                    quantity: 1,
                     condition: 'used_likenew',
                     status: 'sold',
+                    sellerDescription: "Comme neuf, utilisé pour quelques présentations.",
+                    sellerPhotos: ['https://via.placeholder.com/150'],
                     createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
                 },
                 {
                     id: 'offer3',
                     productModel: { id: 'prod3', name: 'Sony WH-1000XM4', imageUrl: 'https://via.placeholder.com/80/2196F3/FFFFFF?Text=P3' },
                     price: 250,
+                    currency: 'EUR',
+                    quantity: 3,
                     condition: 'used_fair',
                     status: 'pending_shipment',
+                    sellerPhotos: ['https://via.placeholder.com/150'],
                     createdAt: new Date().toISOString(),
                 },
                 {
                     id: 'offer4',
                     productModel: { id: 'prod4', name: 'Samsung Odyssey G7' }, // Pas d'image
                     price: 450,
+                    currency: 'EUR',
+                    quantity: 1,
                     condition: 'new',
                     status: 'available',
+                    sellerPhotos: ['https://via.placeholder.com/150'],
                     createdAt: new Date(Date.now() - 86400000 * 10).toISOString(),
                 },
             ]);

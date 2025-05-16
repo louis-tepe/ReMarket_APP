@@ -45,7 +45,9 @@ export default function SellPage() {
 
     const initialOfferDetails: OfferDetails = {
         price: '',
-        condition: 'used_good', // Valeur par défaut cohérente
+        quantity: '1',
+        currency: 'EUR',
+        condition: 'used_good',
         sellerDescription: '',
         photos: [],
         dynamicFields: {},
@@ -355,9 +357,12 @@ export default function SellPage() {
         const payload = {
             productModelId: selectedProductModel._id.toString(),
             price: parseFloat(offerDetails.price),
+            quantity: parseInt(offerDetails.quantity, 10) || 1,
+            currency: offerDetails.currency || 'EUR',
             condition: offerDetails.condition,
             sellerDescription: offerDetails.sellerDescription,
             sellerPhotos: [], // L'upload n'est pas géré, donc on envoie un tableau vide
+            dynamicFields: offerDetails.dynamicFields || {},
         };
         setIsLoadingSubmitOffer(true);
         try {
@@ -600,6 +605,21 @@ export default function SellPage() {
                                     onChange={handleOfferDetailsChange}
                                     placeholder="Ex: 450.00"
                                     required
+                                    className="bg-input"
+                                />
+                            </div>
+
+                            <div>
+                                <Label htmlFor="quantity">Quantité <span className="text-destructive">*</span></Label>
+                                <Input
+                                    id="quantity"
+                                    name="quantity"
+                                    type="number"
+                                    value={offerDetails.quantity}
+                                    onChange={handleOfferDetailsChange}
+                                    placeholder="Ex: 1"
+                                    required
+                                    min="1"
                                     className="bg-input"
                                 />
                             </div>

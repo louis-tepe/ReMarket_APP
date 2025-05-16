@@ -80,27 +80,29 @@ export async function GET(request: NextRequest) {
 
     let reMarketCategoryName: string | undefined = undefined;
     let reMarketBrandName: string | undefined = undefined;
+    let categoryDocForFilter: ICategory | null = null;
+    let brandDocForFilter: IBrand | null = null;
 
     if (categorySlug) {
-      const categoryDoc = (await CategoryModel.findOne({ slug: categorySlug }).lean()) as ICategory | null;
-      if (!categoryDoc) {
+      categoryDocForFilter = (await CategoryModel.findOne({ slug: categorySlug }).lean()) as ICategory | null;
+      if (!categoryDocForFilter) {
         return NextResponse.json({ message: `Catégorie ReMarket avec slug '${categorySlug}' non trouvée.` }, { status: 404 });
       }
-      reMarketCategoryName = categoryDoc.name;
+      reMarketCategoryName = categoryDocForFilter.name;
     }
 
     if (brandSlug) {
-      const brandDoc = (await BrandModel.findOne({ slug: brandSlug }).lean()) as IBrand | null;
-      if (!brandDoc) {
+      brandDocForFilter = (await BrandModel.findOne({ slug: brandSlug }).lean()) as IBrand | null;
+      if (!brandDocForFilter) {
         return NextResponse.json({ message: `Marque ReMarket avec slug '${brandSlug}' non trouvée.` }, { status: 404 });
       }
-      reMarketBrandName = brandDoc.name;
+      reMarketBrandName = brandDocForFilter.name;
     }
 
     // Le filtre productModelQueryFilters est déjà correctement défini pour status: 'approved'
     const productModelQueryFilters: ProductModelQueryFilters = {};
-    if (reMarketCategoryName) productModelQueryFilters.category = reMarketCategoryName;
-    if (reMarketBrandName) productModelQueryFilters.brand = reMarketBrandName;
+    if (categoryDocForFilter) productModelQueryFilters.category = categoryDocForFilter._id.toString();
+    if (brandDocForFilter) productModelQueryFilters.brand = brandDocForFilter._id.toString();
     
     if (searchTerm) {
       productModelQueryFilters.$text = { $search: searchTerm };
@@ -328,8 +330,8 @@ export async function POST(request: NextRequest) {
       try {
         productModel = new ProductModel({
           title: scrapedProductData.title,
-          brand: brandDoc.name, // Utiliser le nom de la marque ReMarket
-          category: categoryDoc.name, // Utiliser le nom de la catégorie ReMarket
+          brand: brandDoc._id, // Utiliser l'ID de la marque ReMarket
+          category: categoryDoc._id, // Utiliser l'ID de la catégorie ReMarket
           standardDescription: scrapedProductData.description || "Description non disponible.",
           standardImageUrls: scrapedProductData.imageUrls && scrapedProductData.imageUrls.length > 0 ? scrapedProductData.imageUrls : ['/placeholder-image.png'],
           keyFeatures: scrapedProductData.keyFeatures || [],

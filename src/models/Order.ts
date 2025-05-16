@@ -1,6 +1,6 @@
 import { Schema, model, models, Document, Types } from 'mongoose';
 import { IUser } from './User';
-import { ISellerProduct } from './SellerProduct';
+import { IOffer } from './OfferModel';
 
 export type OrderStatus = 
   | 'pending_payment' 
@@ -17,15 +17,15 @@ export type OrderStatus =
 export type PaymentStatus = 'pending' | 'succeeded' | 'failed';
 
 interface IOrderItem extends Document {
-  sellerProductId: Types.ObjectId | ISellerProduct;
+  offerId: Types.ObjectId | IOffer;
   quantity: number;
   priceAtPurchase: number; // Prix unitaire au moment de l'achat
 }
 
 const OrderItemSchema = new Schema<IOrderItem>({
-  sellerProductId: {
+  offerId: {
     type: Schema.Types.ObjectId,
-    ref: 'SellerProduct',
+    ref: 'Offer',
     required: true,
   },
   quantity: {

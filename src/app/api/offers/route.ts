@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from '@/lib/authOptions';
 import dbConnect from '@/lib/db.Connect';
-import SellerProduct, { ISellerProduct, SellerProductStatus } from '@/models/SellerProduct';
+import OfferModel, { IOffer } from '@/models/OfferModel';
 import ProductModel from '@/models/ProductModel';
 import mongoose from 'mongoose';
 import type { Session } from 'next-auth';
@@ -33,6 +33,7 @@ interface ExtendedSession extends Session {
  *               - price
  *               - condition
  *               - sellerPhotos
+ *               - quantity
  *             properties:
  *               productModelId:
  *                 type: string
@@ -42,6 +43,9 @@ interface ExtendedSession extends Session {
  *               condition:
  *                 type: string
  *                 enum: [new, used_likenew, used_good, used_fair]
+ *               quantity:
+ *                 type: number
+ *                 default: 1
  *               sellerDescription:
  *                 type: string
  *               sellerPhotos:
@@ -66,7 +70,7 @@ interface ExtendedSession extends Session {
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/ISellerProduct' # Référence à l'interface ISellerProduct
+ *               $ref: '#/components/schemas/IOffer' # Modifié
  *       400:
  *         description: Données d'entrée invalides ou produit modèle non trouvé/invalide.
  *       401:
@@ -84,27 +88,33 @@ interface ExtendedSession extends Session {
  *           type: object
  *         unit:
  *           type: string
- *     ISellerProduct:
+ *     IOffer: # Modifié
  *       type: object
  *       properties:
  *         _id:
  *           type: string
- *         scrapedProductId:
+ *         productModel:
  *           type: string
- *         sellerId:
+ *         seller:
  *           type: string
  *         price:
  *           type: number
- *         condition:
+ *         currency:
  *           type: string
  *         quantity:
  *           type: number
+ *         condition:
+ *           type: string
  *         sellerDescription:
  *           type: string
- *         sellerImages:
+ *         sellerPhotos:
  *           type: array
  *           items:
  *             type: string
+ *         dynamicFields: 
+ *           type: array
+ *           items: 
+ *             $ref: '#/components/schemas/IDynamicField'
  *         status:
  *           type: string
  *         createdAt:
@@ -128,17 +138,19 @@ export async function POST(request: NextRequest) {
 
     await dbConnect();
     const {
-      productModelId, // Doit être l'ID d'un ProductModel existant
+      productModelId, 
       price,
       condition,
+      quantity = 1, // Ajout de la quantité avec valeur par défaut
       sellerDescription,
       sellerPhotos, 
-      // quantity, // SellerProduct attend quantity, default 1
+      dynamicFields,
+      currency = 'EUR', // Ajout currency avec valeur par défaut
     } = body;
     console.log('[API /api/offers LOG] productModelId from body:', productModelId);
 
-    if (!productModelId || !mongoose.Types.ObjectId.isValid(productModelId) || price === undefined || !condition) {
-      return NextResponse.json({ message: 'Champs requis manquants ou invalides: productModelId, price, condition.' }, { status: 400 });
+    if (!productModelId || !mongoose.Types.ObjectId.isValid(productModelId) || price === undefined || !condition || !sellerPhotos || sellerPhotos.length === 0) {
+      return NextResponse.json({ message: 'Champs requis manquants ou invalides: productModelId, price, condition, sellerPhotos.' }, { status: 400 });
     }
 
     // Vérifier que le ProductModel existe
@@ -147,35 +159,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: `Modèle de produit ReMarket avec ID '${productModelId}' non trouvé.` }, { status: 404 });
     }
 
-    const quantity = body.quantity || 1;
-
-    // Adapter le type pour SellerProductCreationData
-    type SellerProductCreationData = {
-      productModelId: mongoose.Types.ObjectId; // Changé de scrapedProductId
-      sellerId: mongoose.Types.ObjectId;
-      price: number;
-      condition: string; 
-      quantity: number;
-      sellerDescription?: string;
-      sellerImages?: string[];
-      status: SellerProductStatus;
-    };
-
-    const newSellerProductData: SellerProductCreationData = {
-      productModelId: new mongoose.Types.ObjectId(productModelId), // Changé ici
-      sellerId: new mongoose.Types.ObjectId(userId),
+    // Pas besoin de SellerProductCreationData, on peut typer directement pour IOffer ou laisser Mongoose inferer
+    const newOfferData = {
+      productModel: new mongoose.Types.ObjectId(productModelId),
+      seller: new mongoose.Types.ObjectId(userId),
       price: parseFloat(price),
-      condition, 
-      quantity: parseInt(quantity.toString(), 10), // s'assurer que quantity est une chaine avant parseInt
+      condition,
+      quantity: parseInt(quantity.toString(), 10),
       sellerDescription: sellerDescription || undefined,
-      sellerImages: sellerPhotos || [], 
-      status: 'available', 
+      sellerPhotos: sellerPhotos || [], 
+      dynamicFields: dynamicFields || [],
+      status: 'available', // Statut par défaut pour une nouvelle offre
+      currency: currency,
     };
 
-    const createdSellerProduct: ISellerProduct = new SellerProduct(newSellerProductData);
-    await createdSellerProduct.save();
+    const createdOffer: IOffer = new OfferModel(newOfferData);
+    await createdOffer.save();
 
-    return NextResponse.json(createdSellerProduct, { status: 201 });
+    return NextResponse.json(createdOffer, { status: 201 });
 
   } catch (error: unknown) {
     console.error('[POST /api/offers]', error);

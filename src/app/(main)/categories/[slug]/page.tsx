@@ -1,5 +1,5 @@
 import { IScrapedProduct } from '@/models/ScrapedProduct';
-import { ISellerProduct } from '@/models/SellerProduct';
+import { IOffer } from '@/models/OfferModel';
 import Link from 'next/link';
 import ProductCard, { ProductCardProps } from '@/components/shared/ProductCard';
 import { AlertTriangle, Info } from 'lucide-react';
@@ -12,7 +12,7 @@ interface CategoryProductCardProps extends ProductCardProps {
 
 interface ProductFromApi extends IScrapedProduct { // Supposant que l'API retourne une structure basée sur IScrapedProduct
     _id: string;
-    sellerOffers?: ISellerProduct[];
+    sellerOffers?: IOffer[];
 }
 
 async function getCategoryProducts(slug: string): Promise<CategoryProductCardProps[]> {

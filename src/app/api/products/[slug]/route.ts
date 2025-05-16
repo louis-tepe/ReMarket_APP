@@ -7,11 +7,13 @@ import { NextRequest, NextResponse } from 'next/server';
 // Types simulés pour la réponse
 interface SimulatedSellerOffer {
     id: string;
-    sellerName: string; // Simplifié, normalement on aurait un ID vendeur et on populerait
+    seller: { id: string, name?: string };
     price: number;
-    condition: string;
+    currency: string;
+    quantity: number;
+    condition: 'new' | 'used_likenew' | 'used_good' | 'used_fair';
     sellerDescription?: string;
-    // photos?: string[]; // Photos spécifiques du vendeur pour cette offre
+    sellerPhotos?: string[];
 }
 
 interface SimulatedProductDetails {
@@ -49,17 +51,23 @@ const MOCK_PRODUCT_DATA: Record<string, SimulatedProductDetails> = {
         offers: [
             {
                 id: "offer_1a",
-                sellerName: "TechRevendeur75",
+                seller: { id: "seller_xyz", name: "TechRevendeur75" },
                 price: 750,
-                condition: "Comme neuf",
-                sellerDescription: "Très peu utilisé, aucune rayure. Batterie à 98%. Vendu avec boîte et chargeur d'origine."
+                currency: "EUR",
+                quantity: 1,
+                condition: "used_likenew",
+                sellerDescription: "Très peu utilisé, aucune rayure. Batterie à 98%. Vendu avec boîte et chargeur d'origine.",
+                sellerPhotos: ['/images/placeholders/offer1_1.jpg'],
             },
             {
                 id: "offer_1b",
-                sellerName: "MobileOccazParis",
+                seller: { id: "seller_abc", name: "MobileOccazParis" },
                 price: 690,
-                condition: "Bon état",
-                sellerDescription: "Quelques micro-rayures sur l'écran, invisibles écran allumé. Fonctionne parfaitement."
+                currency: "EUR",
+                quantity: 1,
+                condition: "used_good",
+                sellerDescription: "Quelques micro-rayures sur l'écran, invisibles écran allumé. Fonctionne parfaitement.",
+                sellerPhotos: ['/images/placeholders/offer1_2.jpg'],
             },
         ],
     },
@@ -83,10 +91,13 @@ const MOCK_PRODUCT_DATA: Record<string, SimulatedProductDetails> = {
         offers: [
             {
                 id: "offer_2a",
-                sellerName: "LaptopProIDF",
+                seller: { id: "seller_def", name: "LaptopProIDF" },
                 price: 1100,
-                condition: "Comme neuf",
-                sellerDescription: "Acheté il y a 3 mois, très peu servi. Sous garantie Apple encore 9 mois."
+                currency: "EUR",
+                quantity: 1,
+                condition: "used_likenew",
+                sellerDescription: "Acheté il y a 3 mois, très peu servi. Sous garantie Apple encore 9 mois.",
+                sellerPhotos: ['/images/placeholders/offer2_1.jpg'],
             },
         ],
     },

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db.Connect';
 import ScrapedProduct, { IScrapedProduct } from '@/models/ScrapedProduct';
-import SellerProduct, { ISellerProduct } from '@/models/SellerProduct';
+import OfferModel, { IOffer } from '@/models/OfferModel';
 import CategoryModel, { ICategory } from '@/models/CategoryModel'; // Import de ICategory
 
 interface ProductWithOffers extends IScrapedProduct {
-  sellerOffers: ISellerProduct[];
+  sellerOffers: IOffer[];
 }
 
 export async function GET(
@@ -54,12 +54,12 @@ export async function GET(
     // 3. Pour chaque produit officiel, récupérer les offres des vendeurs
     const productsWithOffers: ProductWithOffers[] = await Promise.all(
       officialProducts.map(async (officialProduct) => {
-        const sellerOffers = await SellerProduct.find({
-          scrapedProductId: officialProduct._id,
-          status: 'available', // On ne récupère que les offres disponibles
+        const sellerOffers = await OfferModel.find({
+          scrapedProduct: officialProduct._id,
+          status: 'available',
         })
-          .populate('sellerId', 'name email') // Populer des infos du vendeur si besoin
-          .lean() as unknown as ISellerProduct[];
+          .populate('seller', 'name email')
+          .lean() as unknown as IOffer[];
         
         // Assurer que officialProduct est bien un objet plain JS avant d'ajouter la propriété
         const plainOfficialProduct = JSON.parse(JSON.stringify(officialProduct));

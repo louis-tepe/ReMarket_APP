@@ -14,6 +14,7 @@ export interface IOffer extends Document {
   
   price: number; // Prix de vente fixé par le vendeur
   currency: string; // Ex: "EUR"
+  quantity: number; // Nombre d'unités disponibles pour cette offre
   
   condition: 'new' | 'used_likenew' | 'used_good' | 'used_fair'; // État de l'article du vendeur
   sellerDescription?: string; // Description spécifique du vendeur pour son article
@@ -72,6 +73,12 @@ const OfferSchema = new Schema<IOffer>(
       type: String,
       required: true,
       default: 'EUR',
+    },
+    quantity: {
+      type: Number,
+      required: [true, "La quantité est obligatoire."],
+      min: [1, "La quantité doit être d'au moins 1."],
+      default: 1,
     },
     condition: {
       type: String,

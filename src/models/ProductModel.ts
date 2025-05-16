@@ -11,8 +11,8 @@ interface IStandardSpecification {
 export interface IProductModel {
   _id: Types.ObjectId | string; // Ajouter _id explicitement pour les objets lean
   title: string; // Titre unique et standardisé pour le produit
-  brand: string; // Marque standardisée
-  category: string; // Catégorie standardisée (pourrait être un ID vers une collection de catégories)
+  brand: Types.ObjectId; // Modifié en Types.ObjectId
+  category: Types.ObjectId; // Modifié en Types.ObjectId
   
   standardDescription: string; // Description officielle et standardisée du produit
   standardImageUrls: string[]; // URLs des images officielles et standardisées
@@ -53,15 +53,15 @@ const ProductModelSchema = new Schema<IProductModel>(
       index: true,
     },
     brand: {
-      type: String,
+      type: Schema.Types.ObjectId,
+      ref: 'Brand', // Ajout de la référence à BrandModel
       required: [true, "La marque est obligatoire."],
-      trim: true,
       index: true,
     },
     category: {
-      type: String, // Pourrait être Schema.Types.ObjectId si référence à une collection CategoryModel
+      type: Schema.Types.ObjectId,
+      ref: 'Category', // Ajout de la référence à CategoryModel
       required: [true, "La catégorie est obligatoire."],
-      trim: true,
       index: true,
     },
     standardDescription: {
