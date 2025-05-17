@@ -21,7 +21,6 @@ export interface ProductModelReMarketSelectItem {
 
 export interface OfferDetails {
   price: string;
-  quantity: string;
   currency: string;
   condition: string;
   sellerDescription: string;

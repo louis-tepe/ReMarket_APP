@@ -10,7 +10,6 @@ interface SimulatedSellerOffer {
     seller: { id: string, name?: string };
     price: number;
     currency: string;
-    quantity: number;
     condition: 'new' | 'used_likenew' | 'used_good' | 'used_fair';
     sellerDescription?: string;
     sellerPhotos?: string[];
@@ -54,7 +53,6 @@ const MOCK_PRODUCT_DATA: Record<string, SimulatedProductDetails> = {
                 seller: { id: "seller_xyz", name: "TechRevendeur75" },
                 price: 750,
                 currency: "EUR",
-                quantity: 1,
                 condition: "used_likenew",
                 sellerDescription: "Très peu utilisé, aucune rayure. Batterie à 98%. Vendu avec boîte et chargeur d'origine.",
                 sellerPhotos: ['/images/placeholders/offer1_1.jpg'],
@@ -64,7 +62,6 @@ const MOCK_PRODUCT_DATA: Record<string, SimulatedProductDetails> = {
                 seller: { id: "seller_abc", name: "MobileOccazParis" },
                 price: 690,
                 currency: "EUR",
-                quantity: 1,
                 condition: "used_good",
                 sellerDescription: "Quelques micro-rayures sur l'écran, invisibles écran allumé. Fonctionne parfaitement.",
                 sellerPhotos: ['/images/placeholders/offer1_2.jpg'],
@@ -94,7 +91,6 @@ const MOCK_PRODUCT_DATA: Record<string, SimulatedProductDetails> = {
                 seller: { id: "seller_def", name: "LaptopProIDF" },
                 price: 1100,
                 currency: "EUR",
-                quantity: 1,
                 condition: "used_likenew",
                 sellerDescription: "Acheté il y a 3 mois, très peu servi. Sous garantie Apple encore 9 mois.",
                 sellerPhotos: ['/images/placeholders/offer2_1.jpg'],

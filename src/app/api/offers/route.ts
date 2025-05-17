@@ -33,7 +33,6 @@ interface ExtendedSession extends Session {
  *               - price
  *               - condition
  *               - sellerPhotos
- *               - quantity
  *             properties:
  *               productModelId:
  *                 type: string
@@ -43,9 +42,6 @@ interface ExtendedSession extends Session {
  *               condition:
  *                 type: string
  *                 enum: [new, used_likenew, used_good, used_fair]
- *               quantity:
- *                 type: number
- *                 default: 1
  *               sellerDescription:
  *                 type: string
  *               sellerPhotos:
@@ -141,7 +137,6 @@ export async function POST(request: NextRequest) {
       productModelId, 
       price,
       condition,
-      quantity = 1, // Ajout de la quantité avec valeur par défaut
       sellerDescription,
       sellerPhotos, 
       dynamicFields,
@@ -165,7 +160,6 @@ export async function POST(request: NextRequest) {
       seller: new mongoose.Types.ObjectId(userId),
       price: parseFloat(price),
       condition,
-      quantity: parseInt(quantity.toString(), 10),
       sellerDescription: sellerDescription || undefined,
       sellerPhotos: Array.isArray(sellerPhotos) ? sellerPhotos : [], 
       dynamicFields: Array.isArray(dynamicFields) ? dynamicFields : [],

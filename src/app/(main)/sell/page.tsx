@@ -23,12 +23,14 @@ import type {
     Specifications
 } from './types';
 import { Loader2, CheckCircle, ArrowRight, RefreshCcw, ArrowLeft } from 'lucide-react'; // Icônes pour les états
+import { useRouter } from 'next/navigation';
 
 const NOT_LISTED_ID = "---PRODUCT_NOT_LISTED---";
 
 export default function SellPage() {
     const [step, setStep] = useState(1);
     const { data: session, status: sessionStatus } = useSession();
+    const router = useRouter();
 
     const [categories, setCategories] = useState<Category[]>([]);
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -45,7 +47,6 @@ export default function SellPage() {
 
     const initialOfferDetails: OfferDetails = {
         price: '',
-        quantity: '1',
         currency: 'EUR',
         condition: 'used_good',
         sellerDescription: '',
@@ -357,7 +358,6 @@ export default function SellPage() {
         const payload = {
             productModelId: selectedProductModel._id.toString(),
             price: parseFloat(offerDetails.price),
-            quantity: parseInt(offerDetails.quantity, 10) || 1,
             currency: offerDetails.currency || 'EUR',
             condition: offerDetails.condition,
             sellerDescription: offerDetails.sellerDescription,
@@ -610,23 +610,8 @@ export default function SellPage() {
                             </div>
 
                             <div>
-                                <Label htmlFor="quantity">Quantité <span className="text-destructive">*</span></Label>
-                                <Input
-                                    id="quantity"
-                                    name="quantity"
-                                    type="number"
-                                    value={offerDetails.quantity}
-                                    onChange={handleOfferDetailsChange}
-                                    placeholder="Ex: 1"
-                                    required
-                                    min="1"
-                                    className="bg-input"
-                                />
-                            </div>
-
-                            <div>
                                 <Label htmlFor="condition">État de votre article <span className="text-destructive">*</span></Label>
-                                <Select name="condition" value={offerDetails.condition} onValueChange={handleConditionChange} required>
+                                <Select value={offerDetails.condition} onValueChange={(value) => handleOfferDetailsChange({ target: { name: 'condition', value } } as any)}>
                                     <SelectTrigger id="condition" className="bg-input">
                                         <SelectValue placeholder="Sélectionnez l'état" />
                                     </SelectTrigger>

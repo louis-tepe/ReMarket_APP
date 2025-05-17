@@ -18,7 +18,6 @@ export type PaymentStatus = 'pending' | 'succeeded' | 'failed';
 
 interface IOrderItem extends Document {
   offerId: Types.ObjectId | IOffer;
-  quantity: number;
   priceAtPurchase: number; // Prix unitaire au moment de l'achat
 }
 
@@ -27,11 +26,6 @@ const OrderItemSchema = new Schema<IOrderItem>({
     type: Schema.Types.ObjectId,
     ref: 'Offer',
     required: true,
-  },
-  quantity: {
-    type: Number,
-    required: true,
-    min: [1, "La quantité doit être d'au moins 1."],
   },
   priceAtPurchase: {
     type: Number,
