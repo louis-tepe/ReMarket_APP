@@ -2,24 +2,30 @@ import { Schema, model, models, Document, Types } from 'mongoose';
 
 // Interface pour les champs dynamiques spécifiques à la catégorie de l'offre
 interface IDynamicField {
-  label: string;
-  value: string | number | boolean;
-  unit?: string;
+  name: string; // Identifier for the field, maps to IFormFieldDefinition.name
+  label: string; // Display label, maps to IFormFieldDefinition.label
+  value: string | number | boolean | string[] | number[] | Date | undefined; // Seller-provided value
+  unit?: string; // Optional unit, maps to IFormFieldDefinition.unit
 }
 
 export interface IOffer extends Document {
   productModel: Types.ObjectId; // Référence au _id du ProductModel ReMarket pertinent
   scrapedProduct?: Types.ObjectId; // Optionnel: Référence au ScrapedProduct si l'offre est basée dessus avant création du ProductModel final
   seller: Types.ObjectId; // Référence au _id de l'Utilisateur (vendeur)
+  categories: Types.ObjectId[]; // Références aux _ids des Categories associées
   
   price: number; // Prix de vente fixé par le vendeur
   currency: string; // Ex: "EUR"
   
   condition: 'new' | 'used_likenew' | 'used_good' | 'used_fair'; // État de l'article du vendeur
-  sellerDescription?: string; // Description spécifique du vendeur pour son article
   sellerPhotos: string[]; // URLs des photos de l'article du vendeur
   
-  dynamicFields?: IDynamicField[]; // Champs additionnels basés sur la catégorie (ex: capacité batterie, kilométrage)
+  /**
+   * Champs additionnels basés sur la catégorie.
+   * Doivent correspondre aux `formFieldDefinitions` de la catégorie associée à cette offre qui a la `depth` la plus élevée.
+   * Le champ `name` de chaque IDynamicField doit correspondre au `name` du IFormFieldDefinition correspondant.
+   */
+  dynamicFields?: IDynamicField[];
   
   status: 'available' | 'reserved' | 'sold' | 'pending_shipment' | 'shipped' | 'delivered' | 'cancelled' | 'archived';
   
@@ -37,8 +43,9 @@ export interface IOffer extends Document {
 
 const DynamicFieldSchema = new Schema<IDynamicField>(
   {
+    name: { type: String, required: true },
     label: { type: String, required: true },
-    value: { type: Schema.Types.Mixed, required: true }, // Peut être string, number, boolean
+    value: { type: Schema.Types.Mixed, required: true },
     unit: { type: String },
   },
   { _id: false }
@@ -63,6 +70,12 @@ const OfferSchema = new Schema<IOffer>(
       required: true,
       index: true,
     },
+    categories: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'Category',
+      },
+    ],
     price: {
       type: Number,
       required: [true, "Le prix est obligatoire."],
@@ -77,11 +90,6 @@ const OfferSchema = new Schema<IOffer>(
       type: String,
       required: [true, "L\'état de l\'article est obligatoire."],
       enum: ['new', 'used_likenew', 'used_good', 'used_fair'],
-    },
-    sellerDescription: {
-      type: String,
-      trim: true,
-      maxLength: [1000, "La description ne peut pas dépasser 1000 caractères."],
     },
     sellerPhotos: [
       {

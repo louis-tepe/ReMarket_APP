@@ -1,10 +1,54 @@
-import { Schema, model, models, Document } from 'mongoose';
+import { Schema, model, models, Document, Types } from 'mongoose';
+import { IFormFieldDefinition, IFormFieldOption } from '../types/formFields';
+
+// Sub-schema for IFormFieldOption
+const FormFieldOptionSchema = new Schema<IFormFieldOption>(
+  {
+    value: { type: Schema.Types.Mixed, required: true }, // string or number
+    label: { type: String, required: true },
+  },
+  { _id: false } // No _id for subdocuments unless necessary
+);
+
+// Sub-schema for IFormFieldDefinition
+const FormFieldDefinitionSchema = new Schema<IFormFieldDefinition>(
+  {
+    name: { type: String, required: true },
+    label: { type: String, required: true },
+    type: {
+      type: String,
+      required: true,
+      enum: ['text', 'number', 'select', 'textarea', 'checkbox', 'radio', 'date', 'file', 'email', 'password', 'url'],
+    },
+    required: { type: Boolean, default: false },
+    placeholder: { type: String },
+    defaultValue: { type: Schema.Types.Mixed }, // string | number | boolean | string[] | undefined
+    options: [FormFieldOptionSchema], // Array of FormFieldOptionSchema
+    unit: { type: String },
+    minValue: { type: Number },
+    maxValue: { type: Number },
+    step: { type: Number },
+    minLength: { type: Number },
+    maxLength: { type: Number },
+    pattern: { type: String },
+    rows: { type: Number },
+    accept: { type: String },
+    multiple: { type: Boolean, default: false },
+    validationMessage: { type: String },
+    helperText: { type: String },
+    disabled: { type: Boolean, default: false },
+    readonly: { type: Boolean, default: false },
+  },
+  { _id: false } // No _id for subdocuments unless necessary
+);
 
 export interface ICategory extends Document {
   name: string; // Nom de la catégorie (ex: "Téléphones Mobiles")
   slug: string; // Slug unique pour l'URL et les IDs (ex: "telephones-mobiles")
   description?: string;
-  // parentCategory?: Types.ObjectId; // Pour des sous-catégories éventuelles
+  depth: number; // Profondeur de la catégorie dans la hiérarchie
+  parent?: Types.ObjectId; // Catégorie parente, requise si depth > 0
+  formFieldDefinitions?: IFormFieldDefinition[]; // Définitions des champs de formulaire spécifiques à la catégorie
   // iconUrl?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -31,7 +75,22 @@ const CategorySchema = new Schema<ICategory>(
       type: String,
       trim: true,
     },
-    // parentCategory: { type: Schema.Types.ObjectId, ref: 'Category' },
+    depth: {
+      type: Number,
+      required: [true, "La profondeur de la catégorie est obligatoire."],
+      min: [0, "La profondeur doit être un entier positif ou nul."]
+    },
+    parent: {
+      type: Schema.Types.ObjectId,
+      ref: 'Category',
+      validate: {
+        validator: function(this: ICategory, value: Types.ObjectId | undefined) {
+          return this.depth === 0 || (this.depth > 0 && value != null);
+        },
+        message: "Une catégorie parente est requise si la profondeur est supérieure à 0.",
+      }
+    },
+    formFieldDefinitions: [FormFieldDefinitionSchema],
     // iconUrl: { type: String },
   },
   {
