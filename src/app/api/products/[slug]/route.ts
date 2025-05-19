@@ -1,106 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db.Connect';
-import ProductModel from '@/models/ProductModel';
-import OfferModel from '@/models/OfferModel';
+import ProductModel, { IProductModel } from '@/models/ProductModel';
+import ProductOfferModel, { IProductBase } from '@/models/ProductBaseModel';
 import UserModel from '@/models/User';
 import { Types } from 'mongoose';
 // import SellerProduct, { ISellerProduct } from '@/models/SellerProduct';
 // import ScrapedProduct, { IScrapedProduct } from '@/models/ScrapedProduct';
 
-// Types simulés pour la réponse
-interface SimulatedSellerOffer {
-    id: string;
-    seller: { id: string, name?: string };
-    price: number;
-    currency: string;
-    condition: 'new' | 'used_likenew' | 'used_good' | 'used_fair';
-    sellerDescription?: string;
-    sellerPhotos?: string[];
-}
-
-interface SimulatedProductDetails {
-    id: string;
-    slug: string;
-    title: string;
-    brand: string;
-    category: string;
-    standardDescription: string;
-    standardImageUrls: string[];
-    keyFeatures?: string[];
-    specifications?: { label: string; value: string; unit?: string }[];
-    offers: SimulatedSellerOffer[];
-}
-
-// Données de simulation
-const MOCK_PRODUCT_DATA: Record<string, SimulatedProductDetails> = {
-    "iphone-13-pro-graphite-256go": {
-        id: "pm_iphone13pro",
-        slug: "iphone-13-pro-graphite-256go",
-        title: "iPhone 13 Pro 256Go - Graphite",
-        brand: "Apple",
-        category: "Téléphones Mobiles",
-        standardDescription: "L'iPhone 13 Pro. Le plus grand bond en avant du système photo Pro d'Apple. Écran Super Retina XDR avec ProMotion pour une réactivité inédite. Puce A15 Bionic surpuissante. Design en acier inoxydable chirurgical et Ceramic Shield, plus résistant que n'importe quel verre de smartphone.",
-        standardImageUrls: [
-            '/images/placeholders/iphone1.jpg', 
-            '/images/placeholders/iphone2.jpg',
-        ],
-        keyFeatures: ["Écran Super Retina XDR 6,1 pouces avec ProMotion", "Puce A15 Bionic", "Système photo pro 12 Mpx"],
-        specifications: [
-            { label: "Capacité", value: "256Go" },
-            { label: "Couleur", value: "Graphite" },
-            { label: "Écran", value: "6.1 pouces OLED" },
-        ],
-        offers: [
-            {
-                id: "offer_1a",
-                seller: { id: "seller_xyz", name: "TechRevendeur75" },
-                price: 750,
-                currency: "EUR",
-                condition: "used_likenew",
-                sellerDescription: "Très peu utilisé, aucune rayure. Batterie à 98%. Vendu avec boîte et chargeur d'origine.",
-                sellerPhotos: ['/images/placeholders/offer1_1.jpg'],
-            },
-            {
-                id: "offer_1b",
-                seller: { id: "seller_abc", name: "MobileOccazParis" },
-                price: 690,
-                currency: "EUR",
-                condition: "used_good",
-                sellerDescription: "Quelques micro-rayures sur l'écran, invisibles écran allumé. Fonctionne parfaitement.",
-                sellerPhotos: ['/images/placeholders/offer1_2.jpg'],
-            },
-        ],
-    },
-    "macbook-air-m2-minuit-512go": {
-        id: "pm_macbookairm2",
-        slug: "macbook-air-m2-minuit-512go",
-        title: "MacBook Air M2 13.6p 512Go - Minuit",
-        brand: "Apple",
-        category: "Ordinateurs Portables",
-        standardDescription: "Le MacBook Air repensé est plus portable que jamais et pèse à peine 1,24 kg. C'est l'ordinateur portable ultra-capable qui vous permet de travailler, de jouer ou de créer à peu près n'importe quoi, n'importe où.",
-        standardImageUrls: [
-            '/images/placeholders/macbook1.jpg',
-            '/images/placeholders/macbook2.jpg',
-        ],
-        keyFeatures: ["Puce Apple M2", "Écran Liquid Retina de 13,6 pouces", "Jusqu'à 18 heures d'autonomie"],
-        specifications: [
-            { label: "Capacité SSD", value: "512Go" },
-            { label: "Couleur", value: "Minuit" },
-            { label: "RAM", value: "8Go" },
-        ],
-        offers: [
-            {
-                id: "offer_2a",
-                seller: { id: "seller_def", name: "LaptopProIDF" },
-                price: 1100,
-                currency: "EUR",
-                condition: "used_likenew",
-                sellerDescription: "Acheté il y a 3 mois, très peu servi. Sous garantie Apple encore 9 mois.",
-                sellerPhotos: ['/images/placeholders/offer2_1.jpg'],
-            },
-        ],
-    },
-};
+// Les types simulés et MOCK_PRODUCT_DATA ont été supprimés car non utilisés.
 
 export async function GET(
     request: NextRequest,
@@ -119,17 +26,17 @@ export async function GET(
         }
 
         const productModel = await ProductModel.findOne(query)
-            .populate('brand', 'name')
-            .populate('category', 'name')
-            .lean();
+            .populate('brand', 'name slug')
+            .populate('category', 'name slug')
+            .lean() as IProductModel | null;
 
         if (!productModel) {
-            return NextResponse.json({ message: "Produit non trouvé" }, { status: 404 });
+            return NextResponse.json({ message: "Produit modèle non trouvé" }, { status: 404 });
         }
 
-        const offersFromDB = await OfferModel.find({ 
+        const offersFromDB = await ProductOfferModel.find({ 
             productModel: productModel._id, 
-            status: 'available' 
+            transactionStatus: 'available'
         })
         .populate({
             path: 'seller',
@@ -137,27 +44,36 @@ export async function GET(
             model: UserModel
         })
         .sort({ price: 1 })
-        .lean();
+        .lean() as IProductBase[];
 
         const productData = {
             id: productModel._id.toString(),
-            slug: productModel.slug,
+            slug: productModel.slug || productModel._id.toString(),
             title: productModel.title,
-            brand: (productModel.brand as any)?.name || 'Marque inconnue',
-            category: (productModel.category as any)?.name || 'Catégorie inconnue',
+            brand: {
+                name: (productModel.brand as any)?.name || 'Marque inconnue',
+                slug: (productModel.brand as any)?.slug || ''
+            },
+            category: {
+                name: (productModel.category as any)?.name || 'Catégorie inconnue',
+                slug: (productModel.category as any)?.slug || ''
+            },
             standardDescription: productModel.standardDescription || '',
             standardImageUrls: productModel.standardImageUrls || [],
             keyFeatures: productModel.keyFeatures || [],
             specifications: productModel.specifications || [],
             offers: offersFromDB.map(offer => ({
                 id: offer._id.toString(),
-                seller: { id: offer.seller?._id?.toString(), name: (offer.seller as any)?.name || (offer.seller as any)?.username || 'Vendeur ReMarket' },
+                seller: {
+                    id: (offer.seller as any)?._id?.toString(),
+                    name: (offer.seller as any)?.name || (offer.seller as any)?.username || 'Vendeur ReMarket'
+                },
                 price: offer.price,
                 currency: offer.currency,
-                quantity: (offer as any).quantity !== undefined ? (offer as any).quantity : 1,
+                stockQuantity: offer.stockQuantity,
                 condition: offer.condition,
-                sellerDescription: offer.sellerDescription || '',
-                sellerPhotos: offer.sellerPhotos || [],
+                description: offer.description,
+                images: offer.images,
             })),
         };
 

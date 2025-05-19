@@ -35,9 +35,9 @@ function mapMongooseTypeToFormType(instance: string, enumValues?: string[] | num
 
 export async function GET(
     request: Request,
-    { params }: { params: { categorySlug: string } }
+    context: { params: { categorySlug: string } }
 ) {
-    const categorySlug = params.categorySlug?.toLowerCase();
+    const categorySlug = context.params.categorySlug?.toLowerCase();
 
     if (!categorySlug) {
         return NextResponse.json({ success: false, message: "Slug de catégorie manquant." }, { status: 400 });

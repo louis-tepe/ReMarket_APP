@@ -254,9 +254,9 @@ export default function ProductPage({ params }: ProductPageProps) {
 
                 {/* Colonne Informations Produit et Offres */}
                 <div>
-                    <Badge variant="outline" className="mb-2">{product.category} {product.brand ? `> ${product.brand}` : ''}</Badge>
+                    <Badge variant="outline" className="mb-2">{product.category?.name} {product.brand?.name ? `> ${product.brand.name}` : ''}</Badge>
                     <h1 className="text-3xl lg:text-4xl font-bold mb-2">{product.title}</h1>
-                    <p className="text-lg text-muted-foreground mb-1">Par <span className="font-semibold text-foreground">{product.brand || 'Marque inconnue'}</span></p>
+                    <p className="text-lg text-muted-foreground mb-1">Par <span className="font-semibold text-foreground">{product.brand?.name || 'Marque inconnue'}</span></p>
                     {/* TODO: Afficher le nombre d'offres disponibles */}
                     <p className="text-sm text-primary mb-6">{product.offers.length} offre(s) disponible(s)</p>
 

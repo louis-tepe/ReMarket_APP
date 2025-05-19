@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { ICategory } from '@/models/CategoryModel';
 import { IBrand } from '@/models/BrandModel';
 import { IProductModel } from '@/models/ProductModel'; // Utilisation de IProductModel
-import { IOffer } from '@/models/OfferModel'; // Gardé pour la structure de ProductFromApi
+import { IProductBase as IOffer } from '@/models/ProductBaseModel'; // Modifié pour utiliser IProductBase
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Types } from 'mongoose';

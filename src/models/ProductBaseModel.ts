@@ -16,9 +16,7 @@ export interface IProductBase extends Document {
   stockQuantity: number; // Quantité en stock pour cette offre
   
   // Champs pour la gestion de l'annonce et le statut transactionnel
-  listingStatus: 'pending_approval' | 'active' | 'inactive' | 'rejected' | 'sold';
   transactionStatus?: 'available' | 'reserved' | 'pending_shipment' | 'shipped' | 'delivered' | 'cancelled' | 'sold';
-  rejectionReason?: string; // Raison du rejet si listingStatus est 'rejected'
   soldTo?: Types.ObjectId; // Référence à l'acheteur si vendu
   orderId?: Types.ObjectId; // Référence à la commande associée
 
@@ -85,22 +83,12 @@ const ProductBaseSchema = new Schema<IProductBase>(
       min: [0, "La quantité en stock ne peut être négative."],
       default: 1,
     },
-    listingStatus: {
-      type: String,
-      required: true,
-      enum: ['pending_approval', 'active', 'inactive', 'rejected', 'sold'],
-      default: 'pending_approval',
-      index: true,
-    },
     transactionStatus: {
         type: String,
         enum: ['available', 'reserved', 'pending_shipment', 'shipped', 'delivered', 'cancelled', 'sold'],
-        required: false, // Initialement non requis, devient 'available' si listingStatus passe à 'active'
+        required: false, 
+        default: 'available', // Mettre 'available' par défaut si listingStatus est supprimé
         index: true,
-    },
-    rejectionReason: {
-      type: String,
-      trim: true,
     },
     soldTo: { 
         type: Schema.Types.ObjectId, 
@@ -112,7 +100,6 @@ const ProductBaseSchema = new Schema<IProductBase>(
         ref: 'Order', // Assurez-vous que 'Order' est le nom de votre modèle de commande
         required: false 
     },
-    // L'ancien champ 'status' est remplacé par listingStatus et transactionStatus
   },
   {
     timestamps: true,
@@ -122,14 +109,9 @@ const ProductBaseSchema = new Schema<IProductBase>(
 );
 
 ProductBaseSchema.pre('save', function(next) {
-  if (this.isModified('listingStatus') && this.listingStatus === 'active') {
-    this.transactionStatus = 'available';
-  }
-  // Si l'offre est marquée comme vendue (via l'un ou l'autre statut)
-  if ( (this.isModified('listingStatus') && this.listingStatus === 'sold') || 
-       (this.isModified('transactionStatus') && this.transactionStatus === 'sold') ) {
-    this.listingStatus = 'sold'; // Assurer la cohérence
-    this.transactionStatus = 'sold'; // Assurer la cohérence
+  // Si l'offre est marquée comme vendue (via transactionStatus)
+  if (this.isModified('transactionStatus') && this.transactionStatus === 'sold') {
+    this.transactionStatus = 'sold'; // Assurer la cohérence (déjà fait par la condition, mais explicite)
     // Idéalement, d'autres logiques comme la décrémentation du stock du ProductModel pourraient avoir lieu ici ou via des événements
   }
   next();

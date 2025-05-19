@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db.Connect';
 import ProductModel, { IProductModel } from '@/models/ProductModel';
-import OfferModel, { IOffer } from '@/models/OfferModel';
+import ProductOfferModel, { IProductBase as IOffer } from '@/models/ProductBaseModel';
 import CategoryModel from '@/models/CategoryModel';
 import BrandModel from '@/models/BrandModel'; // Nécessaire si on filtre par marque
 import { Types } from 'mongoose';
@@ -17,6 +17,8 @@ export async function GET(request: NextRequest) {
   const brandSlugsQuery = searchParams.get('brandSlugs');
   const searchQuery = searchParams.get('search');
   
+  console.log('[API_PRODUCTS_GET] Received request with params:', { categorySlug, brandSlugsQuery, searchQuery });
+
   try {
     await dbConnect();
 
@@ -25,6 +27,7 @@ export async function GET(request: NextRequest) {
     // Recherche textuelle
     if (searchQuery) {
       query.$text = { $search: searchQuery };
+      console.log('[API_PRODUCTS_GET] Applied text search to query:', searchQuery);
     }
 
     // Filtre par catégorie
@@ -32,8 +35,9 @@ export async function GET(request: NextRequest) {
       const category = await CategoryModel.findOne({ slug: categorySlug.toLowerCase() }).lean();
       if (category) {
         query.category = category._id; // Filtrer par ObjectId de la catégorie
+        console.log('[API_PRODUCTS_GET] Applied category filter to query. Category ID:', category._id);
       } else {
-        // Catégorie non trouvée, retourner aucun produit pour ce filtre
+        console.log('[API_PRODUCTS_GET] Category slug not found, returning empty for category filter:', categorySlug);
         return NextResponse.json({ success: true, data: [] }, { status: 200 });
       }
     }
@@ -44,11 +48,14 @@ export async function GET(request: NextRequest) {
       const brands = await BrandModel.find({ slug: { $in: brandSlugs } }).select('_id').lean();
       if (brands.length > 0) {
         query.brand = { $in: brands.map(b => b._id) }; // Filtrer par ObjectId de la marque
+        console.log('[API_PRODUCTS_GET] Applied brand filter to query. Brand IDs:', brands.map(b => b._id));
       } else {
-        // Marques non trouvées, retourner aucun produit pour ce filtre
+        console.log('[API_PRODUCTS_GET] Brand slugs not found, returning empty for brand filter:', brandSlugsQuery);
         return NextResponse.json({ success: true, data: [] }, { status: 200 });
       }
     }
+
+    console.log('[API_PRODUCTS_GET] Final ProductModel query:', JSON.stringify(query));
 
     // Ajout d'un score de pertinence pour la recherche textuelle si searchQuery est utilisé
     let sortOptions: any = {};
@@ -61,7 +68,10 @@ export async function GET(request: NextRequest) {
       .lean()
       .exec()) as (IProductModel & { _id: string; score?: number })[];
 
+    console.log(`[API_PRODUCTS_GET] Found ${products.length} ProductModels matching query.`);
+
     if (!products.length) {
+      console.log('[API_PRODUCTS_GET] No ProductModels found, returning empty data.');
       return NextResponse.json(
         {
           success: true,
@@ -74,12 +84,15 @@ export async function GET(request: NextRequest) {
 
     const productsWithOffers: ProductWithOffers[] = await Promise.all(
       products.map(async (product) => {
-        const sellerOffers = await OfferModel.find({
-          productModel: product._id, // Assurez-vous que OfferModel référence productModel via productModelId (ou un nom similaire)
-          status: 'available',
+        console.log(`[API_PRODUCTS_GET] Processing ProductModel ID: ${product._id}, Title: ${product.title}`);
+        const sellerOffers = await ProductOfferModel.find({
+          productModel: product._id, 
+          transactionStatus: 'available'
         })
           .populate('seller', 'name email')
           .lean() as unknown as IOffer[];
+        
+        console.log(`[API_PRODUCTS_GET] Found ${sellerOffers.length} active/available offers for ProductModel ID: ${product._id}`);
         
         const plainProduct = JSON.parse(JSON.stringify(product));
 
@@ -89,6 +102,9 @@ export async function GET(request: NextRequest) {
         };
       })
     );
+    
+    const finalProductCount = productsWithOffers.filter(p => p.sellerOffers && p.sellerOffers.length > 0).length;
+    console.log(`[API_PRODUCTS_GET] Returning ${productsWithOffers.length} products, of which ${finalProductCount} have active/available offers.`);
 
     return NextResponse.json(
       { success: true, data: productsWithOffers },
