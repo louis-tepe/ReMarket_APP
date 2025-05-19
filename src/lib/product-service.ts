@@ -1,6 +1,6 @@
 import dbConnect from "@/lib/db.Connect";
 import ProductModel, { IProductModel } from "@/models/ProductModel";
-import OfferModel, { IOffer } from "@/models/OfferModel";
+import ProductOfferModel, { IProductBase } from "@/models/ProductBaseModel";
 import { ProductCardProps } from "@/components/shared/ProductCard";
 
 const FEATURED_PRODUCTS_LIMIT = 4;
@@ -16,12 +16,13 @@ export async function fetchFeaturedProductData(): Promise<ProductCardProps[]> {
 
   const productsForCardPromises = featuredProductModels.map(
     async (product: IProductModel) => {
-      const cheapestOffer: IOffer | null = await OfferModel.findOne({
+      const cheapestOffer: IProductBase | null = await ProductOfferModel.findOne({
         productModel: product._id,
-        status: "available",
+        listingStatus: "active",
+        transactionStatus: "available",
       })
         .sort({ price: 1 })
-        .lean<IOffer>();
+        .lean<IProductBase>();
 
       const slug = product.slug || product.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
 
@@ -38,10 +39,10 @@ export async function fetchFeaturedProductData(): Promise<ProductCardProps[]> {
   const productsForCard = await Promise.all(productsForCardPromises);
   
   const validProducts = productsForCard.filter(
-    (p): p is ProductCardProps => p.price !== null
+    (p): p is Omit<typeof p, 'price'> & { price: number } => p.price !== null
   );
 
   return validProducts.map(p => ({
     ...p,
-  }));
+  })) as ProductCardProps[];
 } 

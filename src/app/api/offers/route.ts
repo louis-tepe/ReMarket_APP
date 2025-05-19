@@ -2,16 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from '@/lib/authOptions';
 import dbConnect from '@/lib/db.Connect';
-import OfferModel, { IOffer } from '@/models/OfferModel';
+import ProductOfferModel from '@/models/ProductBaseModel';
+import CategoryModel from '@/models/CategoryModel';
 import ProductModel from '@/models/ProductModel';
-import mongoose from 'mongoose';
 import type { Session } from 'next-auth';
 
-// Définir SessionUserWithId si ce n'est pas déjà globalement défini
-// type SessionUserWithId = { id: string } & NonNullable<ReturnType<typeof getServerSession>["user"]>; // Précédente tentative
+// Importer les modèles discriminateurs pour s'assurer qu'ils sont enregistrés auprès de Mongoose
+import '@/models/discriminators/SmartphoneModel';
+import '@/models/discriminators/LaptopModel';
+// Ajoutez d'autres imports de discriminateurs ici au fur et à mesure de leur création
 
-interface ExtendedSession extends Session {
-  user?: Session['user'] & { id?: string | null };
+interface SessionWithId extends Session {
+  user?: Session['user'] & { id?: string };
 }
 
 /**
@@ -121,79 +123,83 @@ interface ExtendedSession extends Session {
  *           format: date-time
  */
 export async function POST(request: NextRequest) {
-  const session: ExtendedSession | null = await getServerSession(authOptions);
-
-  if (!session || !session.user || !session.user.id) {
-    return NextResponse.json({ message: 'Non autorisé. Veuillez vous connecter.' }, { status: 401 });
-  }
-  const userId = session.user.id;
-
   try {
-    const body = await request.json();
-    console.log('[API /api/offers LOG] Request body received:', JSON.stringify(body, null, 2));
-
     await dbConnect();
+    const session: SessionWithId | null = await getServerSession(authOptions);
+
+    if (!session || !session.user || !session.user.id) {
+      return NextResponse.json({ success: false, message: "Authentification requise." }, { status: 401 });
+    }
+    const userId = session.user.id;
+
+    const body = await request.json();
     const {
-      productModelId, 
+      productModelId,
       price,
       condition,
       sellerDescription,
-      sellerPhotos, 
-      dynamicFields,
-      currency = 'EUR', // Ajout currency avec valeur par défaut
+      images,
+      kind,
+      category,
+      stockQuantity,
+      ...specificFields
     } = body;
-    console.log('[API /api/offers LOG] productModelId from body:', productModelId);
 
-    if (!productModelId || !mongoose.Types.ObjectId.isValid(productModelId) || price === undefined || !condition /* || !sellerPhotos || sellerPhotos.length === 0 */) {
-      return NextResponse.json({ message: 'Champs requis manquants ou invalides: productModelId, price, condition.' }, { status: 400 });
+    if (!productModelId || price === undefined || !condition || !kind || !category) {
+      return NextResponse.json({ success: false, message: "Champs obligatoires manquants (productModelId, price, condition, kind, category)." }, { status: 400 });
     }
 
-    // Vérifier que le ProductModel existe
-    const existingProductModel = await ProductModel.findById(productModelId).populate('category');
-    if (!existingProductModel) {
-      return NextResponse.json({ message: `Modèle de produit ReMarket avec ID '${productModelId}' non trouvé.` }, { status: 404 });
+    const categoryDoc = await CategoryModel.findById(category);
+    if (!categoryDoc || !categoryDoc.isLeafNode) {
+      return NextResponse.json({ success: false, message: "La catégorie spécifiée n'est pas une catégorie feuille valide." }, { status: 400 });
     }
 
-    const offerCategories: mongoose.Types.ObjectId[] = [];
-    if (existingProductModel.category) {
-        // Assurer que category est un ObjectId ou un objet avec _id
-        const categoryObject = existingProductModel.category as any; // Peut être ICategory ou ObjectId
-        const categoryId = categoryObject._id ? new mongoose.Types.ObjectId(categoryObject._id) : new mongoose.Types.ObjectId(categoryObject.toString());
-        if (categoryId) {
-            offerCategories.push(categoryId);
-        }
+    if (categoryDoc.slug !== kind) {
+      return NextResponse.json({ success: false, message: `Incohérence entre le type de produit (kind: ${kind}) et le slug de la catégorie (${categoryDoc.slug}).` }, { status: 400 });
     }
 
-    // Pas besoin de SellerProductCreationData, on peut typer directement pour IOffer ou laisser Mongoose inferer
-    const newOfferData = {
-      productModel: new mongoose.Types.ObjectId(productModelId),
-      seller: new mongoose.Types.ObjectId(userId),
+    const productModelDoc = await ProductModel.findById(productModelId);
+    if (!productModelDoc) {
+      return NextResponse.json({ success: false, message: "La fiche produit ReMarket spécifiée n'existe pas." }, { status: 400 });
+    }
+
+    const OfferModelForKind = ProductOfferModel.discriminators?.[kind];
+
+    if (!OfferModelForKind) {
+      return NextResponse.json({ success: false, message: `Aucun modèle d'offre spécifique trouvé pour le type: ${kind}. Assurez-vous que le discriminateur est enregistré.` }, { status: 400 });
+    }
+
+    const offerData = {
+      productModel: productModelId,
+      category: category,
+      seller: userId,
       price: parseFloat(price),
       condition,
-      sellerDescription: sellerDescription || undefined,
-      sellerPhotos: Array.isArray(sellerPhotos) ? sellerPhotos : [], 
-      dynamicFields: Array.isArray(dynamicFields) ? dynamicFields : [],
-      status: 'available', // Statut par défaut pour une nouvelle offre
-      currency: currency,
-      categories: offerCategories,
+      description: sellerDescription,
+      images: images || [],
+      stockQuantity: stockQuantity !== undefined ? parseInt(String(stockQuantity), 10) : 1,
+      listingStatus: 'pending_approval',
+      kind,
+      ...specificFields,
     };
 
-    console.log("[API /api/offers] Données préparées pour la nouvelle offre:", JSON.stringify(newOfferData, null, 2)); // Log détaillé des données
+    const newOffer = new OfferModelForKind(offerData);
+    await newOffer.save();
 
-    const createdOffer: IOffer = new OfferModel(newOfferData);
-    await createdOffer.save();
+    return NextResponse.json({ success: true, message: "Offre créée avec succès!", offer: newOffer }, { status: 201 });
 
-    return NextResponse.json(createdOffer, { status: 201 });
+  } catch (error) {
+    console.error("Erreur API (POST /api/offers):", error);
+    const typedError = error as Error & { errors?: Record<string, { message: string }> };
+    const errorMessage = typedError.message || "Erreur inconnue du serveur.";
 
-  } catch (error: unknown) {
-    console.error('[POST /api/offers]', error);
-    if (error instanceof mongoose.Error.ValidationError) {
-        const messages = Object.values(error.errors).map(
-            (err: mongoose.Error.ValidatorError | mongoose.Error.CastError) => err.message
-        );
-        return NextResponse.json({ message: 'Erreur de validation.', errors: messages }, { status: 400 });
+    if (typedError.name === 'ValidationError' && typedError.errors) {
+      const validationMessages = Object.values(typedError.errors).map(err => err.message).join(', ');
+      return NextResponse.json({ success: false, message: `Erreur de validation: ${validationMessages}`, errors: typedError.errors }, { status: 400 });
     }
-    const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue.';
-    return NextResponse.json({ message: 'Erreur lors de la création de l\'offre.', error: errorMessage }, { status: 500 });
+    return NextResponse.json({ success: false, message: errorMessage }, { status: 500 });
   }
-} 
+}
+
+// TODO: Ajouter une méthode GET pour lister les offres si nécessaire (par exemple, pour un utilisateur)
+// export async function GET(request: Request) { ... } 

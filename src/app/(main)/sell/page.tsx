@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useState, ChangeEvent, FormEvent, useEffect, useCallback } from 'react';
+import { useState, ChangeEvent, FormEvent, useEffect } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,26 +14,58 @@ import type { IScrapedProduct } from '@/models/ScrapedProduct';
 import type { IProductModel as IProductModelReMarketType } from '@/models/ProductModel';
 import { useSession } from "next-auth/react";
 import type {
-    Brand,
     ProductModelReMarketSelectItem,
-    OfferDetails,
     DisplayableProductModel,
     AttributeItem,
     Specifications
 } from './types';
-import { ICategory } from '@/models/CategoryModel';
+import type { ICategory as BackendCategory } from '@/models/CategoryModel';
 import { IBrand } from '@/models/BrandModel';
 import { Loader2, CheckCircle, ArrowRight, RefreshCcw, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 const NOT_LISTED_ID = "---PRODUCT_NOT_LISTED---";
 
+interface FrontendCategory extends Omit<BackendCategory, '_id' | 'parent' | 'createdAt' | 'updatedAt'> {
+    _id: string;
+    name: string;
+    slug: string;
+    depth: number;
+    isLeafNode: boolean;
+    parent?: string;
+    createdAt?: string;
+    updatedAt?: string;
+}
+
 interface CategoryDropdownLevel {
     level: number;
     parentId: string | null;
-    options: ICategory[];
+    options: FrontendCategory[];
     selectedId: string | null;
     placeholder: string;
+}
+
+export interface FormFieldDefinition {
+    name: string;
+    label: string;
+    type: 'text' | 'number' | 'select' | 'textarea';
+    required: boolean;
+    placeholder?: string;
+    options?: Array<{ value: string; label: string }>;
+    min?: number;
+    max?: number;
+    minLength?: number;
+    maxLength?: number;
+    defaultValue?: string | number | boolean;
+}
+
+export interface OfferDetails {
+    price: string;
+    currency: 'EUR';
+    condition: 'new' | 'like-new' | 'good' | 'fair' | 'poor';
+    sellerDescription: string;
+    photos: File[];
+    stockQuantity: string;
 }
 
 export default function SellPage() {
@@ -41,9 +73,9 @@ export default function SellPage() {
     const { data: session, status: sessionStatus } = useSession();
     const router = useRouter();
 
-    const [allCategories, setAllCategories] = useState<ICategory[]>([]);
+    const [allCategories, setAllCategories] = useState<FrontendCategory[]>([]);
     const [categoryDropdowns, setCategoryDropdowns] = useState<CategoryDropdownLevel[]>([]);
-    const [finalSelectedLeafCategory, setFinalSelectedLeafCategory] = useState<ICategory | null>(null);
+    const [finalSelectedLeafCategory, setFinalSelectedLeafCategory] = useState<FrontendCategory | null>(null);
 
     const [brands, setBrands] = useState<IBrand[]>([]);
     const [selectedBrandId, setSelectedBrandId] = useState<string | null>(null);
@@ -56,12 +88,14 @@ export default function SellPage() {
     const initialOfferDetails: OfferDetails = {
         price: '',
         currency: 'EUR',
-        condition: 'used_good',
+        condition: 'good',
         sellerDescription: '',
         photos: [],
-        dynamicFields: {},
+        stockQuantity: '1',
     };
     const [offerDetails, setOfferDetails] = useState<OfferDetails>(initialOfferDetails);
+    const [categorySpecificFormFields, setCategorySpecificFormFields] = useState<FormFieldDefinition[]>([]);
+    const [offerSpecificFieldValues, setOfferSpecificFieldValues] = useState<Record<string, string | number | boolean | File | File[]>>({});
 
     const [isLoadingCategories, setIsLoadingCategories] = useState(false);
     const [isLoadingBrands, setIsLoadingBrands] = useState(false);
@@ -104,12 +138,12 @@ export default function SellPage() {
             })
             .then(data => {
                 if (data && data.success && Array.isArray(data.categories)) {
-                    setAllCategories(data.categories);
+                    setAllCategories(data.categories as FrontendCategory[]);
                     setCategoryDropdowns([
                         {
                             level: 0,
                             parentId: null,
-                            options: data.categories.filter((cat: ICategory) => cat.depth === 0),
+                            options: (data.categories as FrontendCategory[]).filter((cat: FrontendCategory) => cat.depth === 0),
                             selectedId: null,
                             placeholder: "Sélectionnez la catégorie principale"
                         }
@@ -129,7 +163,7 @@ export default function SellPage() {
     }, []);
 
     const handleCategoryLevelSelect = (level: number, categoryId: string) => {
-        const selectedCategory = allCategories.find(cat => cat._id.toString() === categoryId);
+        const selectedCategory = allCategories.find(cat => cat._id === categoryId);
 
         if (!selectedCategory) return;
 
@@ -146,11 +180,14 @@ export default function SellPage() {
         setProductModelsReMarketSelectItems([]);
         setSelectedProductModelReMarketId(null);
         setShowCreateByName(false);
+        setOfferSpecificFieldValues({});
+        setCategorySpecificFormFields([]);
 
         if (selectedCategory.isLeafNode) {
             setFinalSelectedLeafCategory(selectedCategory);
             setCategoryDropdowns(updatedDropdowns);
             toast.success(`Catégorie sélectionnée: ${selectedCategory.name}`);
+            fetchCategorySpecificFormFields(selectedCategory.slug);
         } else {
             const children = allCategories.filter(cat => cat.parent?.toString() === categoryId);
             if (children.length > 0) {
@@ -170,6 +207,50 @@ export default function SellPage() {
             }
         }
     };
+
+    const fetchCategorySpecificFormFields = async (categorySlug: string) => {
+        if (!categorySlug) return;
+        try {
+            const response = await fetch(`/api/categories/${categorySlug}/form`);
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || `Erreur ${response.status} lors du chargement du formulaire.`);
+            }
+            const formFieldsData = await response.json();
+            if (formFieldsData && formFieldsData.success && Array.isArray(formFieldsData.formFields)) {
+                setCategorySpecificFormFields(formFieldsData.formFields);
+                const initialSpecificValues: Record<string, string | number | boolean> = {};
+                formFieldsData.formFields.forEach((field: FormFieldDefinition) => {
+                    if (field.defaultValue !== undefined) {
+                        initialSpecificValues[field.name] = field.defaultValue;
+                    } else if (field.type === 'number') {
+                        initialSpecificValues[field.name] = '';
+                    } else {
+                        initialSpecificValues[field.name] = '';
+                    }
+                });
+                setOfferSpecificFieldValues(initialSpecificValues);
+
+            } else {
+                setCategorySpecificFormFields([]);
+                setOfferSpecificFieldValues({});
+                toast.error("Formulaire Dynamique", { description: formFieldsData.message || "Format de données de formulaire incorrect." });
+            }
+        } catch (error) {
+            setCategorySpecificFormFields([]);
+            setOfferSpecificFieldValues({});
+            const typedError = error as Error;
+            toast.error("Erreur Formulaire", { description: typedError.message || "Impossible de charger les champs du formulaire pour cette catégorie." });
+        }
+    };
+
+    useEffect(() => {
+        if (finalSelectedLeafCategory && finalSelectedLeafCategory.isLeafNode) {
+        } else {
+            setCategorySpecificFormFields([]);
+            setOfferSpecificFieldValues({});
+        }
+    }, [finalSelectedLeafCategory]);
 
     useEffect(() => {
         if (finalSelectedLeafCategory) {
@@ -215,18 +296,19 @@ export default function SellPage() {
                     if (!res.ok) throw new Error(`Erreur HTTP: ${res.status} - ${res.statusText}`);
                     return res.json();
                 })
-                .then((data: any[] | { success: boolean; productModels?: any[]; message?: string }) => {
+                .then((data: { success: boolean; productModels?: Array<{ _id?: string; id?: string; title?: string; name?: string; }>; message?: string } | Array<{ _id?: string; id?: string; title?: string; name?: string; }>) => {
                     let items: ProductModelReMarketSelectItem[] = [];
+                    const processPmData = (pmList: Array<{ _id?: string; id?: string; title?: string; name?: string; }>) => {
+                        return pmList.map(pm => ({
+                            id: pm._id || pm.id || '',
+                            name: pm.title || pm.name || 'Produit sans nom'
+                        })).filter(pm => pm.id);
+                    };
+
                     if (Array.isArray(data)) {
-                        items = data.map(pm => ({
-                            id: pm._id ? pm._id.toString() : (pm.id ? pm.id.toString() : ''),
-                            name: pm.title || pm.name || 'Produit sans nom'
-                        })).filter(pm => pm.id);
+                        items = processPmData(data);
                     } else if (data && data.success && Array.isArray(data.productModels)) {
-                        items = data.productModels.map(pm => ({
-                            id: pm._id ? pm._id.toString() : (pm.id ? pm.id.toString() : ''),
-                            name: pm.title || pm.name || 'Produit sans nom'
-                        })).filter(pm => pm.id);
+                        items = processPmData(data.productModels);
                     } else if (data && data.message) {
                         console.info("Message de l'API ProductModels:", data.message);
                     }
@@ -285,8 +367,9 @@ export default function SellPage() {
             const errorMessage = error instanceof Error ? error.message : "Impossible de charger les détails du produit.";
             toast.error("Erreur Chargement Produit", { description: errorMessage });
             setSelectedProductModelReMarketId(null);
+        } finally {
+            setIsLoadingFullProduct(false);
         }
-        setIsLoadingFullProduct(false);
     };
 
     const handleScrapeNewProductModel = async (e: FormEvent) => {
@@ -361,8 +444,14 @@ export default function SellPage() {
         setOfferDetails(prev => ({ ...prev, [e.target.name]: e.target.value }));
     };
 
+    const handleSpecificFieldChange = (name: string, value: string | number | boolean /*, type?: string */) => {
+        // const isCheckbox = type === 'checkbox';
+        // const processedValue = isCheckbox ? (e.target as HTMLInputElement).checked : value;
+        setOfferSpecificFieldValues(prev => ({ ...prev, [name]: value }));
+    };
+
     const handleConditionChange = (value: string) => {
-        setOfferDetails({ ...offerDetails, condition: value });
+        setOfferDetails({ ...offerDetails, condition: value as OfferDetails['condition'] });
     };
 
     const handlePhotoChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -391,7 +480,6 @@ export default function SellPage() {
         setIsLoadingSubmitOffer(true);
         let uploadedPhotoUrls: string[] = [];
 
-        // Étape 1: Uploader les photos si présentes
         if (offerDetails.photos && offerDetails.photos.length > 0) {
             const photoFormData = new FormData();
             for (const photo of offerDetails.photos) {
@@ -403,8 +491,6 @@ export default function SellPage() {
                 const uploadResponse = await fetch('/api/upload/images', {
                     method: 'POST',
                     body: photoFormData,
-                    // Note: Ne pas mettre de 'Content-Type': 'application/json' ici,
-                    // le navigateur le mettra automatiquement à 'multipart/form-data' avec la bonne boundary.
                 });
 
                 const uploadData = await uploadResponse.json();
@@ -417,22 +503,35 @@ export default function SellPage() {
                 const uploadErrorMessage = uploadError instanceof Error ? uploadError.message : "Erreur inconnue lors du téléversement.";
                 toast.error("Erreur Upload Photos", { description: uploadErrorMessage, id: "upload-toast" });
                 setIsLoadingSubmitOffer(false);
-                return; // Arrêter si l'upload échoue
+                return;
             }
         }
 
-        // Étape 2: Créer l'offre avec les URLs des photos (ou un tableau vide si aucune photo)
         const payload = {
             productModelId: selectedProductModel._id.toString(),
             price: parseFloat(offerDetails.price),
             currency: offerDetails.currency || 'EUR',
             condition: offerDetails.condition,
             sellerDescription: offerDetails.sellerDescription,
-            sellerPhotos: uploadedPhotoUrls, // Utiliser les URLs obtenues ou un tableau vide
-            dynamicFields: Array.isArray(offerDetails.dynamicFields) ? offerDetails.dynamicFields : [],
+            images: uploadedPhotoUrls,
+            stockQuantity: parseInt(offerDetails.stockQuantity, 10) || 1,
+            ...offerSpecificFieldValues,
+            kind: finalSelectedLeafCategory?.slug || '',
+            category: finalSelectedLeafCategory?._id || '',
         };
 
-        console.log("[SellPage] Payload de l'offre avant envoi API:", JSON.stringify(payload, null, 2)); // Log détaillé du payload
+        if (!payload.kind) {
+            toast.error("Erreur Catégorie", { description: "Le type de produit (kind/slug de catégorie) est manquant." });
+            setIsLoadingSubmitOffer(false);
+            return;
+        }
+        if (!payload.category) {
+            toast.error("Erreur Catégorie", { description: "L'ID de catégorie est manquant." });
+            setIsLoadingSubmitOffer(false);
+            return;
+        }
+
+        console.log("[SellPage] Payload de l'offre avant envoi API:", JSON.stringify(payload, null, 2));
 
         try {
             toast.info("Publication de l'offre...", { id: "offer-toast" });
@@ -460,8 +559,26 @@ export default function SellPage() {
     };
 
     const displayTitle = selectedProductModel?.title || 'N/A';
-    const displayBrand = selectedProductModel?.brand || 'N/A';
-    const displayCategory = finalSelectedLeafCategory?.name || selectedProductModel?.category || 'N/A';
+    
+    const getDisplayString = (value: string | number | null | undefined | { name?: string; title?: string; toString?: () => string; }) : string => {
+        if (value === null || value === undefined) return 'N/A';
+        if (typeof value === 'string') return value;
+        if (typeof value === 'number') return String(value);
+        if (typeof value === 'object') {
+            if (value.name && typeof value.name === 'string') return value.name;
+            if (value.title && typeof value.title === 'string') return value.title;
+        }
+        if (typeof value.toString === 'function') {
+            // Éviter d'appeler .toString() sur des objets simples comme {} qui donnerait "[object Object]"
+            // On le fait seulement si ce n'est pas un objet simple ou si les autres conditions n'ont pas marché
+            const strValue = value.toString();
+            if (strValue !== '[object Object]') return strValue;
+        } 
+        return 'N/A';
+    };
+
+    const displayBrand = selectedProductModel?.brand ? getDisplayString(selectedProductModel.brand) : 'N/A';
+    const displayCategory = finalSelectedLeafCategory?.name || (selectedProductModel?.category ? getDisplayString(selectedProductModel.category) : 'N/A');
     const displayAsin = selectedProductModel && 'asin' in selectedProductModel ? (selectedProductModel as IScrapedProduct).asin : undefined;
     let displayStandardDescription: string | undefined = 'N/A';
     if (selectedProductModel) {
@@ -487,7 +604,11 @@ export default function SellPage() {
             if ('specifications' in selectedProductModel && Array.isArray((selectedProductModel as IProductModelReMarketType).specifications)) {
                 displayAttributes = (selectedProductModel as IProductModelReMarketType).specifications;
             } else if ('attributes' in selectedProductModel && Array.isArray((selectedProductModel as IScrapedProduct).attributes)) {
-                displayAttributes = (selectedProductModel as IScrapedProduct).attributes.map(attr => ({ label: attr.label, value: attr.value, unit: attr.unit }));
+                displayAttributes = (selectedProductModel as IScrapedProduct).attributes.map(attr => ({ 
+                    label: attr.label, 
+                    value: attr.value, 
+                    unit: attr.unit || undefined
+                }));
             }
         }
         return { displayAttributes };
@@ -495,9 +616,10 @@ export default function SellPage() {
     const { displayAttributes } = prepareDisplayData();
     const conditionOptions = [
         { value: "new", label: "Neuf (jamais utilisé, emballage d'origine)" },
-        { value: "used_likenew", label: "Comme neuf (utilisé quelques fois, aucune trace)" },
-        { value: "used_good", label: "Bon état (traces d'usure légères)" },
-        { value: "used_fair", label: "État correct (traces d'usure visibles, fonctionnel)" },
+        { value: "like-new", label: "Comme neuf (utilisé quelques fois, aucune trace)" },
+        { value: "good", label: "Bon état (traces d'usure légères)" },
+        { value: "fair", label: "État correct (traces d'usure visibles, fonctionnel)" },
+        { value: "poor", label: "Mauvais état (endommagé mais peut-être fonctionnel/pour pièces)"}
     ];
 
     const renderCategoryDropdowns = () => {
@@ -516,8 +638,8 @@ export default function SellPage() {
                         {dropdown.options.length > 0 ? (
                             dropdown.options.map(cat => (
                                 <SelectItem
-                                    key={cat._id.toString()}
-                                    value={cat._id.toString()}
+                                    key={cat._id}
+                                    value={cat._id}
                                 >
                                     {cat.name}
                                 </SelectItem>
@@ -679,10 +801,92 @@ export default function SellPage() {
                                 </Select>
                             </div>
                             <div>
+                                <Label htmlFor="stockQuantity">Quantité en stock <span className="text-destructive">*</span></Label>
+                                <Input id="stockQuantity" name="stockQuantity" type="number" value={offerDetails.stockQuantity} onChange={handleOfferDetailsChange} placeholder="Ex: 1" required min="1" className="bg-input" />
+                            </div>
+                            <div>
                                 <Label htmlFor="sellerDescription">Description de votre offre (optionnel)</Label>
                                 <Textarea id="sellerDescription" name="sellerDescription" value={offerDetails.sellerDescription} onChange={handleOfferDetailsChange} placeholder="Ex: Vendu avec boîte d&apos;origine..." rows={4} className="bg-input" />
                                 <p className="text-xs text-muted-foreground mt-1">Soyez précis pour éviter les surprises !</p>
                             </div>
+
+                            {categorySpecificFormFields.length > 0 && (
+                                <Card className="bg-muted/40 p-4 border-dashed">
+                                    <CardHeader className="p-0 mb-3">
+                                        <CardTitle className="text-md">Détails spécifiques à "{finalSelectedLeafCategory?.name}"</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-0 space-y-4">
+                                        {categorySpecificFormFields.map(field => (
+                                            <div key={field.name}>
+                                                <Label htmlFor={field.name}>
+                                                    {field.label}
+                                                    {field.required && <span className="text-destructive">*</span>}
+                                                </Label>
+                                                {field.type === 'text' && (
+                                                    <Input
+                                                        id={field.name}
+                                                        name={field.name}
+                                                        type="text"
+                                                        value={String(offerSpecificFieldValues[field.name] || '')}
+                                                        onChange={(e) => handleSpecificFieldChange(field.name, e.target.value)}
+                                                        placeholder={field.placeholder}
+                                                        required={field.required}
+                                                        minLength={field.minLength}
+                                                        maxLength={field.maxLength}
+                                                        className="bg-input"
+                                                    />
+                                                )}
+                                                {field.type === 'number' && (
+                                                    <Input
+                                                        id={field.name}
+                                                        name={field.name}
+                                                        type="number"
+                                                        value={String(offerSpecificFieldValues[field.name] || '')}
+                                                        onChange={(e) => handleSpecificFieldChange(field.name, e.target.value)}
+                                                        placeholder={field.placeholder}
+                                                        required={field.required}
+                                                        min={field.min}
+                                                        max={field.max}
+                                                        className="bg-input"
+                                                    />
+                                                )}
+                                                {field.type === 'textarea' && (
+                                                    <Textarea
+                                                        id={field.name}
+                                                        name={field.name}
+                                                        value={String(offerSpecificFieldValues[field.name] || '')}
+                                                        onChange={(e) => handleSpecificFieldChange(field.name, e.target.value)}
+                                                        placeholder={field.placeholder}
+                                                        required={field.required}
+                                                        minLength={field.minLength}
+                                                        maxLength={field.maxLength}
+                                                        rows={3}
+                                                        className="bg-input"
+                                                    />
+                                                )}
+                                                {field.type === 'select' && field.options && (
+                                                    <Select
+                                                        name={field.name}
+                                                        value={String(offerSpecificFieldValues[field.name] || '')}
+                                                        onValueChange={(value) => handleSpecificFieldChange(field.name, value)}
+                                                        required={field.required}
+                                                    >
+                                                        <SelectTrigger id={field.name} className="bg-input">
+                                                            <SelectValue placeholder={field.placeholder || 'Sélectionnez...'} />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {field.options.map(opt => (
+                                                                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </CardContent>
+                                </Card>
+                            )}
+
                             <Card className="bg-muted/30 p-4">
                                 <CardHeader className="p-0 mb-2"><CardTitle className="text-base">Rappel du produit ReMarket</CardTitle></CardHeader>
                                 <CardContent className="p-0 flex flex-col sm:flex-row gap-4 items-start">

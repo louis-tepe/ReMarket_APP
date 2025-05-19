@@ -26,12 +26,17 @@ export interface OfferDetails {
   condition: string;
   sellerDescription: string;
   photos: File[];
-  dynamicFields?: Record<string, string | number | boolean>;
 }
 
 export type DisplayableProductModel =
   (IProductModelReMarketType & { _id: string; /* status?: string */ }) |
   (IScrapedProduct & { _id: string });
+
+export interface ScrapedProductAttribute {
+  label: string;
+  value: string;
+  unit?: string;
+}
 
 export interface AttributeItem {
   label: string;

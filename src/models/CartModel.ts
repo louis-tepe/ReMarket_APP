@@ -1,6 +1,7 @@
 import { Schema, model, models, Document, Types } from 'mongoose';
 
 interface ICartItem extends Document {
+  _id: Types.ObjectId; // Ajout explicite de l'identifiant unique de l'item
   offer: Types.ObjectId; // Référence à OfferModel
   quantity: number;
   productModel: Types.ObjectId; // Référence à ProductModel (pour faciliter l'affichage du produit dans le panier)
@@ -90,9 +91,8 @@ CartSchema.methods.addItem = async function ({ offerId, productModelId, quantity
 CartSchema.methods.removeItem = async function (cartItemId: string | Types.ObjectId) {
   const cart = this as ICart;
   const cartItemIdAsObject = typeof cartItemId === 'string' ? new Types.ObjectId(cartItemId) : cartItemId;
-  
   cart.items = cart.items.filter(
-    (item) => !item._id.equals(cartItemIdAsObject)
+    (item: ICartItem) => !item._id.equals(cartItemIdAsObject)
   );
   await cart.save();
   return cart;
