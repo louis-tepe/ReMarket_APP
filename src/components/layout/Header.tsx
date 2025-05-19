@@ -16,17 +16,19 @@ import {
 import { UserCircle, LayoutDashboard, Settings, Heart, LogIn, LogOut, Search, ShoppingCart } from "lucide-react";
 import Image from "next/image";
 
-// Interface pour la structure d'une catégorie (doit correspondre à ce que l'API retourne)
-interface Category {
-    _id: string; // ou id si l'API le transforme
+// Interface pour la structure d'une catégorie
+interface CategoryFromAPI {
+    _id: string;
     name: string;
     slug: string;
-    // Ajoutez d'autres champs si nécessaire, par ex. iconUrl
+    depth: number;
+    isLeafNode: boolean;
+    // Ajoutez d'autres champs si l'API les retourne et qu'ils sont utiles ici
 }
 
 export default function Header() {
     const { data: session, status } = useSession();
-    const [categories, setCategories] = useState<Category[]>([]);
+    const [categories, setCategories] = useState<CategoryFromAPI[]>([]);
     const [isLoadingCategories, setIsLoadingCategories] = useState(true);
     const [errorCategories, setErrorCategories] = useState<string | null>(null);
 
@@ -35,15 +37,24 @@ export default function Header() {
             setIsLoadingCategories(true);
             setErrorCategories(null);
             try {
-                const response = await fetch("/api/categories");
+                // Récupérer uniquement les catégories de niveau 0
+                const response = await fetch("/api/categories?depth=0");
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ message: "Erreur lors de la récupération des catégories" }));
-                    throw new Error(errorData.message);
+                    throw new Error(errorData.message || "Erreur inconnue du serveur");
                 }
                 const data = await response.json();
-                setCategories(data.categories || []);
+                if (data.success && Array.isArray(data.categories)) {
+                    setCategories(data.categories);
+                } else {
+                    console.warn("Réponse API inattendue pour les catégories:", data);
+                    setCategories([]);
+                    if (!data.success) {
+                        setErrorCategories(data.message || "Format de réponse incorrect pour les catégories.");
+                    }
+                }
             } catch (err) {
-                setErrorCategories(err instanceof Error ? err.message : "Une erreur inconnue est survenue");
+                setErrorCategories(err instanceof Error ? err.message : "Une erreur inconnue est survenue lors du chargement des catégories.");
                 console.error("Failed to fetch categories:", err);
                 setCategories([]);
             } finally {
@@ -68,12 +79,13 @@ export default function Header() {
                             <Skeleton className="h-5 w-28" />
                         </>
                     )}
-                    {errorCategories && <p className="text-destructive text-sm">{errorCategories}</p>}
+                    {errorCategories && <p className="text-destructive text-sm">Erreur catégories: {errorCategories}</p>}
                     {!isLoadingCategories && !errorCategories && categories.length === 0 && (
-                        <p className="text-sm text-muted-foreground">Aucune catégorie.</p>
+                        <p className="text-sm text-muted-foreground">Aucune catégorie principale.</p>
                     )}
                     {!isLoadingCategories && !errorCategories && categories.length > 0 &&
-                        categories.slice(0, 4).map((category) => (
+                        // Afficher toutes les catégories de niveau 0 récupérées
+                        categories.map((category) => (
                             <Link
                                 key={category._id}
                                 href={`/categories/${category.slug}`}
@@ -82,20 +94,17 @@ export default function Header() {
                                 {category.name}
                             </Link>
                         ))}
-                    {/* TODO: Ajouter un lien "Plus de catégories" si > 4 cats */}
                 </div>
 
                 <div className="flex items-center space-x-3 sm:space-x-4">
-                    {/* TODO: Bouton Recherche et Panier à styliser/intégrer correctement */}
                     <Button variant="ghost" size="icon" asChild>
                         <Link href="/search" aria-label="Rechercher">
                             <Search className="h-5 w-5" />
                         </Link>
                     </Button>
                     <Button variant="ghost" size="icon" asChild>
-                        <Link href="/cart" aria-label="Panier"> {/* TODO: Créer la page /cart */}
+                        <Link href="/cart" aria-label="Panier">
                             <ShoppingCart className="h-5 w-5" />
-                            {/* TODO: Badge avec nombre d'articles dans le panier */}
                         </Link>
                     </Button>
 
@@ -126,7 +135,6 @@ export default function Header() {
                                     ) : (
                                         <UserCircle className="h-7 w-7 text-muted-foreground" />
                                     )}
-                                    {/* <ChevronDown className="h-4 w-4 text-muted-foreground ml-1" /> */}
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-56">
@@ -142,13 +150,13 @@ export default function Header() {
                                     </Link>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem asChild>
-                                    <Link href="/favorites"> {/* TODO: Créer la page /favorites */}
+                                    <Link href="/favorites">
                                         <Heart className="mr-2 h-4 w-4" />
                                         Mes Favoris
                                     </Link>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem asChild>
-                                    <Link href="/settings"> {/* TODO: Créer la page /settings */}
+                                    <Link href="/settings">
                                         <Settings className="mr-2 h-4 w-4" />
                                         Paramètres du compte
                                     </Link>

@@ -153,12 +153,15 @@ export default function SellPage() {
                     if (!res.ok) throw new Error(`Erreur HTTP: ${res.status} - ${res.statusText}`);
                     return res.json();
                 })
-                .then((data: ProductModelReMarketSelectItem[] | { message: string }) => {
+                .then((data: any[] | { message: string }) => {
                     let items: ProductModelReMarketSelectItem[] = [];
                     if (Array.isArray(data)) {
-                        items = data;
+                        items = data.map(pm => ({
+                            id: pm._id ? pm._id.toString() : (pm.id ? pm.id.toString() : ''),
+                            name: pm.title || pm.name || 'Produit sans nom'
+                        })).filter(pm => pm.id);
                     } else if (data && (data as { message: string }).message) {
-                        // Ce cas est géré par l'ajout de "Non listé" ci-dessous
+                        console.info("Message de l'API ProductModels:", (data as { message: string }).message);
                     }
                     const notListedOption: ProductModelReMarketSelectItem = {
                         id: NOT_LISTED_ID,
@@ -481,7 +484,13 @@ export default function SellPage() {
                                 <SelectContent>
                                     {categories.length > 0 ? (
                                         categories.map(cat => (
-                                            <SelectItem key={cat._id} value={cat._id}>{cat.name}</SelectItem>
+                                            <SelectItem
+                                                key={cat._id}
+                                                value={cat._id}
+                                                disabled={!cat.isLeafNode}
+                                            >
+                                                {cat.name}{!cat.isLeafNode ? " (Sélectionnez une sous-catégorie)" : ""}
+                                            </SelectItem>
                                         ))
                                     ) : (
                                         <SelectItem value="no-cat" disabled>{isLoadingCategories ? "Chargement..." : "Aucune catégorie"}</SelectItem>

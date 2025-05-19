@@ -49,6 +49,7 @@ export interface ICategory extends Document {
   depth: number; // Profondeur de la catégorie dans la hiérarchie
   parent?: Types.ObjectId; // Catégorie parente, requise si depth > 0
   formFieldDefinitions?: IFormFieldDefinition[]; // Définitions des champs de formulaire spécifiques à la catégorie
+  isLeafNode: boolean; // Indique si la catégorie est un nœud terminal (pas d'enfants)
   // iconUrl?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -78,7 +79,7 @@ const CategorySchema = new Schema<ICategory>(
     depth: {
       type: Number,
       required: [true, "La profondeur de la catégorie est obligatoire."],
-      min: [0, "La profondeur doit être un entier positif ou nul."]
+      min: [0, "La profondeur doit être un entier positif ou nul"]
     },
     parent: {
       type: Schema.Types.ObjectId,
@@ -91,6 +92,11 @@ const CategorySchema = new Schema<ICategory>(
       }
     },
     formFieldDefinitions: [FormFieldDefinitionSchema],
+    isLeafNode: {
+      type: Boolean,
+      default: true, // Par défaut, une nouvelle catégorie est considérée comme une feuille
+      required: true,
+    },
     // iconUrl: { type: String },
   },
   {

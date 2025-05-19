@@ -1,38 +1,27 @@
 {
   "requestsFinished": 1,
   "requestsFailed": 0,
-  "requestsRetries": 1,
+  "requestsRetries": 0,
   "requestsFailedPerMinute": 0,
-  "requestsFinishedPerMinute": 17,
-  "requestMinDurationMillis": 3034,
-  "requestMaxDurationMillis": 3034,
+  "requestsFinishedPerMinute": 21,
+  "requestMinDurationMillis": 2701,
+  "requestMaxDurationMillis": 2701,
   "requestTotalFailedDurationMillis": 0,
-  "requestTotalFinishedDurationMillis": 3034,
-  "crawlerStartedAt": "2025-05-16T12:56:39.338Z",
-  "crawlerFinishedAt": "2025-05-16T12:56:42.866Z",
-  "statsPersistedAt": "2025-05-16T12:56:42.866Z",
-  "crawlerRuntimeMillis": 3541,
-  "crawlerLastStartTimestamp": 1747400199325,
+  "requestTotalFinishedDurationMillis": 2701,
+  "crawlerStartedAt": "2025-05-18T13:16:37.749Z",
+  "crawlerFinishedAt": "2025-05-18T13:16:40.582Z",
+  "statsPersistedAt": "2025-05-18T13:16:40.582Z",
+  "crawlerRuntimeMillis": 2913,
+  "crawlerLastStartTimestamp": 1747574197669,
   "requestRetryHistogram": [
-    null,
     1
   ],
   "statsId": 1,
   "requestAvgFailedDurationMillis": null,
-  "requestAvgFinishedDurationMillis": 3034,
-  "requestTotalDurationMillis": 3034,
+  "requestAvgFinishedDurationMillis": 2701,
+  "requestTotalDurationMillis": 2701,
   "requestsTotal": 1,
   "requestsWithStatusCode": {},
   "errors": {},
-  "retryErrors": {
-    "rsc": {
-      "missing error code": {
-        "Error": {
-          "CAPTCHA detected on page: https://www.amazon.com/SAMSUNG-Smartphone-Unlocked-Brightest-Processor/dp/B0B496PPTG/ref=sr_1_1?dib=eyJ2IjoiMSJ9.bdLjAci4DD6a1zxcCQjtrMYaSqSqCTcBkUhWGjbE9I4wM8izgDWwu8rbD8FOJ5LNnX09zffSfvZyE8dtGQs08b9Pbn_EE6fD0HhsLHjpCkPdibdArT7Yp7ZwvV7x-7nF-8q6h5WOVPk_3hkJ8HoWbwLCoB1ZKEoJV9LcJvXFpJy8HCCZO2DM7WXAlQwiTHAifmizPFA9VMPy5xs88Umtrx0QmC9CEDaXZs4B20zzsTM.xb0tEPlBk2e3dBHUc4H-0OCRNeObx6EOW2CKboO3uaI&dib_tag=se&keywords=Samsung+s22&qid=1747400198&sr=8-1": {
-            "count": 1
-          }
-        }
-      }
-    }
-  }
+  "retryErrors": {}
 }

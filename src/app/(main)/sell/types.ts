@@ -5,6 +5,7 @@ export interface Category {
   _id: string;
   name: string;
   slug: string;
+  isLeafNode: boolean;
 }
 
 export interface Brand {

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-// import dbConnect from '@/lib/db.Connect';
-// import ProductModel, { IProductModel } from '@/models/ProductModel';
+import dbConnect from '@/lib/db.Connect';
+import ProductModel from '@/models/ProductModel';
+import OfferModel from '@/models/OfferModel';
+import UserModel from '@/models/User';
 // import SellerProduct, { ISellerProduct } from '@/models/SellerProduct';
 // import ScrapedProduct, { IScrapedProduct } from '@/models/ScrapedProduct';
 
@@ -101,29 +103,60 @@ const MOCK_PRODUCT_DATA: Record<string, SimulatedProductDetails> = {
 
 export async function GET(
     request: NextRequest,
-    { params: incomingParams }: { params: { slug: string } }
+    { params }: { params: Promise<{ slug: string }> }
 ) {
-    const params = await incomingParams;
-    const { slug } = params;
-
-    // await dbConnect(); // En commentaire pour la simulation
+    await dbConnect();
+    const resolvedParams = await params;
+    const slug = resolvedParams.slug;
 
     try {
-        // Simulation: trouver le produit par slug dans les données mockées
-        const productData = MOCK_PRODUCT_DATA[slug];
+        const productModel = await ProductModel.findOne({ slug: slug })
+            .populate('brand', 'name')
+            .populate('category', 'name')
+            .lean();
 
-        if (!productData) {
-            return NextResponse.json({ message: 'Produit non trouvé.' }, { status: 404 });
+        if (!productModel) {
+            return NextResponse.json({ message: "Produit non trouvé" }, { status: 404 });
         }
 
-        // Dans un cas réel, ici on chercherait le ProductModel (ou ScrapedProduct)
-        // puis les SellerProduct associés.
+        const offersFromDB = await OfferModel.find({ 
+            productModel: productModel._id, 
+            status: 'available' 
+        })
+        .populate({
+            path: 'seller',
+            select: 'name username _id',
+            model: UserModel
+        })
+        .sort({ price: 1 })
+        .lean();
 
-        return NextResponse.json(productData, { status: 200 });
+        const productData = {
+            id: productModel._id.toString(),
+            slug: productModel.slug,
+            title: productModel.title,
+            brand: (productModel.brand as any)?.name || 'Marque inconnue',
+            category: (productModel.category as any)?.name || 'Catégorie inconnue',
+            standardDescription: productModel.standardDescription || '',
+            standardImageUrls: productModel.standardImageUrls || [],
+            keyFeatures: productModel.keyFeatures || [],
+            specifications: productModel.specifications || [],
+            offers: offersFromDB.map(offer => ({
+                id: offer._id.toString(),
+                seller: { id: offer.seller?._id?.toString(), name: (offer.seller as any)?.name || (offer.seller as any)?.username || 'Vendeur ReMarket' },
+                price: offer.price,
+                currency: offer.currency,
+                quantity: (offer as any).quantity !== undefined ? (offer as any).quantity : 1,
+                condition: offer.condition,
+                sellerDescription: offer.sellerDescription || '',
+                sellerPhotos: offer.sellerPhotos || [],
+            })),
+        };
+
+        return NextResponse.json(productData);
 
     } catch (error) {
-        console.error(`[GET /api/products/${slug}]`, error);
-        const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue.';
-        return NextResponse.json({ message: 'Erreur lors de la récupération du produit.', error: errorMessage }, { status: 500 });
+        console.error(`[API /api/products/${slug}] Error fetching product:`, error);
+        return NextResponse.json({ message: "Erreur serveur lors de la récupération du produit." }, { status: 500 });
     }
 } 

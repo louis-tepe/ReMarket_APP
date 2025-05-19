@@ -1,28 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db.Connect'; // Assurez-vous que le chemin est correct
-import ProductModel from '@/models/ProductModel'; 
+// import ProductModel from '@/models/ProductModel'; 
 import BrandModel, { IBrand } from '@/models/BrandModel';
-import CategoryModel from '@/models/CategoryModel'; // Nécessaire pour trouver le nom de la catégorie par son slug
-import mongoose from 'mongoose';
+import CategoryModel, { ICategory } from '@/models/CategoryModel';
+import { Types } from 'mongoose';
+// import mongoose from 'mongoose';
 
 /**
  * @swagger
  * /api/brands:
  *   get:
- *     summary: Récupère les marques pour une catégorie donnée depuis la base de données.
- *     description: >
- *       Retourne une liste de marques disponibles pour la catégorie de produit spécifiée (slug de la catégorie).
- *       Les marques sont dérivées des ProductModel approuvés associés à cette catégorie.
+ *     summary: Récupère la liste de toutes les marques.
+ *     description: Retourne une liste de toutes les marques disponibles.
  *     tags:
  *       - Brands
- *       - Categories
- *     parameters:
- *       - in: query
- *         name: categoryId # Ce sera le slug de la catégorie
- *         required: true
- *         schema:
- *           type: string
- *         description: Le slug de la catégorie pour laquelle récupérer les marques.
  *     responses:
  *       200:
  *         description: Une liste de marques.
@@ -31,74 +22,126 @@ import mongoose from 'mongoose';
  *             schema:
  *               type: array
  *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: string # Correspond au slug de la marque
- *                   name:
- *                     type: string
- *       400:
- *         description: Paramètre categoryId manquant.
- *       404:
- *         description: Catégorie non trouvée ou aucune marque trouvée pour cette catégorie.
+ *                 $ref: '#/components/schemas/Brand'
  *       500:
  *         description: Erreur serveur.
  */
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Brand:
+ *       type: object
+ *       properties:
+ *         _id:
+ *           type: string
+ *         name:
+ *           type: string
+ *         slug:
+ *           type: string
+ *         description:
+ *           type: string
+ *           nullable: true
+ *         logoUrl:
+ *           type: string
+ *           nullable: true
+ *         categories:
+ *           type: array
+ *           items:
+ *             type: string # Références aux IDs des catégories
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ */
+
+// Helper function to get all descendant category IDs (including self)
+async function findAllDescendantIds(initialCategoryId: Types.ObjectId): Promise<Types.ObjectId[]> {
+    const allDescendantIds = new Set<string>();
+    const queue: Types.ObjectId[] = [initialCategoryId];
+    const visited = new Set<string>();
+
+    visited.add(initialCategoryId.toString());
+    allDescendantIds.add(initialCategoryId.toString());
+
+    while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        const children = await CategoryModel.find({ parent: currentId }).select('_id').lean();
+        for (const child of children) {
+            if (!visited.has(child._id.toString())) {
+                visited.add(child._id.toString());
+                allDescendantIds.add(child._id.toString());
+                queue.push(child._id as Types.ObjectId);
+            }
+        }
+    }
+    return Array.from(allDescendantIds).map(idStr => new Types.ObjectId(idStr));
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const categorySlug = searchParams.get('categoryId'); // Renommé pour clarifier que c'est un slug
-
-  if (!categorySlug) {
-    return NextResponse.json({ message: 'Le paramètre categoryId (slug de la catégorie) est requis.' }, { status: 400 });
-  }
+  const categorySlug = searchParams.get('categorySlug');
 
   try {
     await dbConnect();
+    let brandsQuery;
 
-    // 1. Trouver le nom de la catégorie à partir de son slug
-    const category = await CategoryModel.findOne({ slug: categorySlug });
-    if (!category) {
-      return NextResponse.json({ message: `Catégorie avec slug '${categorySlug}' non trouvée.` }, { status: 404 });
-    }
-    // const categoryName = category.name; // Plus besoin de categoryName pour cette requête
+    if (categorySlug) {
+      const category = await CategoryModel.findOne({ slug: categorySlug.toLowerCase() }).select('_id name').lean();
+      if (category) {
+        console.log(`[API_BRANDS_GET] Catégorie sélectionnée: ${category.name} (Slug: ${categorySlug}) (ID: ${category._id.toString()})`);
+        
+        // 1. Trouver tous les descendants de la catégorie sélectionnée (y compris elle-même)
+        const allDescendantIds = await findAllDescendantIds(category._id as Types.ObjectId);
+        console.log(`[API_BRANDS_GET] Tous les IDs descendants (y compris self): ${allDescendantIds.map(id => id.toString())}`);
 
-    // 2. Récupérer les ID de marques distincts des ProductModel pour cette catégorie
-    // ProductModel.brand est maintenant un ObjectId référençant BrandModel
-    const distinctBrandIdsFromProducts: mongoose.Types.ObjectId[] = await ProductModel.find({
-      category: category._id, // Filtrer par l'ID de la catégorie
-      // status: 'approved' // Le champ status n'existe plus sur ProductModel
-    }).distinct('brand');
+        if (allDescendantIds.length > 0) {
+          // 2. Parmi ces descendants, ne garder que ceux qui sont des catégories feuilles
+          const leafCategoriesInSubtree = await CategoryModel.find({
+            _id: { $in: allDescendantIds },
+            isLeafNode: true
+          }).select('_id').lean();
+          
+          const leafCategoryIdsToFilterBy = leafCategoriesInSubtree.map(cat => cat._id as Types.ObjectId);
+          console.log(`[API_BRANDS_GET] IDs de catégories FEUILLES dans la sous-arborescence: ${leafCategoryIdsToFilterBy.map(id => id.toString())}`);
 
-    let brands: IBrand[] = [];
-
-    if (distinctBrandIdsFromProducts && distinctBrandIdsFromProducts.length > 0) {
-      console.log(`[GET /api/brands] IDs de Marques trouvés pour la catégorie '${category.name}' via ProductModels: ${distinctBrandIdsFromProducts.join(', ')}`);
-      // 3. Récupérer les détails complets de ces marques depuis la collection BrandModel en utilisant leurs IDs
-      brands = await BrandModel.find({
-        _id: { $in: distinctBrandIdsFromProducts }
-      }).sort({ name: 1 });
+          if (leafCategoryIdsToFilterBy.length > 0) {
+            brandsQuery = BrandModel.find({ categories: { $in: leafCategoryIdsToFilterBy } });
+          } else {
+            console.log(`[API_BRANDS_GET] Aucune catégorie FEUILLE trouvée dans la sous-arborescence de ${category.name}, retour de 0 marques.`);
+            return NextResponse.json({ success: true, brands: [] }, { status: 200 });
+          }
+        } else {
+           // Ne devrait pas arriver si la catégorie parente est trouvée
+           console.log(`[API_BRANDS_GET] Aucun descendant trouvé pour ${category.name}, retour de 0 marques.`);
+           return NextResponse.json({ success: true, brands: [] }, { status: 200 });
+        }
+      } else {
+        console.log(`[API_BRANDS_GET] Catégorie avec slug '${categorySlug}' non trouvée.`);
+        return NextResponse.json({ success: true, brands: [] }, { status: 200 }); 
+      }
     } else {
-      // Aucun ProductModel trouvé pour cette catégorie avec des marques spécifiées.
-      // Fallback: Charger toutes les marques pour permettre la sélection et la création/scraping.
-      console.log(`[GET /api/brands] Aucune marque trouvée via ProductModels pour la catégorie '${category.name}'. Fallback vers toutes les marques.`);
-      brands = await BrandModel.find({}).sort({ name: 1 });
+      console.log("[API_BRANDS_GET] Aucun categorySlug fourni, récupération de toutes les marques.");
+      brandsQuery = BrandModel.find({});
     }
 
-    if (!brands || brands.length === 0) {
-      // Ce cas ne devrait survenir que si la collection BrandModel est vide.
-      return NextResponse.json({ message: `Aucune marque disponible, ni spécifiquement pour la catégorie '${category.name}', ni globalement.` }, { status: 404 });
-    }
-
-    const formattedBrands = brands.map(brand => ({
-      id: brand.slug, // Utiliser le slug comme ID pour le frontend
-      name: brand.name,
-    }));
+    const brands: IBrand[] = await brandsQuery
+      .select('_id name slug logoUrl') 
+      .sort({ name: 1 })
+      .lean() as IBrand[];
     
-    return NextResponse.json(formattedBrands, { status: 200 });
+    console.log(`[API_BRANDS_GET] Nombre de marques retournées: ${brands.length} pour categorySlug: ${categorySlug || '(aucun)'}`);
 
+    return NextResponse.json({ success: true, brands }, { status: 200 });
   } catch (error) {
-    console.error('[GET /api/brands]', error);
-    const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue.';
-    return NextResponse.json({ message: 'Erreur lors de la récupération des marques.', error: errorMessage }, { status: 500 });
+    console.error("[API_BRANDS_GET] Erreur: ", error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+    return NextResponse.json(
+      { success: false, message: "Erreur serveur lors de la récupération des marques", error: errorMessage }, 
+      { status: 500 }
+    );
   }
 } 

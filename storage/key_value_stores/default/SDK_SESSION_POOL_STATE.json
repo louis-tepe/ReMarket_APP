@@ -1,9 +1,9 @@
 {
-  "usableSessionsCount": 6,
+  "usableSessionsCount": 2,
   "retiredSessionsCount": 0,
   "sessions": [
     {
-      "id": "session_kZJaq2abFb",
+      "id": "session_jyJ9KLznEy",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -14,50 +14,50 @@
         "cookies": [
           {
             "key": "session-id",
-            "value": "137-9918498-1242657",
-            "expires": "2026-05-16T12:56:38.000Z",
+            "value": "137-1005954-0311252",
+            "expires": "2026-05-18T13:16:36.000Z",
             "domain": "amazon.com",
             "path": "/",
             "secure": true,
             "hostOnly": false,
-            "creation": "2025-05-16T12:56:39.216Z",
-            "lastAccessed": "2025-05-16T12:56:39.216Z"
+            "creation": "2025-05-18T13:16:37.569Z",
+            "lastAccessed": "2025-05-18T13:16:37.569Z"
           },
           {
             "key": "session-id-time",
             "value": "2082787201l",
-            "expires": "2026-05-16T12:56:38.000Z",
+            "expires": "2026-05-18T13:16:36.000Z",
             "domain": "amazon.com",
             "path": "/",
             "secure": true,
             "hostOnly": false,
-            "creation": "2025-05-16T12:56:39.216Z",
-            "lastAccessed": "2025-05-16T12:56:39.216Z"
+            "creation": "2025-05-18T13:16:37.569Z",
+            "lastAccessed": "2025-05-18T13:16:37.569Z"
           },
           {
             "key": "i18n-prefs",
             "value": "USD",
-            "expires": "2026-05-16T12:56:38.000Z",
+            "expires": "2026-05-18T13:16:36.000Z",
             "domain": "amazon.com",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-05-16T12:56:39.217Z",
-            "lastAccessed": "2025-05-16T12:56:39.217Z"
+            "creation": "2025-05-18T13:16:37.570Z",
+            "lastAccessed": "2025-05-18T13:16:37.570Z"
           },
           {
             "key": "lc-main",
             "value": "en_US",
-            "expires": "2026-05-16T12:56:38.000Z",
+            "expires": "2026-05-18T13:16:36.000Z",
             "domain": "amazon.com",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-05-16T12:56:39.217Z",
-            "lastAccessed": "2025-05-16T12:56:39.217Z"
+            "creation": "2025-05-18T13:16:37.570Z",
+            "lastAccessed": "2025-05-18T13:16:37.570Z"
           },
           {
             "key": "sp-cdn",
             "value": "\"L5Z9:JP\"",
-            "expires": "2026-05-16T12:56:38.000Z",
+            "expires": "2026-05-18T13:16:36.000Z",
             "maxAge": 31536000,
             "domain": "amazon.com",
             "path": "/",
@@ -67,42 +67,22 @@
               "Version=1"
             ],
             "hostOnly": false,
-            "creation": "2025-05-16T12:56:39.217Z",
-            "lastAccessed": "2025-05-16T12:56:39.217Z"
+            "creation": "2025-05-18T13:16:37.570Z",
+            "lastAccessed": "2025-05-18T13:16:37.570Z"
           }
         ]
       },
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-05-16T13:46:36.760Z",
-      "createdAt": "2025-05-16T12:56:36.760Z",
+      "expiresAt": "2025-05-18T14:06:35.408Z",
+      "createdAt": "2025-05-18T13:16:35.408Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_BDdIErmbWK",
-      "cookieJar": {
-        "version": "tough-cookie@5.1.2",
-        "storeType": "MemoryCookieStore",
-        "rejectPublicSuffixes": true,
-        "enableLooseMode": false,
-        "allowSpecialUseDomain": true,
-        "prefixSecurity": "silent",
-        "cookies": []
-      },
-      "userData": {},
-      "maxErrorScore": 3,
-      "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-05-16T13:46:39.565Z",
-      "createdAt": "2025-05-16T12:56:39.565Z",
-      "usageCount": 1,
-      "maxUsageCount": 50,
-      "errorScore": 1
-    },
-    {
-      "id": "session_fBNCfm6BAx",
+      "id": "session_cPlm5dfhEM",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -113,227 +93,43 @@
         "cookies": [
           {
             "key": "session-id",
-            "value": "136-5590138-0724567",
-            "expires": "2026-05-16T12:56:40.000Z",
+            "value": "136-5934371-0304509",
+            "expires": "2026-05-18T13:16:38.000Z",
             "domain": "amazon.com",
             "path": "/",
             "secure": true,
             "hostOnly": false,
-            "creation": "2025-05-16T12:56:42.818Z",
-            "lastAccessed": "2025-05-16T12:56:42.818Z"
+            "creation": "2025-05-18T13:16:40.530Z",
+            "lastAccessed": "2025-05-18T13:16:40.530Z"
           },
           {
             "key": "session-id-time",
             "value": "2082787201l",
-            "expires": "2026-05-16T12:56:40.000Z",
+            "expires": "2026-05-18T13:16:38.000Z",
             "domain": "amazon.com",
             "path": "/",
             "secure": true,
             "hostOnly": false,
-            "creation": "2025-05-16T12:56:42.818Z",
-            "lastAccessed": "2025-05-16T12:56:42.818Z"
+            "creation": "2025-05-18T13:16:40.530Z",
+            "lastAccessed": "2025-05-18T13:16:40.530Z"
           },
           {
             "key": "i18n-prefs",
             "value": "USD",
-            "expires": "2026-05-16T12:56:40.000Z",
+            "expires": "2026-05-18T13:16:38.000Z",
             "domain": "amazon.com",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-05-16T12:56:42.818Z",
-            "lastAccessed": "2025-05-16T12:56:42.818Z"
-          },
-          {
-            "key": "sp-cdn",
-            "value": "\"L5Z9:JP\"",
-            "expires": "2026-05-16T12:56:40.000Z",
-            "maxAge": 31536000,
-            "domain": "amazon.com",
-            "path": "/",
-            "secure": true,
-            "httpOnly": true,
-            "extensions": [
-              "Version=1"
-            ],
-            "hostOnly": false,
-            "creation": "2025-05-16T12:56:42.818Z",
-            "lastAccessed": "2025-05-16T12:56:42.818Z"
+            "creation": "2025-05-18T13:16:40.530Z",
+            "lastAccessed": "2025-05-18T13:16:40.530Z"
           }
         ]
       },
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-05-16T13:46:39.818Z",
-      "createdAt": "2025-05-16T12:56:39.818Z",
-      "usageCount": 1,
-      "maxUsageCount": 50,
-      "errorScore": 0
-    },
-    {
-      "id": "session_ONOrx10aQP",
-      "cookieJar": {
-        "version": "tough-cookie@5.1.2",
-        "storeType": "MemoryCookieStore",
-        "rejectPublicSuffixes": true,
-        "enableLooseMode": false,
-        "allowSpecialUseDomain": true,
-        "prefixSecurity": "silent",
-        "cookies": [
-          {
-            "key": "session-id",
-            "value": "139-6536417-3111150",
-            "expires": "2026-05-16T13:27:32.000Z",
-            "domain": "amazon.com",
-            "path": "/",
-            "secure": true,
-            "hostOnly": false,
-            "creation": "2025-05-16T13:27:34.249Z",
-            "lastAccessed": "2025-05-16T13:27:34.249Z"
-          },
-          {
-            "key": "session-id-time",
-            "value": "2082787201l",
-            "expires": "2026-05-16T13:27:32.000Z",
-            "domain": "amazon.com",
-            "path": "/",
-            "secure": true,
-            "hostOnly": false,
-            "creation": "2025-05-16T13:27:34.249Z",
-            "lastAccessed": "2025-05-16T13:27:34.249Z"
-          },
-          {
-            "key": "i18n-prefs",
-            "value": "USD",
-            "expires": "2026-05-16T13:27:32.000Z",
-            "domain": "amazon.com",
-            "path": "/",
-            "hostOnly": false,
-            "creation": "2025-05-16T13:27:34.250Z",
-            "lastAccessed": "2025-05-16T13:27:34.250Z"
-          },
-          {
-            "key": "lc-main",
-            "value": "en_US",
-            "expires": "2026-05-16T13:27:32.000Z",
-            "domain": "amazon.com",
-            "path": "/",
-            "hostOnly": false,
-            "creation": "2025-05-16T13:27:34.250Z",
-            "lastAccessed": "2025-05-16T13:27:34.250Z"
-          },
-          {
-            "key": "sp-cdn",
-            "value": "\"L5Z9:JP\"",
-            "expires": "2026-05-16T13:27:32.000Z",
-            "maxAge": 31536000,
-            "domain": "amazon.com",
-            "path": "/",
-            "secure": true,
-            "httpOnly": true,
-            "extensions": [
-              "Version=1"
-            ],
-            "hostOnly": false,
-            "creation": "2025-05-16T13:27:34.250Z",
-            "lastAccessed": "2025-05-16T13:27:34.250Z"
-          }
-        ]
-      },
-      "userData": {},
-      "maxErrorScore": 3,
-      "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-05-16T14:17:31.943Z",
-      "createdAt": "2025-05-16T13:27:31.943Z",
-      "usageCount": 0,
-      "maxUsageCount": 50,
-      "errorScore": 0
-    },
-    {
-      "id": "session_m2TubEvQoA",
-      "cookieJar": {
-        "version": "tough-cookie@5.1.2",
-        "storeType": "MemoryCookieStore",
-        "rejectPublicSuffixes": true,
-        "enableLooseMode": false,
-        "allowSpecialUseDomain": true,
-        "prefixSecurity": "silent",
-        "cookies": []
-      },
-      "userData": {},
-      "maxErrorScore": 3,
-      "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-05-16T14:17:34.591Z",
-      "createdAt": "2025-05-16T13:27:34.591Z",
-      "usageCount": 1,
-      "maxUsageCount": 50,
-      "errorScore": 1
-    },
-    {
-      "id": "session_WW9b4T2dtq",
-      "cookieJar": {
-        "version": "tough-cookie@5.1.2",
-        "storeType": "MemoryCookieStore",
-        "rejectPublicSuffixes": true,
-        "enableLooseMode": false,
-        "allowSpecialUseDomain": true,
-        "prefixSecurity": "silent",
-        "cookies": [
-          {
-            "key": "session-id",
-            "value": "138-7744035-3495250",
-            "expires": "2026-05-16T13:27:35.000Z",
-            "domain": "amazon.com",
-            "path": "/",
-            "secure": true,
-            "hostOnly": false,
-            "creation": "2025-05-16T13:27:37.303Z",
-            "lastAccessed": "2025-05-16T13:27:37.303Z"
-          },
-          {
-            "key": "session-id-time",
-            "value": "2082787201l",
-            "expires": "2026-05-16T13:27:35.000Z",
-            "domain": "amazon.com",
-            "path": "/",
-            "secure": true,
-            "hostOnly": false,
-            "creation": "2025-05-16T13:27:37.303Z",
-            "lastAccessed": "2025-05-16T13:27:37.303Z"
-          },
-          {
-            "key": "i18n-prefs",
-            "value": "USD",
-            "expires": "2026-05-16T13:27:35.000Z",
-            "domain": "amazon.com",
-            "path": "/",
-            "hostOnly": false,
-            "creation": "2025-05-16T13:27:37.304Z",
-            "lastAccessed": "2025-05-16T13:27:37.304Z"
-          },
-          {
-            "key": "sp-cdn",
-            "value": "\"L5Z9:JP\"",
-            "expires": "2026-05-16T13:27:35.000Z",
-            "maxAge": 31536000,
-            "domain": "amazon.com",
-            "path": "/",
-            "secure": true,
-            "httpOnly": true,
-            "extensions": [
-              "Version=1"
-            ],
-            "hostOnly": false,
-            "creation": "2025-05-16T13:27:37.304Z",
-            "lastAccessed": "2025-05-16T13:27:37.304Z"
-          }
-        ]
-      },
-      "userData": {},
-      "maxErrorScore": 3,
-      "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-05-16T14:17:34.841Z",
-      "createdAt": "2025-05-16T13:27:34.841Z",
+      "expiresAt": "2025-05-18T14:06:37.867Z",
+      "createdAt": "2025-05-18T13:16:37.867Z",
       "usageCount": 1,
       "maxUsageCount": 50,
       "errorScore": 0
