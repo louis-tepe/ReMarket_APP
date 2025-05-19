@@ -18,6 +18,7 @@ export interface IOffer extends Document {
   currency: string; // Ex: "EUR"
   
   condition: 'new' | 'used_likenew' | 'used_good' | 'used_fair'; // État de l'article du vendeur
+  sellerDescription?: string; // Description spécifique de l'offre par le vendeur
   sellerPhotos: string[]; // URLs des photos de l'article du vendeur
   
   /**
@@ -90,6 +91,10 @@ const OfferSchema = new Schema<IOffer>(
       type: String,
       required: [true, "L\'état de l\'article est obligatoire."],
       enum: ['new', 'used_likenew', 'used_good', 'used_fair'],
+    },
+    sellerDescription: {
+      type: String,
+      trim: true,
     },
     sellerPhotos: [
       {

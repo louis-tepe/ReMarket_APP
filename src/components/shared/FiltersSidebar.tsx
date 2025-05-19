@@ -24,11 +24,11 @@ interface CategoryNode extends ICategory {
 interface FiltersSidebarProps {
     allCategories: ICategory[];
     allBrands: IBrand[];
-    initialCategorySlug?: string;
+    activeCategorySlug?: string; // NOUVEAU: slug de la catégorie active, géré par la page parente
+    currentCategoryAncestors?: string[]; // Ancêtres de la catégorie active
     onFiltersChange: (filters: { categorySlug?: string; brandSlugs?: string[] }) => void;
     // Pour la navigation de page en page catégorie:
     basePath?: string; // ex: '/categories'
-    currentCategoryAncestors?: string[]; // IDs des ancêtres de la catégorie sélectionnée
 }
 
 const BASE_CATEGORY_ITEM_PADDING_X = "px-2"; // Padding horizontal de base pour chaque item de catégorie
@@ -37,15 +37,13 @@ const INDENT_PER_DEPTH = 10; // Augmentation du padding-left (en px) par niveau 
 export default function FiltersSidebar({
     allCategories,
     allBrands,
-    initialCategorySlug,
+    activeCategorySlug, // NOUVEAU
+    currentCategoryAncestors = [],
     onFiltersChange,
     basePath = '/categories',
-    currentCategoryAncestors = [],
 }: FiltersSidebarProps) {
-    const [selectedCategorySlug, setSelectedCategorySlug] = useState<string | undefined>(initialCategorySlug);
     const [selectedBrandSlugs, setSelectedBrandSlugs] = useState<string[]>([]);
     const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
-    // isSidebarVisible est géré par la page parente maintenant
 
     const categoriesTree = useMemo(() => {
         const map: Record<string, CategoryNode> = {};
@@ -89,13 +87,12 @@ export default function FiltersSidebar({
     }, []);
 
     useEffect(() => {
-        setSelectedCategorySlug(initialCategorySlug);
         const newExpandedState: Record<string, boolean> = {};
         currentCategoryAncestors.forEach(ancestorId => {
             newExpandedState[ancestorId] = true;
         });
-        if (initialCategorySlug) {
-            const currentCatData = allCategories.find(c => c.slug === initialCategorySlug);
+        if (activeCategorySlug) {
+            const currentCatData = allCategories.find(c => c.slug === activeCategorySlug);
             if (currentCatData) {
                 const currentCatNode = findCategoryNodeInTree(categoriesTree, currentCatData._id.toString());
                 if (currentCatNode && currentCatNode.children && currentCatNode.children.length > 0) {
@@ -104,32 +101,19 @@ export default function FiltersSidebar({
             }
         }
         setExpandedCategories(newExpandedState);
-    }, [initialCategorySlug, currentCategoryAncestors, allCategories, categoriesTree, findCategoryNodeInTree]);
+    }, [activeCategorySlug, currentCategoryAncestors, allCategories, categoriesTree, findCategoryNodeInTree]);
 
     const handleCategoryClick = useCallback((category: CategoryNode) => {
-        setSelectedCategorySlug(category.slug);
-        const newExpandedState: Record<string, boolean> = {};
-        const ancestors = getAncestorsOfNode(category._id.toString(), categoriesTree);
-        ancestors.forEach(ancestorId => {
-            newExpandedState[ancestorId] = true;
-        });
-        if (category.children && category.children.length > 0) {
-            newExpandedState[category._id.toString()] = true;
-        }
-        setExpandedCategories(prev => ({ ...prev, ...newExpandedState }));
-    }, [categoriesTree, getAncestorsOfNode]);
-
-    useEffect(() => {
-        onFiltersChange({
-            categorySlug: selectedCategorySlug,
-            brandSlugs: selectedBrandSlugs.length > 0 ? selectedBrandSlugs : undefined,
-        });
-    }, [selectedCategorySlug, selectedBrandSlugs, onFiltersChange]);
+        onFiltersChange({ categorySlug: category.slug, brandSlugs: [] }); // Réinitialiser les marques lors du changement de catégorie
+        // L'expansion est maintenant gérée par l'useEffect ci-dessus via activeCategorySlug et currentCategoryAncestors
+    }, [onFiltersChange]);
 
     const handleBrandChange = (brandSlug: string, checked: boolean | string) => {
-        setSelectedBrandSlugs(prev =>
-            checked ? [...prev, brandSlug] : prev.filter(slug => slug !== brandSlug)
-        );
+        const newBrandSlugs = checked
+            ? [...selectedBrandSlugs, brandSlug]
+            : selectedBrandSlugs.filter(slug => slug !== brandSlug);
+        setSelectedBrandSlugs(newBrandSlugs);
+        onFiltersChange({ categorySlug: activeCategorySlug, brandSlugs: newBrandSlugs.length > 0 ? newBrandSlugs : undefined });
     };
 
     const toggleManualExpansion = (categoryId: string) => {
@@ -137,9 +121,8 @@ export default function FiltersSidebar({
     };
 
     const renderCategory = (category: CategoryNode, depth: number) => {
-        const isSelected = selectedCategorySlug === category.slug;
-        const isAncestor = currentCategoryAncestors.includes(category._id.toString()) ||
-            (selectedCategorySlug && getAncestorsOfNode(allCategories.find(c => c.slug === selectedCategorySlug)?._id.toString() || ' ', categoriesTree).includes(category._id.toString()));
+        const isSelected = activeCategorySlug === category.slug;
+        const isAncestor = currentCategoryAncestors.includes(category._id.toString());
 
         const hasChildren = category.children && category.children.length > 0;
         const isExplicitlyExpanded = expandedCategories[category._id.toString()] === true;
@@ -203,7 +186,7 @@ export default function FiltersSidebar({
     };
 
     const clearCategoryFilter = () => {
-        setSelectedCategorySlug(undefined);
+        onFiltersChange({ categorySlug: undefined, brandSlugs: selectedBrandSlugs }); // Garder les filtres de marque
         setExpandedCategories({});
     }
 
@@ -220,7 +203,7 @@ export default function FiltersSidebar({
                     <div className="">
                         <div className="flex justify-between items-center mb-1 px-2">
                             <h3 className="text-sm font-medium tracking-tight">Catégories</h3>
-                            {selectedCategorySlug && (
+                            {activeCategorySlug && (
                                 <Button variant="ghost" size="sm" onClick={clearCategoryFilter} className="h-auto p-0.5 text-xs text-muted-foreground hover:text-destructive">
                                     <X className="h-3 w-3 mr-0.5" /> Effacer
                                 </Button>

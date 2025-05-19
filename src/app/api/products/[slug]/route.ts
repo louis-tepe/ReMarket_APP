@@ -3,6 +3,7 @@ import dbConnect from '@/lib/db.Connect';
 import ProductModel from '@/models/ProductModel';
 import OfferModel from '@/models/OfferModel';
 import UserModel from '@/models/User';
+import { Types } from 'mongoose';
 // import SellerProduct, { ISellerProduct } from '@/models/SellerProduct';
 // import ScrapedProduct, { IScrapedProduct } from '@/models/ScrapedProduct';
 
@@ -107,10 +108,17 @@ export async function GET(
 ) {
     await dbConnect();
     const resolvedParams = await params;
-    const slug = resolvedParams.slug;
+    const slugOrId = resolvedParams.slug;
 
     try {
-        const productModel = await ProductModel.findOne({ slug: slug })
+        let query: any;
+        if (Types.ObjectId.isValid(slugOrId)) {
+            query = { _id: new Types.ObjectId(slugOrId) };
+        } else {
+            query = { slug: slugOrId };
+        }
+
+        const productModel = await ProductModel.findOne(query)
             .populate('brand', 'name')
             .populate('category', 'name')
             .lean();
@@ -156,7 +164,7 @@ export async function GET(
         return NextResponse.json(productData);
 
     } catch (error) {
-        console.error(`[API /api/products/${slug}] Error fetching product:`, error);
+        console.error(`[API /api/products/${slugOrId}] Error fetching product:`, error);
         return NextResponse.json({ message: "Erreur serveur lors de la récupération du produit." }, { status: 500 });
     }
 } 

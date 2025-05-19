@@ -4,13 +4,15 @@ import { useEffect, useState, use } from 'react';
 import Image from 'next/image';
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, Info, Tag, CheckCircle, Package, ZoomIn } from "lucide-react";
+import { ShoppingCart, Info, Tag, CheckCircle, Package, ZoomIn, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import Link from 'next/link';
+import { useSession } from "next-auth/react";
+import { toast } from "sonner";
 
 // Types (doivent correspondre à ceux de l'API /api/products/[slug])
 interface SellerOffer {
@@ -118,6 +120,8 @@ export default function ProductPage({ params }: ProductPageProps) {
     const [product, setProduct] = useState<ProductDetails | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const [isAddingToCart, setIsAddingToCart] = useState<string | null>(null);
+    const { data: session, status: sessionStatus } = useSession();
 
     useEffect(() => {
         if (productSlug) {
@@ -152,11 +156,47 @@ export default function ProductPage({ params }: ProductPageProps) {
         );
     }
 
-    const handleAddToCart = (offer: SellerOffer) => {
-        // TODO: Implémenter la logique d'ajout au panier
-        // Cela impliquera probablement un contexte de panier ou une API
-        console.log("Ajout au panier:", product.title, offer);
-        // toast.success(`${product.title} (Vendeur: ${offer.seller.name}) ajouté au panier!`);
+    const handleAddToCart = async (offer: SellerOffer) => {
+        if (sessionStatus !== 'authenticated' || !session?.user) {
+            toast.error("Veuillez vous connecter pour ajouter des articles au panier.");
+            return;
+        }
+
+        if (!product) return;
+
+        setIsAddingToCart(offer.id);
+        try {
+            const response = await fetch('/api/cart', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    offerId: offer.id,
+                    productModelId: product.id,
+                    quantity: 1,
+                }),
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                toast.success(`${product.title} a été ajouté à votre panier !`, {
+                    description: `Vendeur: ${offer.seller.name || 'N/A'}, Prix: ${offer.price}€`,
+                    action: {
+                        label: "Voir le panier",
+                        onClick: () => { window.location.href = '/cart'; }
+                    }
+                });
+            } else {
+                throw new Error(result.message || "Erreur lors de l'ajout au panier.");
+            }
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : "Une erreur inconnue s'est produite.";
+            toast.error("Erreur Panier", { description: errorMessage });
+        } finally {
+            setIsAddingToCart(null);
+        }
     };
 
     return (
@@ -247,8 +287,15 @@ export default function ProductPage({ params }: ProductPageProps) {
                                             </CardContent>
                                         )}
                                         <CardFooter>
-                                            <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" onClick={() => handleAddToCart(offer)}>
-                                                <ShoppingCart className="mr-2 h-5 w-5" /> Ajouter au panier
+                                            <Button
+                                                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                                                onClick={() => handleAddToCart(offer)}
+                                                disabled={isAddingToCart === offer.id || sessionStatus === 'loading'}
+                                            >
+                                                {isAddingToCart === offer.id ?
+                                                    <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Ajout...</> :
+                                                    <><ShoppingCart className="mr-2 h-5 w-5" /> Ajouter au panier</>
+                                                }
                                             </Button>
                                         </CardFooter>
                                     </Card>

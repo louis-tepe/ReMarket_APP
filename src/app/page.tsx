@@ -72,7 +72,7 @@ export default function HomePage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" asChild className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              <Link href="/search">Trouver une perle</Link>
+              <Link href="/categories">Trouver une perle</Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
               <Link href="/sell">Vendre un article</Link>
@@ -90,7 +90,7 @@ export default function HomePage() {
           </Suspense>
           <div className="text-center mt-10">
             <Button variant="outline" asChild>
-              <Link href="/search">Voir tous les produits</Link>
+              <Link href="/categories">Voir tous les produits</Link>
             </Button>
           </div>
         </div>

@@ -149,9 +149,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Vérifier que le ProductModel existe
-    const existingProductModel = await ProductModel.findById(productModelId);
+    const existingProductModel = await ProductModel.findById(productModelId).populate('category');
     if (!existingProductModel) {
       return NextResponse.json({ message: `Modèle de produit ReMarket avec ID '${productModelId}' non trouvé.` }, { status: 404 });
+    }
+
+    const offerCategories: mongoose.Types.ObjectId[] = [];
+    if (existingProductModel.category) {
+        // Assurer que category est un ObjectId ou un objet avec _id
+        const categoryObject = existingProductModel.category as any; // Peut être ICategory ou ObjectId
+        const categoryId = categoryObject._id ? new mongoose.Types.ObjectId(categoryObject._id) : new mongoose.Types.ObjectId(categoryObject.toString());
+        if (categoryId) {
+            offerCategories.push(categoryId);
+        }
     }
 
     // Pas besoin de SellerProductCreationData, on peut typer directement pour IOffer ou laisser Mongoose inferer
@@ -165,7 +175,10 @@ export async function POST(request: NextRequest) {
       dynamicFields: Array.isArray(dynamicFields) ? dynamicFields : [],
       status: 'available', // Statut par défaut pour une nouvelle offre
       currency: currency,
+      categories: offerCategories,
     };
+
+    console.log("[API /api/offers] Données préparées pour la nouvelle offre:", JSON.stringify(newOfferData, null, 2)); // Log détaillé des données
 
     const createdOffer: IOffer = new OfferModel(newOfferData);
     await createdOffer.save();

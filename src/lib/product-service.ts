@@ -10,7 +10,6 @@ export async function fetchFeaturedProductData(): Promise<ProductCardProps[]> {
 
   const featuredProductModels: IProductModel[] = await ProductModel.find({
     isFeatured: true,
-    status: "approved",
   })
     .limit(FEATURED_PRODUCTS_LIMIT)
     .lean<IProductModel[]>();

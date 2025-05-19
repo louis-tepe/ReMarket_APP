@@ -249,7 +249,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { name, categoryId, brandId } = body; // categoryId et brandId sont des slugs
 
+    console.log(`[API POST /product-models] Attempting to process request. Received body fields: name='${name}', categoryId='${categoryId}', brandId='${brandId}'`);
+
     if (!name || !categoryId || !brandId) {
+      console.error(`[API POST /product-models] Missing required fields. Evaluation: name=${!!name}, categoryId=${!!categoryId}, brandId=${!!brandId}. Request body:`, body);
       return NextResponse.json({ message: 'Le nom du produit, categoryId (slug) et brandId (slug) sont requis.' }, { status: 400 });
     }
 
