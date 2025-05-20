@@ -162,7 +162,32 @@ export async function POST(request: NextRequest) {
     const OfferModelForKind = ProductOfferModel.discriminators?.[kind];
 
     if (!OfferModelForKind) {
-      return NextResponse.json({ success: false, message: `Aucun modèle d'offre spécifique trouvé pour le type: ${kind}. Assurez-vous que le discriminateur est enregistré.` }, { status: 400 });
+      return NextResponse.json({ success: false, message: `Aucun modèle d'offre spécifique trouvé pour le type: ${kind}.` }, { status: 400 });
+    }
+
+    // Validation des champs spécifiques requis par le discriminateur
+    const discriminatorSchemaPaths = OfferModelForKind.schema.paths;
+    const baseSchemaPaths = ProductOfferModel.schema.paths;
+    const missingSpecificFields: string[] = [];
+
+    for (const pathName in discriminatorSchemaPaths) {
+      // Considérer uniquement les champs qui sont spécifiques au discriminateur (pas dans la base, ni _id, __v, kind)
+      if (!baseSchemaPaths[pathName] && pathName !== '_id' && pathName !== '__v' && pathName !== 'kind') {
+        const schemaPath = discriminatorSchemaPaths[pathName];
+        if (schemaPath.isRequired && (specificFields[pathName] === undefined || specificFields[pathName] === '')) {
+          missingSpecificFields.push(pathName);
+        }
+        // Optionnel : Validation de type plus poussée ici
+        // Par exemple, si schemaPath.instance === 'Number' et que parseFloat(specificFields[pathName]) est NaN
+      }
+    }
+
+    if (missingSpecificFields.length > 0) {
+      return NextResponse.json({
+        success: false,
+        message: `Champs spécifiques requis manquants pour la catégorie '${kind}': ${missingSpecificFields.join(', ')}`,
+        missingFields: missingSpecificFields
+      }, { status: 400 });
     }
 
     const offerData = {

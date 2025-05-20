@@ -1,4 +1,5 @@
 import { Schema, model, models, Document, Types } from 'mongoose';
+import slugify from 'slugify';
 
 export interface IBrand extends Document {
   name: string; // Nom de la marque (ex: "Apple")
@@ -24,7 +25,7 @@ const BrandSchema = new Schema<IBrand>(
       trim: true,
       unique: true,
       index: true,
-      set: (value: string) => value.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, ''),
+      set: (value: string) => slugify(value, { lower: true, strict: true, remove: /[*+~.()'"!:@]/g }),
     },
     description: {
       type: String,
@@ -42,9 +43,9 @@ const BrandSchema = new Schema<IBrand>(
   }
 );
 
-BrandSchema.pre('save', function (next) {
+BrandSchema.pre('save', function (this: IBrand, next) {
   if (!this.slug || this.isModified('name')) {
-    this.slug = this.name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+    this.slug = slugify(this.name, { lower: true, strict: true, remove: /[*+~.()'"!:@]/g });
   }
   next();
 });

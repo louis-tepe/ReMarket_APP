@@ -18,7 +18,7 @@ export interface ICart extends Document {
 const CartItemSchema = new Schema<ICartItem>({
   offer: {
     type: Schema.Types.ObjectId,
-    ref: 'Offer',
+    ref: 'ProductOffer',
     required: true,
   },
   productModel: { // Dénormalisation pour un accès plus facile aux détails du produit depuis le panier

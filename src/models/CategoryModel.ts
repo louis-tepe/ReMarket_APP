@@ -1,4 +1,5 @@
 import { Schema, model, models, Document, Types } from 'mongoose';
+import slugify from 'slugify';
 
 export interface ICategory extends Document {
   name: string; // Nom de la catégorie (ex: "Téléphones Mobiles")
@@ -25,8 +26,7 @@ const CategorySchema = new Schema<ICategory>(
       trim: true,
       unique: true,
       index: true,
-      // Simple fonction pour générer un slug, à améliorer si besoin (ex: avec un package comme slugify)
-      set: (value: string) => value.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, ''),
+      set: (value: string) => slugify(value, { lower: true, strict: true, remove: /[*+~.()'"!:@]/g }),
     },
     description: {
       type: String,
@@ -59,10 +59,9 @@ const CategorySchema = new Schema<ICategory>(
   }
 );
 
-// Pré-validation ou hook pour s'assurer que le slug est généré si non fourni manuellement
-CategorySchema.pre('save', function (next) {
+CategorySchema.pre('save', function (this: ICategory, next) {
   if (!this.slug || this.isModified('name')) {
-    this.slug = this.name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+    this.slug = slugify(this.name, { lower: true, strict: true, remove: /[*+~.()'"!:@]/g });
   }
   next();
 });

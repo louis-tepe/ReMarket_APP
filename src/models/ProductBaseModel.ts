@@ -16,7 +16,8 @@ export interface IProductBase extends Document {
   stockQuantity: number; // Quantité en stock pour cette offre
   
   // Champs pour la gestion de l'annonce et le statut transactionnel
-  transactionStatus?: 'available' | 'reserved' | 'pending_shipment' | 'shipped' | 'delivered' | 'cancelled' | 'sold';
+  listingStatus: 'pending_approval' | 'active' | 'inactive' | 'rejected' | 'sold'; // Statut de l'annonce elle-même
+  transactionStatus?: 'available' | 'reserved' | 'pending_shipment' | 'shipped' | 'delivered' | 'cancelled' | 'sold'; // Statut de la transaction sur l'offre
   soldTo?: Types.ObjectId; // Référence à l'acheteur si vendu
   orderId?: Types.ObjectId; // Référence à la commande associée
 
@@ -83,11 +84,17 @@ const ProductBaseSchema = new Schema<IProductBase>(
       min: [0, "La quantité en stock ne peut être négative."],
       default: 1,
     },
+    listingStatus: {
+        type: String,
+        required: true,
+        enum: ['pending_approval', 'active', 'inactive', 'rejected', 'sold'],
+        default: 'pending_approval',
+        index: true,
+    },
     transactionStatus: {
         type: String,
         enum: ['available', 'reserved', 'pending_shipment', 'shipped', 'delivered', 'cancelled', 'sold'],
         required: false, 
-        default: 'available', // Mettre 'available' par défaut si listingStatus est supprimé
         index: true,
     },
     soldTo: { 
@@ -108,11 +115,17 @@ const ProductBaseSchema = new Schema<IProductBase>(
   }
 );
 
-ProductBaseSchema.pre('save', function(next) {
-  // Si l'offre est marquée comme vendue (via transactionStatus)
-  if (this.isModified('transactionStatus') && this.transactionStatus === 'sold') {
-    this.transactionStatus = 'sold'; // Assurer la cohérence (déjà fait par la condition, mais explicite)
-    // Idéalement, d'autres logiques comme la décrémentation du stock du ProductModel pourraient avoir lieu ici ou via des événements
+ProductBaseSchema.pre('save', function(this: IProductBase, next) {
+  // Gérer la transition de transactionStatus lorsque listingStatus devient 'active'
+  if (this.isModified('listingStatus') && this.listingStatus === 'active' && !this.transactionStatus) {
+    this.transactionStatus = 'available';
+  }
+
+  // Si l'offre est marquée comme vendue (via l'un ou l'autre statut)
+  if ( (this.isModified('listingStatus') && this.listingStatus === 'sold') || 
+       (this.isModified('transactionStatus') && this.transactionStatus === 'sold') ) {
+    this.listingStatus = 'sold'; 
+    this.transactionStatus = 'sold'; 
   }
   next();
 });

@@ -1,4 +1,4 @@
-import { Schema, models } from 'mongoose';
+import { Schema, models, Model } from 'mongoose';
 import ProductOfferModel, { IProductBase } from '../ProductBaseModel'; // Chemin vers le modèle de base
 
 // Interface pour les champs spécifiques aux smartphones
@@ -52,6 +52,9 @@ const SmartphoneSchema = new Schema<ISmartphoneOffer>(
         type: String,
         trim: true,
         // Vous pourriez ajouter une validation regex pour l'IMEI ici
+        match: [/^\d{15}$/, "L'IMEI doit être composé de 15 chiffres."],
+        required: false,
+        sparse: true,
     }
   },
   {
@@ -77,9 +80,9 @@ if (models.ProductOffer && models.ProductOffer.discriminators && models.ProductO
   // mais c'est une sécurité pour s'assurer que le modèle de base est compilé avant d'ajouter un discriminateur.
   // Cependant, cela peut introduire des complexités avec l'ordre de chargement des modèles.
   // Il est généralement préférable de s'assurer que le modèle de base est chargé en premier.
-  console.warn("ProductOfferModel base model not found when defining SmartphoneOffer discriminator. This might lead to issues.");
+  console.error("ProductOfferModel base model not found when defining SmartphoneOffer discriminator. This might lead to critical issues if not resolved.");
   // Tentative de définition, mais peut échouer si ProductOfferModel n'est pas encore initialisé
   // SmartphoneOfferModel = model<ISmartphoneOffer>('ProductOffer').discriminator('SmartphoneOffer', SmartphoneSchema);
 }
 
-export default SmartphoneOfferModel as typeof models.ProductOffer | undefined; // Exporter avec un type qui reflète sa nature de discriminateur 
+export default SmartphoneOfferModel as Model<ISmartphoneOffer> | undefined; // Exporter avec un type qui reflète sa nature de discriminateur 

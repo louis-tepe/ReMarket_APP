@@ -1,4 +1,4 @@
-import { Schema, models } from 'mongoose';
+import { Schema, models, Model } from 'mongoose';
 import ProductOfferModel, { IProductBase } from '../ProductBaseModel'; // Chemin vers le modèle de base
 
 // Interface pour les champs spécifiques aux ordinateurs portables
@@ -73,7 +73,7 @@ if (models.ProductOffer && models.ProductOffer.discriminators && models.ProductO
 } else if (models.ProductOffer) {
   LaptopOfferModel = ProductOfferModel.discriminator<ILaptopOffer>('laptops', LaptopSchema);
 } else {
-  console.warn("ProductOfferModel base model not found when defining LaptopOffer discriminator. This might lead to issues.");
+  console.error("ProductOfferModel base model not found when defining LaptopOffer discriminator. This might lead to critical issues if not resolved.");
 }
 
-export default LaptopOfferModel as typeof models.ProductOffer | undefined; 
+export default LaptopOfferModel as Model<ILaptopOffer> | undefined; 
