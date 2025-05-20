@@ -3,22 +3,28 @@ import dbConnect from '@/lib/db.Connect';
 import ProductModel, { IProductModel } from '@/models/ProductModel';
 import ProductOfferModel, { IProductBase } from '@/models/ProductBaseModel';
 import UserModel from '@/models/User';
-import { Types } from 'mongoose';
+import { Types, FilterQuery } from 'mongoose';
 // import SellerProduct, { ISellerProduct } from '@/models/SellerProduct';
 // import ScrapedProduct, { IScrapedProduct } from '@/models/ScrapedProduct';
 
 // Les types simulés et MOCK_PRODUCT_DATA ont été supprimés car non utilisés.
+
+// Définition du type pour le vendeur peuplé
+type PopulatedSellerType = {
+  _id: Types.ObjectId;
+  name?: string;
+  username?: string;
+};
 
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ slug: string }> }
 ) {
     await dbConnect();
-    const resolvedParams = await params;
-    const slugOrId = resolvedParams.slug;
+    const { slug: slugOrId } = await params;
 
     try {
-        let query: any;
+        let query: FilterQuery<IProductModel>;
         if (Types.ObjectId.isValid(slugOrId)) {
             query = { _id: new Types.ObjectId(slugOrId) };
         } else {
@@ -44,37 +50,40 @@ export async function GET(
             model: UserModel
         })
         .sort({ price: 1 })
-        .lean() as IProductBase[];
+        .lean() as unknown as IProductBase[];
 
         const productData = {
             id: productModel._id.toString(),
             slug: productModel.slug || productModel._id.toString(),
             title: productModel.title,
             brand: {
-                name: (productModel.brand as any)?.name || 'Marque inconnue',
-                slug: (productModel.brand as any)?.slug || ''
+                name: (productModel.brand as { name?: string, slug?: string })?.name || 'Marque inconnue',
+                slug: (productModel.brand as { name?: string, slug?: string })?.slug || ''
             },
             category: {
-                name: (productModel.category as any)?.name || 'Catégorie inconnue',
-                slug: (productModel.category as any)?.slug || ''
+                name: (productModel.category as { name?: string, slug?: string })?.name || 'Catégorie inconnue',
+                slug: (productModel.category as { name?: string, slug?: string })?.slug || ''
             },
             standardDescription: productModel.standardDescription || '',
             standardImageUrls: productModel.standardImageUrls || [],
             keyFeatures: productModel.keyFeatures || [],
             specifications: productModel.specifications || [],
-            offers: offersFromDB.map(offer => ({
-                id: offer._id.toString(),
-                seller: {
-                    id: (offer.seller as any)?._id?.toString(),
-                    name: (offer.seller as any)?.name || (offer.seller as any)?.username || 'Vendeur ReMarket'
-                },
-                price: offer.price,
-                currency: offer.currency,
-                stockQuantity: offer.stockQuantity,
-                condition: offer.condition,
-                description: offer.description,
-                images: offer.images,
-            })),
+            offers: offersFromDB.map(offer => {
+                const populatedSeller = offer.seller as unknown as PopulatedSellerType;
+                return {
+                    id: (offer._id as Types.ObjectId).toString(),
+                    seller: {
+                        id: populatedSeller?._id?.toString(),
+                        name: populatedSeller?.name || populatedSeller?.username || 'Vendeur ReMarket'
+                    },
+                    price: offer.price,
+                    currency: offer.currency,
+                    stockQuantity: offer.stockQuantity,
+                    condition: offer.condition,
+                    description: offer.description,
+                    images: offer.images,
+                };
+            }),
         };
 
         return NextResponse.json(productData);

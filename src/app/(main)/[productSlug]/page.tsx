@@ -26,12 +26,17 @@ interface SellerOffer {
     sellerPhotos?: string[];
 }
 
+interface BrandOrCategory {
+    name: string;
+    slug: string;
+}
+
 interface ProductDetails {
     id: string;
     slug: string;
     title: string;
-    brand: string;
-    category: string;
+    brand: BrandOrCategory;
+    category: BrandOrCategory;
     standardDescription: string;
     standardImageUrls: string[];
     keyFeatures?: string[];

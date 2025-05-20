@@ -559,8 +559,8 @@ export default function SellPage() {
     };
 
     const displayTitle = selectedProductModel?.title || 'N/A';
-    
-    const getDisplayString = (value: string | number | null | undefined | { name?: string; title?: string; toString?: () => string; }) : string => {
+
+    const getDisplayString = (value: string | number | null | undefined | { name?: string; title?: string; toString?: () => string; }): string => {
         if (value === null || value === undefined) return 'N/A';
         if (typeof value === 'string') return value;
         if (typeof value === 'number') return String(value);
@@ -573,7 +573,7 @@ export default function SellPage() {
             // On le fait seulement si ce n'est pas un objet simple ou si les autres conditions n'ont pas marché
             const strValue = value.toString();
             if (strValue !== '[object Object]') return strValue;
-        } 
+        }
         return 'N/A';
     };
 
@@ -604,10 +604,9 @@ export default function SellPage() {
             if ('specifications' in selectedProductModel && Array.isArray((selectedProductModel as IProductModelReMarketType).specifications)) {
                 displayAttributes = (selectedProductModel as IProductModelReMarketType).specifications;
             } else if ('attributes' in selectedProductModel && Array.isArray((selectedProductModel as IScrapedProduct).attributes)) {
-                displayAttributes = (selectedProductModel as IScrapedProduct).attributes.map(attr => ({ 
-                    label: attr.label, 
-                    value: attr.value, 
-                    unit: attr.unit || undefined
+                displayAttributes = (selectedProductModel as IScrapedProduct).attributes.map(attr => ({
+                    label: attr.label,
+                    value: attr.value
                 }));
             }
         }
@@ -619,7 +618,7 @@ export default function SellPage() {
         { value: "like-new", label: "Comme neuf (utilisé quelques fois, aucune trace)" },
         { value: "good", label: "Bon état (traces d'usure légères)" },
         { value: "fair", label: "État correct (traces d'usure visibles, fonctionnel)" },
-        { value: "poor", label: "Mauvais état (endommagé mais peut-être fonctionnel/pour pièces)"}
+        { value: "poor", label: "Mauvais état (endommagé mais peut-être fonctionnel/pour pièces)" }
     ];
 
     const renderCategoryDropdowns = () => {
@@ -813,7 +812,7 @@ export default function SellPage() {
                             {categorySpecificFormFields.length > 0 && (
                                 <Card className="bg-muted/40 p-4 border-dashed">
                                     <CardHeader className="p-0 mb-3">
-                                        <CardTitle className="text-md">Détails spécifiques à "{finalSelectedLeafCategory?.name}"</CardTitle>
+                                        <CardTitle className="text-md">Détails spécifiques à &quot;{finalSelectedLeafCategory?.name}&quot;</CardTitle>
                                     </CardHeader>
                                     <CardContent className="p-0 space-y-4">
                                         {categorySpecificFormFields.map(field => (
@@ -921,7 +920,7 @@ export default function SellPage() {
                             <Button variant="outline" onClick={() => setStep(1)} type="button"><ArrowLeft className="mr-2 h-4 w-4" /> Précédent</Button>
                             <Button type="submit" form="offerForm" disabled={isLoadingSubmitOffer || sessionStatus !== 'authenticated'} className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
                                 {isLoadingSubmitOffer ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-                                {isLoadingSubmitOffer ? "Publication en cours..." : "Publier mon offre"}
+                                {isLoadingSubmitOffer ? 'Publication en cours...' : 'Publier mon offre'}
                             </Button>
                         </CardFooter>
                     </form>

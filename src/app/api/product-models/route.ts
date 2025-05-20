@@ -19,6 +19,59 @@ interface ProductModelQueryFilters {
   $text?: { $search: string };
 }
 
+// Typage pour l'erreur MongoDB et l'erreur de validation Mongoose
+interface MongoError extends Error {
+    code?: number;
+    errors?: Record<string, { message: string }>; // Pour ValidationError
+}
+
+interface IProductAttribute {
+  label: string;
+  value: string;
+}
+
+// Basé sur le schéma Swagger dans les commentaires de ce fichier
+interface IScrapedProduct {
+  _id?: string; 
+  asin?: string;
+  source: string;
+  sourceUrl: string;
+  title: string;
+  brand?: string;
+  model?: string;
+  category?: string;
+  description?: string;
+  imageUrls: string[];
+  currentPrice?: number | null;
+  listPrice?: number | null;
+  currency?: string;
+  reviewRating?: number | null;
+  reviewCount?: number | null;
+  attributes?: IProductAttribute[];
+  createdAt?: string; 
+  updatedAt?: string;
+}
+
+interface IProductModel {
+  _id?: string;
+  title: string;
+  brand: string; 
+  category: string; 
+  standardDescription: string;
+  standardImageUrls: string[];
+  keyFeatures: string[]; // Peut être précisé si la structure des keyFeatures est connue
+  specifications: IProductAttribute[];
+  slug: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+interface PostProductModelResponse {
+  scrapedProduct: IScrapedProduct;
+  productModel: IProductModel | null;
+  pmError?: string;
+}
+
 /**
  * @swagger
  * /api/product-models:
@@ -78,8 +131,6 @@ export async function GET(request: NextRequest) {
     await dbConnect();
     console.log(`[API GET /product-models] Recherche de ProductModel avec CatSlug: ${categorySlug}, BrandSlug: ${brandSlug}, Terme: ${searchTerm || 'N/A'}`);
 
-    let reMarketCategoryName: string | undefined = undefined;
-    let reMarketBrandName: string | undefined = undefined;
     let categoryDocForFilter: ICategory | null = null;
     let brandDocForFilter: IBrand | null = null;
 
@@ -88,7 +139,6 @@ export async function GET(request: NextRequest) {
       if (!categoryDocForFilter) {
         return NextResponse.json({ message: `Catégorie ReMarket avec slug '${categorySlug}' non trouvée.` }, { status: 404 });
       }
-      reMarketCategoryName = categoryDocForFilter.name;
     }
 
     if (brandSlug) {
@@ -96,13 +146,12 @@ export async function GET(request: NextRequest) {
       if (!brandDocForFilter) {
         return NextResponse.json({ message: `Marque ReMarket avec slug '${brandSlug}' non trouvée.` }, { status: 404 });
       }
-      reMarketBrandName = brandDocForFilter.name;
     }
 
     // Le filtre productModelQueryFilters est déjà correctement défini pour status: 'approved'
     const productModelQueryFilters: ProductModelQueryFilters = {};
-    if (categoryDocForFilter) productModelQueryFilters.category = categoryDocForFilter._id.toString();
-    if (brandDocForFilter) productModelQueryFilters.brand = brandDocForFilter._id.toString();
+    if (categoryDocForFilter && categoryDocForFilter._id) productModelQueryFilters.category = categoryDocForFilter._id.toString();
+    if (brandDocForFilter && brandDocForFilter._id) productModelQueryFilters.brand = brandDocForFilter._id.toString();
     
     if (searchTerm) {
       productModelQueryFilters.$text = { $search: searchTerm };
@@ -261,15 +310,13 @@ export async function POST(request: NextRequest) {
     if (!categoryDoc) {
       return NextResponse.json({ message: `Catégorie ReMarket avec slug '${categoryId}' non trouvée.` }, { status: 404 });
     }
-    const reMarketCategoryName = categoryDoc.name;
 
     const brandDoc = (await BrandModel.findOne({ slug: brandId }).lean()) as IBrand | null;
     if (!brandDoc) {
       return NextResponse.json({ message: `Marque ReMarket avec slug '${brandId}' non trouvée.` }, { status: 404 });
     }
-    const reMarketBrandName = brandDoc.name;
 
-    console.log(`[API POST /product-models] Lancement du scraping pour: "${name}" (Cat: ${reMarketCategoryName}, Marque: ${reMarketBrandName})`);
+    console.log(`[API POST /product-models] Lancement du scraping pour: "${name}" (Cat: ${categoryDoc.name}, Marque: ${brandDoc.name})`);
     const scrapedProductData: AmazonProductDetails | null = await scrapeAmazonProduct(name);
 
     if (!scrapedProductData) {
@@ -331,13 +378,19 @@ export async function POST(request: NextRequest) {
     } else {
       console.log(`[API POST /product-models] Création d'un nouveau ProductModel pour: ${scrapedProductData.title}`);
       try {
+        // Recherche de la description dans les attributs
+        const descriptionAttribute = scrapedProductData.attributes?.find(
+          (attr) => attr.label.toLowerCase() === 'description'
+        );
+        const standardDescription = descriptionAttribute?.value || "Description non disponible.";
+
         productModel = new ProductModel({
           title: scrapedProductData.title,
           brand: brandDoc._id, // Utiliser l'ID de la marque ReMarket
           category: categoryDoc._id, // Utiliser l'ID de la catégorie ReMarket
-          standardDescription: scrapedProductData.description || "Description non disponible.",
+          standardDescription: standardDescription,
           standardImageUrls: scrapedProductData.imageUrls && scrapedProductData.imageUrls.length > 0 ? scrapedProductData.imageUrls : ['/placeholder-image.png'],
-          keyFeatures: scrapedProductData.keyFeatures || [],
+          keyFeatures: [], // Initialiser avec un tableau vide, car scrapedProductData ne semble pas avoir keyFeatures
           specifications: scrapedProductData.attributes ? scrapedProductData.attributes.map(attr => ({ label: attr.label, value: attr.value })) : [],
           // status: 'approved', // Statut par défaut, maintenant implicitement approuvé
           slug: slugify(`${brandDoc.name} ${scrapedProductData.title}`, { lower: true, strict: true }),
@@ -391,10 +444,6 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error(`[POST /api/product-models] Erreur:`, error);
     // Typage pour l'erreur MongoDB et l'erreur de validation Mongoose
-    interface MongoError extends Error {
-        code?: number;
-        errors?: Record<string, { message: string }>; // Pour ValidationError
-    }
     const typedError = error as MongoError;
     const errorMessage = typedError.message || 'Erreur inconnue.';
     

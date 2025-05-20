@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db.Connect'; // Correction du chemin d'importation
 import CategoryModel, { ICategory } from '@/models/CategoryModel';
+import { FilterQuery } from 'mongoose';
 
 /**
  * @swagger
@@ -69,7 +70,7 @@ export async function GET(request: NextRequest) {
   try {
     await dbConnect();
 
-    const query: any = {};
+    const query: FilterQuery<ICategory> = {};
 
     if (depthParam !== null) {
       const depth = parseInt(depthParam, 10);
@@ -84,10 +85,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Inclure explicitement tous les champs nécessaires, y compris isLeafNode et depth
-    const categories: ICategory[] = await CategoryModel.find(query)
+    const categories = await CategoryModel.find(query)
       .select('_id name slug depth isLeafNode parent description createdAt updatedAt') // Soyez explicite sur les champs
       .sort({ name: 1 })
-      .lean() as ICategory[]; // Cast après lean
+      .lean(); // Cast après lean
 
     return NextResponse.json({ success: true, categories }, { status: 200 });
   } catch (error) {

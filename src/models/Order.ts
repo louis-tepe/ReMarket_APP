@@ -1,6 +1,6 @@
 import { Schema, model, models, Document, Types } from 'mongoose';
 import { IUser } from './User';
-import { IOffer } from './OfferModel';
+import { IProductBase as IOffer } from './ProductBaseModel';
 
 export type OrderStatus = 
   | 'pending_payment' 

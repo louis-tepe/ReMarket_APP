@@ -4,11 +4,41 @@ import ProductModel, { IProductModel } from '@/models/ProductModel';
 import ProductOfferModel, { IProductBase as IOffer } from '@/models/ProductBaseModel';
 import CategoryModel from '@/models/CategoryModel';
 import BrandModel from '@/models/BrandModel'; // Nécessaire si on filtre par marque
-import { Types } from 'mongoose';
+import { FilterQuery, SortOrder, Types } from 'mongoose';
 
-interface ProductWithOffers extends IProductModel {
-  sellerOffers: IOffer[];
-  // Potentiellement d'autres champs si on merge avec ProductModel
+// Type pour l'objet ProductModel après .lean()
+// Basé sur IProductModel mais sans étendre Document et avec _id comme string ou Types.ObjectId
+interface LeanProductModel {
+  _id: Types.ObjectId | string;
+  title: string;
+  brand: Types.ObjectId; // Ou un type plus spécifique si populé et lean
+  category: Types.ObjectId; // Ou un type plus spécifique si populé et lean
+  standardDescription: string;
+  standardImageUrls: string[];
+  keyFeatures?: string[];
+  isFeatured?: boolean;
+  specifications: { label: string; value: string; unit?: string }[];
+  slug?: string;
+  createdAt: Date | string; // Date peut devenir string après JSON.stringify ou lean
+  updatedAt: Date | string;
+  score?: number; // Ajouté pour le score de recherche textuelle
+  // N'inclut pas les méthodes Mongoose Document
+}
+
+interface ProductWithOffers extends LeanProductModel { // Modifié pour utiliser LeanProductModel
+  sellerOffers: IOffer[]; 
+}
+
+// Type pour l'objet Category après .lean()
+interface LeanCategory {
+  _id: Types.ObjectId;
+  name: string;
+  slug: string;
+}
+
+// Type pour l'objet Brand après .lean()
+interface LeanBrand {
+  _id: Types.ObjectId;
 }
 
 export async function GET(request: NextRequest) {
@@ -22,7 +52,7 @@ export async function GET(request: NextRequest) {
   try {
     await dbConnect();
 
-    let query: any = {};
+    const query: FilterQuery<IProductModel> = {}; // Le FilterQuery peut toujours se baser sur IProductModel pour la structure de requête
 
     // Recherche textuelle
     if (searchQuery) {
@@ -32,9 +62,9 @@ export async function GET(request: NextRequest) {
 
     // Filtre par catégorie
     if (categorySlug) {
-      const category = await CategoryModel.findOne({ slug: categorySlug.toLowerCase() }).lean();
+      const category = await CategoryModel.findOne({ slug: categorySlug.toLowerCase() }).lean() as LeanCategory | null;
       if (category) {
-        query.category = category._id; // Filtrer par ObjectId de la catégorie
+        query.category = category._id; 
         console.log('[API_PRODUCTS_GET] Applied category filter to query. Category ID:', category._id);
       } else {
         console.log('[API_PRODUCTS_GET] Category slug not found, returning empty for category filter:', categorySlug);
@@ -45,9 +75,9 @@ export async function GET(request: NextRequest) {
     // Filtre par marques
     if (brandSlugsQuery) {
       const brandSlugs = brandSlugsQuery.split(',');
-      const brands = await BrandModel.find({ slug: { $in: brandSlugs } }).select('_id').lean();
-      if (brands.length > 0) {
-        query.brand = { $in: brands.map(b => b._id) }; // Filtrer par ObjectId de la marque
+      const brands = await BrandModel.find({ slug: { $in: brandSlugs } }).select('_id').lean() as LeanBrand[] | null;
+      if (brands && brands.length > 0) {
+        query.brand = { $in: brands.map(b => b._id) }; 
         console.log('[API_PRODUCTS_GET] Applied brand filter to query. Brand IDs:', brands.map(b => b._id));
       } else {
         console.log('[API_PRODUCTS_GET] Brand slugs not found, returning empty for brand filter:', brandSlugsQuery);
@@ -57,16 +87,15 @@ export async function GET(request: NextRequest) {
 
     console.log('[API_PRODUCTS_GET] Final ProductModel query:', JSON.stringify(query));
 
-    // Ajout d'un score de pertinence pour la recherche textuelle si searchQuery est utilisé
-    let sortOptions: any = {};
+    let sortOptions: { [key: string]: SortOrder | { $meta: string } } = {};
     if (searchQuery) {
       sortOptions = { score: { $meta: "textScore" } };
     }
 
     const products = (await ProductModel.find(query, searchQuery ? { score: { $meta: "textScore" } } : {})
-      .sort(sortOptions) // Trier par pertinence si recherche textuelle
+      .sort(sortOptions)
       .lean()
-      .exec()) as (IProductModel & { _id: string; score?: number })[];
+      .exec()) as unknown as LeanProductModel[]; // Modifié pour utiliser LeanProductModel[]
 
     console.log(`[API_PRODUCTS_GET] Found ${products.length} ProductModels matching query.`);
 
@@ -94,10 +123,10 @@ export async function GET(request: NextRequest) {
         
         console.log(`[API_PRODUCTS_GET] Found ${sellerOffers.length} active/available offers for ProductModel ID: ${product._id}`);
         
-        const plainProduct = JSON.parse(JSON.stringify(product));
-
+        // product est déjà un objet "lean", donc JSON.parse(JSON.stringify(product)) n'est pas strictement nécessaire
+        // sauf si product.brand ou product.category étaient des ObjectId non stringifiés par .lean() dans certains cas (ce qui ne devrait pas arriver ici)
         return {
-          ...plainProduct,
+          ...product, // product est déjà un LeanProductModel
           sellerOffers,
         };
       })

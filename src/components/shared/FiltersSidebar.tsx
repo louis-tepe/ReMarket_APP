@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { ICategory } from '@/models/CategoryModel'; // Assurez-vous que le chemin est correct
-import { IBrand } from '@/models/BrandModel'; // Assurez-vous que le chemin est correct
+// import { ICategory } from '@/models/CategoryModel'; // Remplacé par LeanCategory
+// import { IBrand } from '@/models/BrandModel'; // Remplacé par LeanBrand
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -14,21 +14,45 @@ import {
 } from "@/components/ui/accordion"
 import { ChevronDown, ChevronRight, X } from 'lucide-react';
 import Link from 'next/link';
-import { cn } from '@/lib/utils'; // Pour conditionnellement appliquer des classes Tailwind
+import { cn } from '@/lib/utils';
+import { Types } from 'mongoose'; // Importer Types pour ObjectId
 
-interface CategoryNode extends ICategory {
+// Définition d'un type "lean" pour les catégories
+interface LeanCategory {
+    _id: Types.ObjectId | string; // _id peut être string après serialisation
+    name: string;
+    slug: string;
+    description?: string;
+    depth: number;
+    parent?: Types.ObjectId | string; // parent peut être string après serialisation
+    isLeafNode: boolean;
+    createdAt: Date | string; // Date peut devenir string
+    updatedAt: Date | string;
+}
+
+// Définition d'un type "lean" pour les marques
+interface LeanBrand {
+    _id: Types.ObjectId | string;
+    name: string;
+    slug: string;
+    description?: string;
+    logoUrl?: string;
+    categories?: (Types.ObjectId | string)[]; // Peut aussi être des strings après serialisation
+    createdAt: Date | string;
+    updatedAt: Date | string;
+}
+
+interface CategoryNode extends LeanCategory { // Utilise LeanCategory
     children: CategoryNode[];
-    // ancestorIds?: string[]; // Pas directement utilisé dans cette version de renderCategory
 }
 
 interface FiltersSidebarProps {
-    allCategories: ICategory[];
-    allBrands: IBrand[];
-    activeCategorySlug?: string; // NOUVEAU: slug de la catégorie active, géré par la page parente
-    currentCategoryAncestors?: string[]; // Ancêtres de la catégorie active
+    allCategories: LeanCategory[]; // Attend des LeanCategory
+    allBrands: LeanBrand[]; // Modifié pour utiliser LeanBrand
+    activeCategorySlug?: string;
+    currentCategoryAncestors?: string[];
     onFiltersChange: (filters: { categorySlug?: string; brandSlugs?: string[] }) => void;
-    // Pour la navigation de page en page catégorie:
-    basePath?: string; // ex: '/categories'
+    basePath?: string;
 }
 
 const BASE_CATEGORY_ITEM_PADDING_X = "px-2"; // Padding horizontal de base pour chaque item de catégorie
@@ -63,19 +87,6 @@ export default function FiltersSidebar({
         });
         return roots;
     }, [allCategories]);
-
-    const getAncestorsOfNode = useCallback((nodeId: string, tree: CategoryNode[]): string[] => {
-        const getPath = (nodes: CategoryNode[], id: string, currentPath: string[]): string[] | null => {
-            for (const node of nodes) {
-                if (node._id.toString() === id) return [...currentPath, node._id.toString()];
-                const pathFromChild = getPath(node.children, id, [...currentPath, node._id.toString()]);
-                if (pathFromChild) return pathFromChild;
-            }
-            return null;
-        };
-        const path = getPath(tree, nodeId, []);
-        return path ? path.slice(0, -1) : []; // Exclure le nœud lui-même
-    }, []);
 
     const findCategoryNodeInTree = useCallback((nodes: CategoryNode[], id: string): CategoryNode | null => {
         for (const node of nodes) {
@@ -221,7 +232,7 @@ export default function FiltersSidebar({
                                 <AccordionContent className="text-sm pl-1 pr-0.5">
                                     <div className="max-h-52 overflow-y-auto space-y-1">
                                         {allBrands.map(brand => (
-                                            <div key={brand._id.toString()} className="flex items-center space-x-2 py-0.5 px-1 rounded-md hover:bg-accent">
+                                            <div key={(brand._id as Types.ObjectId).toString()} className="flex items-center space-x-2 py-0.5 px-1 rounded-md hover:bg-accent">
                                                 <Checkbox
                                                     id={`brand-${brand.slug}`}
                                                     checked={selectedBrandSlugs.includes(brand.slug)}

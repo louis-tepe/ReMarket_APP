@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input'; // Pour la quantité
 import { toast } from 'sonner';
-import { Loader2, ShoppingCart, Trash2, Info, ArrowLeft } from 'lucide-react';
+import { Loader2, ShoppingCart, Trash2, ArrowLeft } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
@@ -39,15 +39,23 @@ interface CartData {
     total: number;
 }
 
+interface CartActionPayload {
+    action: 'add' | 'remove' | 'update' | 'clear';
+    offerId?: string;
+    productModelId?: string;
+    cartItemId?: string;
+    quantity?: number;
+}
+
 export default function CartPage() {
-    const { data: session, status: sessionStatus } = useSession();
+    const { status: sessionStatus } = useSession();
     const router = useRouter();
     const [cart, setCart] = useState<CartData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isUpdatingQuantity, setIsUpdatingQuantity] = useState<string | null>(null); // ID de l'item en cours de modif
     const [isClearingCart, setIsClearingCart] = useState(false);
 
-    const fetchCart = async () => {
+    const fetchCart = useCallback(async () => {
         setIsLoading(true);
         try {
             const response = await fetch('/api/cart');
@@ -73,7 +81,7 @@ export default function CartPage() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [router]);
 
     useEffect(() => {
         if (sessionStatus === 'authenticated') {
@@ -83,9 +91,9 @@ export default function CartPage() {
             router.push('/signin?callbackUrl=/cart');
         }
         // Si sessionStatus est 'loading', on attend qu'il se résolve.
-    }, [sessionStatus, router]);
+    }, [sessionStatus, router, fetchCart]);
 
-    const handleCartAction = async (payload: any) => {
+    const handleCartAction = async (payload: CartActionPayload) => {
         if (sessionStatus !== 'authenticated') {
             toast.error("Authentification requise pour modifier le panier.");
             return;

@@ -2,9 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db.Connect'; // Assurez-vous que le chemin est correct
 // import ProductModel from '@/models/ProductModel'; 
 import BrandModel, { IBrand } from '@/models/BrandModel';
-import CategoryModel, { ICategory } from '@/models/CategoryModel';
-import { Types } from 'mongoose';
+import CategoryModel from '@/models/CategoryModel';
+import { Types, Query, HydratedDocument } from 'mongoose';
 // import mongoose from 'mongoose';
+
+interface SelectedCategory {
+    _id: Types.ObjectId;
+    name: string;
+}
 
 /**
  * @swagger
@@ -70,11 +75,11 @@ async function findAllDescendantIds(initialCategoryId: Types.ObjectId): Promise<
     while (queue.length > 0) {
         const currentId = queue.shift()!;
         const children = await CategoryModel.find({ parent: currentId }).select('_id').lean();
-        for (const child of children) {
+        for (const child of children as { _id: Types.ObjectId }[]) {
             if (!visited.has(child._id.toString())) {
                 visited.add(child._id.toString());
                 allDescendantIds.add(child._id.toString());
-                queue.push(child._id as Types.ObjectId);
+                queue.push(child._id);
             }
         }
     }
@@ -85,12 +90,15 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const categorySlug = searchParams.get('categorySlug');
 
+  // Typer explicitement brandsQuery
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  let brandsQuery: Query<(HydratedDocument<IBrand>)[], HydratedDocument<IBrand>, {}, IBrand, 'find'>;
+
   try {
     await dbConnect();
-    let brandsQuery;
 
     if (categorySlug) {
-      const category = await CategoryModel.findOne({ slug: categorySlug.toLowerCase() }).select('_id name').lean();
+      const category = await CategoryModel.findOne({ slug: categorySlug.toLowerCase() }).select('_id name').lean() as SelectedCategory | null;
       if (category) {
         console.log(`[API_BRANDS_GET] Catégorie sélectionnée: ${category.name} (Slug: ${categorySlug}) (ID: ${category._id.toString()})`);
         
@@ -128,10 +136,14 @@ export async function GET(request: NextRequest) {
       brandsQuery = BrandModel.find({});
     }
 
-    const brands: IBrand[] = await brandsQuery
+    // Récupérer les marques avec le typage correct
+    const partialBrands = await brandsQuery
       .select('_id name slug logoUrl') 
       .sort({ name: 1 })
-      .lean() as IBrand[];
+      .lean<Pick<IBrand, '_id' | 'name' | 'slug' | 'logoUrl'>[]>();
+    
+    // Changer le type de brands pour correspondre à partialBrands
+    const brands: Pick<IBrand, '_id' | 'name' | 'slug' | 'logoUrl'>[] = partialBrands;
     
     console.log(`[API_BRANDS_GET] Nombre de marques retournées: ${brands.length} pour categorySlug: ${categorySlug || '(aucun)'}`);
 

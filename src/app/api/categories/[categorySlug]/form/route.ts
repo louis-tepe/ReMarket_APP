@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import type { FormFieldDefinition } from '@/app/(main)/sell/page';
 import ProductOfferModel from '@/models/ProductBaseModel';
 
@@ -34,10 +34,11 @@ function mapMongooseTypeToFormType(instance: string, enumValues?: string[] | num
 }
 
 export async function GET(
-    request: Request,
-    context: { params: { categorySlug: string } }
+    request: NextRequest,
+    { params }: { params: Promise<{ categorySlug: string }> }
 ) {
-    const categorySlug = context.params.categorySlug?.toLowerCase();
+    const actualParams = await params;
+    const categorySlug = actualParams.categorySlug?.toLowerCase();
 
     if (!categorySlug) {
         return NextResponse.json({ success: false, message: "Slug de catégorie manquant." }, { status: 400 });
@@ -68,7 +69,7 @@ export async function GET(
 
         const schemaPath = discriminatorSchemaPaths[pathName];
         const instance = schemaPath.instance;
-        const enumValues = schemaPath.enumValues;
+        const enumValues = schemaPath.options.enum;
 
         const fieldType = mapMongooseTypeToFormType(instance, enumValues);
         const fieldDefinition: FormFieldDefinition = {
@@ -77,7 +78,7 @@ export async function GET(
             type: fieldType,
             required: schemaPath.isRequired || false,
             placeholder: `Entrez ${generateLabel(pathName).toLowerCase()}`,
-            defaultValue: schemaPath.defaultValue !== undefined ? schemaPath.defaultValue : '',
+            defaultValue: schemaPath.options.default !== undefined ? schemaPath.options.default : '',
         };
 
         if (fieldType === 'select') {
@@ -91,7 +92,7 @@ export async function GET(
                     fieldDefinition.defaultValue = String(fieldDefinition.defaultValue);
                 }
             } else if (enumValues && enumValues.length > 0) {
-                fieldDefinition.options = enumValues.map((val: string) => ({ value: val, label: generateLabel(val) }));
+                fieldDefinition.options = enumValues.map((val: string | number) => ({ value: String(val), label: generateLabel(String(val)) }));
             }
         }
         

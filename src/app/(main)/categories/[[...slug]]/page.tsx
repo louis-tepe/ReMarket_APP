@@ -15,6 +15,31 @@ import { cn } from '@/lib/utils';
 import { Types } from 'mongoose';
 import { Input } from "@/components/ui/input"; // Ajout de l'Input pour la recherche
 
+// Définition du type LeanCategory (identique à celui dans FiltersSidebar.tsx)
+interface LeanCategory {
+    _id: Types.ObjectId | string;
+    name: string;
+    slug: string;
+    description?: string;
+    depth: number;
+    parent?: Types.ObjectId | string;
+    isLeafNode: boolean;
+    createdAt: Date | string;
+    updatedAt: Date | string;
+}
+
+// Définition du type LeanBrand (pour correspondre à FiltersSidebar.tsx)
+interface LeanBrand {
+    _id: Types.ObjectId | string;
+    name: string;
+    slug: string;
+    description?: string;
+    logoUrl?: string;
+    categories?: (Types.ObjectId | string)[];
+    createdAt: Date | string;
+    updatedAt: Date | string;
+}
+
 // Type attendu par ProductCard, adapté pour inclure le nombre d'offres et le prix de départ
 interface DisplayProductCardProps {
     id: string;
@@ -26,14 +51,7 @@ interface DisplayProductCardProps {
 }
 
 // Structure de données attendue de l'API des produits filtrés
-interface ProductFromApi extends Omit<IProductModel, '_id' | 'standardImageUrls' | 'slug' | 'title' | 'category' | 'brand'> {
-    _id: string; // Doit être string après le fetch et .lean()
-    title: string;
-    slug?: string; // Slug est dans IProductModel
-    standardImageUrls: string[];
-    // category et brand sont des ObjectId dans IProductModel, on ne les attend pas directement ici pour l'affichage de la carte
-    sellerOffers?: IOffer[];
-}
+// interface ProductFromApi extends Omit<IProductModel, '_id' | 'standardImageUrls' | 'slug' | 'title' | 'category' | 'brand'> {\n// _id: string; // Doit être string après le fetch et .lean()\n// title: string;\n// slug?: string; // Slug est dans IProductModel\n// standardImageUrls: string[];\n//     // category et brand sont des ObjectId dans IProductModel, on ne les attend pas directement ici pour l'affichage de la carte\n// sellerOffers?: IOffer[];\n// }\n
 
 interface FiltersState {
     categorySlug?: string;
@@ -197,7 +215,7 @@ export default function CategoryPage({ params: paramsPromise }: { params: Promis
             setCurrentFilters(prev => ({ ...prev, categorySlug: initialCategorySlugFromUrl, brandSlugs: [], searchQuery: '' }));
             setSearchInputValue(''); // Réinitialiser aussi l'input de recherche
         }
-    }, [initialCategorySlugFromUrl]); // Ne dépend que du slug de l'URL
+    }, [initialCategorySlugFromUrl, currentFilters.categorySlug]);
 
     useEffect(() => {
         async function loadInitialCategories() {
@@ -253,7 +271,7 @@ export default function CategoryPage({ params: paramsPromise }: { params: Promis
         if (!isLoadingFiltersData) {
             loadProducts(currentFilters);
         }
-    }, [currentFilters, loadProducts, isLoadingFiltersData]);
+    }, [currentFilters, loadProducts, isLoadingFiltersData, currentFilters.categorySlug]);
 
     const handleFiltersChange = useCallback((newFiltersFromSidebar: Partial<FiltersState>) => {
         setCurrentFilters(prevFilters => {
@@ -308,8 +326,8 @@ export default function CategoryPage({ params: paramsPromise }: { params: Promis
                     isSidebarOpenOnMobile ? "translate-x-0 w-full max-w-xs sm:max-w-sm" : "-translate-x-full"
                 )}>
                     <FiltersSidebar
-                        allCategories={allCategories}
-                        allBrands={availableBrands}
+                        allCategories={allCategories as unknown as LeanCategory[]}
+                        allBrands={availableBrands as unknown as LeanBrand[]}
                         activeCategorySlug={currentFilters.categorySlug} // Passe le slug de l'état de la page
                         onFiltersChange={handleFiltersChange}
                         basePath="/categories"
