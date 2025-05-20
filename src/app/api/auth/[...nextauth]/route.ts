@@ -12,9 +12,9 @@ import { authOptions } from "@/lib/authOptions";
 // import User from "@/models/User"; // Adaptez le chemin vers votre modèle User
 // import bcrypt from "bcryptjs";
 
-console.log("Initialisation de [..nextauth]/route.ts..."); // Log de débogage
+// console.log("Initialisation de [..nextauth]/route.ts..."); // Log de débogage commenté
 
 const handler = NextAuth(authOptions);
-console.log("Handler NextAuth créé."); // Log de débogage
+// console.log("Handler NextAuth créé."); // Log de débogage commenté
 
 export { handler as GET, handler as POST }; 

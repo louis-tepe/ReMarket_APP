@@ -102,28 +102,28 @@ export async function GET(request: NextRequest) {
       if (category) {
         console.log(`[API_BRANDS_GET] Catégorie sélectionnée: ${category.name} (Slug: ${categorySlug}) (ID: ${category._id.toString()})`);
         
-        // 1. Trouver tous les descendants de la catégorie sélectionnée (y compris elle-même)
+        console.time("[API_BRANDS_GET] findAllDescendantIds duration");
         const allDescendantIds = await findAllDescendantIds(category._id as Types.ObjectId);
-        console.log(`[API_BRANDS_GET] Tous les IDs descendants (y compris self): ${allDescendantIds.map(id => id.toString())}`);
+        console.timeEnd("[API_BRANDS_GET] findAllDescendantIds duration");
 
         if (allDescendantIds.length > 0) {
-          // 2. Parmi ces descendants, ne garder que ceux qui sont des catégories feuilles
+          console.time("[API_BRANDS_GET] findLeafCategories duration");
           const leafCategoriesInSubtree = await CategoryModel.find({
             _id: { $in: allDescendantIds },
             isLeafNode: true
           }).select('_id').lean();
+          console.timeEnd("[API_BRANDS_GET] findLeafCategories duration");
           
           const leafCategoryIdsToFilterBy = leafCategoriesInSubtree.map(cat => cat._id as Types.ObjectId);
-          console.log(`[API_BRANDS_GET] IDs de catégories FEUILLES dans la sous-arborescence: ${leafCategoryIdsToFilterBy.map(id => id.toString())}`);
 
           if (leafCategoryIdsToFilterBy.length > 0) {
+            console.log(`[API_BRANDS_GET] Filtrage des marques par ${leafCategoryIdsToFilterBy.length} catégories feuilles.`);
             brandsQuery = BrandModel.find({ categories: { $in: leafCategoryIdsToFilterBy } });
           } else {
             console.log(`[API_BRANDS_GET] Aucune catégorie FEUILLE trouvée dans la sous-arborescence de ${category.name}, retour de 0 marques.`);
             return NextResponse.json({ success: true, brands: [] }, { status: 200 });
           }
         } else {
-           // Ne devrait pas arriver si la catégorie parente est trouvée
            console.log(`[API_BRANDS_GET] Aucun descendant trouvé pour ${category.name}, retour de 0 marques.`);
            return NextResponse.json({ success: true, brands: [] }, { status: 200 });
         }
@@ -136,17 +136,15 @@ export async function GET(request: NextRequest) {
       brandsQuery = BrandModel.find({});
     }
 
-    // Récupérer les marques avec le typage correct
+    console.time("[API_BRANDS_GET] BrandModel.find query duration");
     const partialBrands = await brandsQuery
       .select('_id name slug logoUrl') 
       .sort({ name: 1 })
       .lean<Pick<IBrand, '_id' | 'name' | 'slug' | 'logoUrl'>[]>();
+    console.timeEnd("[API_BRANDS_GET] BrandModel.find query duration");
     
-    // Changer le type de brands pour correspondre à partialBrands
     const brands: Pick<IBrand, '_id' | 'name' | 'slug' | 'logoUrl'>[] = partialBrands;
     
-    console.log(`[API_BRANDS_GET] Nombre de marques retournées: ${brands.length} pour categorySlug: ${categorySlug || '(aucun)'}`);
-
     return NextResponse.json({ success: true, brands }, { status: 200 });
   } catch (error) {
     console.error("[API_BRANDS_GET] Erreur: ", error);

@@ -1,4 +1,5 @@
-import { Schema, model, models, Document, Types } from 'mongoose';
+import { Schema, model, models, Document, Types, Model } from 'mongoose';
+import slugify from 'slugify'; // Import slugify
 
 // Interface pour les spécifications standardisées
 interface IStandardSpecification {
@@ -7,32 +8,31 @@ interface IStandardSpecification {
   unit?: string; // Ex: "Go", "mAh", "kg"
 }
 
-// Interface pour les données brutes de ProductModel
-export interface IProductModel {
-  _id: Types.ObjectId | string; // Ajouter _id explicitement pour les objets lean
-  title: string; // Titre unique et standardisé pour le produit
-  brand: Types.ObjectId; // Modifié en Types.ObjectId
-  category: Types.ObjectId; // Modifié en Types.ObjectId
-  
-  standardDescription: string; // Description officielle et standardisée du produit
-  standardImageUrls: string[]; // URLs des images officielles et standardisées
-  keyFeatures?: string[]; // Liste des caractéristiques clés
-  isFeatured?: boolean; // Pour marquer les produits vedettes
-  
-  specifications: IStandardSpecification[]; // Spécifications techniques standardisées
-  
-  // Champs de gestion
-  slug?: string; // Ajout du champ slug qui était utilisé dans product-service
-  
-  // Référence au ScrapedProduct original si ce modèle a été généré à partir d'un scraping
-  // originalScrapedProductId?: Types.ObjectId; 
+// Interface de base pour les propriétés de ProductModel
+export interface IProductModelBase {
+  title: string;
+  slug: string;
+  brand: Types.ObjectId;
+  category: Types.ObjectId;
+  standardDescription: string;
+  standardImageUrls: string[];
+  keyFeatures?: string[];
+  isFeatured?: boolean;
+  specifications: IStandardSpecification[];
+}
 
+// Interface pour l'objet ProductModel tel qu'il pourrait être retourné (par ex. après .lean())
+export interface IProductModel extends IProductModelBase {
+  _id: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
 
-// Interface pour le document Mongoose, étendant les données brutes et Document
-export interface IProductModelDocument extends Omit<IProductModel, '_id'>, Document {}
+// Interface pour le document Mongoose
+export interface IProductModelDocument extends IProductModelBase, Document {
+  // _id, createdAt, updatedAt sont fournis par Document et timestamps:true
+  // Les méthodes comme isModified, isNew sont disponibles sur Document
+}
 
 const StandardSpecificationSchema = new Schema<IStandardSpecification>(
   {
@@ -43,13 +43,19 @@ const StandardSpecificationSchema = new Schema<IStandardSpecification>(
   { _id: false }
 );
 
-const ProductModelSchema = new Schema<IProductModel>(
+const ProductModelSchema = new Schema<IProductModelDocument>(
   {
     title: {
       type: String,
       required: [true, "Le titre standardisé est obligatoire."],
       trim: true,
-      unique: true, // Assurer que chaque ProductModel ReMarket a un titre unique
+      unique: true,
+      index: true,
+    },
+    slug: {
+      type: String,
+      required: true,
+      unique: true,
       index: true,
     },
     brand: {
@@ -91,9 +97,16 @@ const ProductModelSchema = new Schema<IProductModel>(
   }
 );
 
+ProductModelSchema.pre<IProductModelDocument>('save', function(next) {
+  if (this.isModified('title') || this.isNew) {
+    this.slug = slugify(this.title, { lower: true, strict: true, remove: /[*+~.()'"!:@]/g });
+  }
+  next();
+});
+
 // Index pour la recherche textuelle sur les champs importants
 ProductModelSchema.index({ title: 'text', brand: 'text', category: 'text', standardDescription: 'text' });
 
-const ProductModel = models.ProductModel || model<IProductModel>('ProductModel', ProductModelSchema);
+const ProductModel: Model<IProductModelDocument> = models.ProductModel || model<IProductModelDocument>('ProductModel', ProductModelSchema);
 
 export default ProductModel; 

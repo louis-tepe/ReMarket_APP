@@ -1,0 +1,30 @@
+{
+    "mcpServers": {
+      "filesystem": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@modelcontextprotocol/server-filesystem",
+          "/Users/tepe/Documents/Code/Project/remarket-app"
+        ]
+      },
+      "sequential-thinking": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@modelcontextprotocol/server-sequential-thinking"
+        ]
+      },
+      "MongoDB": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "mongodb-mcp-server",
+          "--connectionString",
+          "mongodb+srv://julienleboulch03:T5ABdjJRgfPAd9L9@cluster0.zmbhl3w.mongodb.net/remarket?retryWrites=true&w=majority&appName=Cluster0"
+        ]
+      }
+    }
+  }
+
+

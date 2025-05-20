@@ -1,17 +1,19 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import ProductCard, { ProductCardProps } from '@/components/shared/ProductCard';
 import { ShieldCheck, Repeat, PackageCheck } from 'lucide-react'; // Icônes pour la section explicative
 import { Suspense } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchFeaturedProductData } from "@/lib/product-service"; // Importer la fonction directe
+import FeaturedProductsClientWrapper from '@/components/shared/FeaturedProductsClientWrapper';
+import { ProductCardProps } from '@/components/shared/ProductCard'; // Importé pour le type de getFeaturedProducts
 
 // Fonction pour récupérer les produits vedettes côté serveur
 async function getFeaturedProducts(): Promise<ProductCardProps[]> {
   try {
-    // Appel direct à la logique métier au lieu de fetch HTTP
     const products = await fetchFeaturedProductData();
-    return products;
+    // Mapper `ProductData` vers `ProductCardProps` si nécessaire ici, ou s'assurer qu'ils sont compatibles.
+    // Pour l'instant, on suppose qu'ils sont compatibles ou que fetchFeaturedProductData retourne déjà ProductCardProps.
+    return products as ProductCardProps[]; // Cast explicite si nécessaire, ou mapper les champs.
   } catch (error: unknown) {
     console.error("Error fetching featured products directly:", error);
     if (error instanceof Error && error.cause) {
@@ -21,21 +23,10 @@ async function getFeaturedProducts(): Promise<ProductCardProps[]> {
   }
 }
 
-// Composant séparé pour la liste des produits vedettes pour utiliser Suspense
+// FeaturedProductsList est un Server Component qui passe les données au Client Component Wrapper
 async function FeaturedProductsList() {
   const products = await getFeaturedProducts();
-
-  if (!products || products.length === 0) {
-    return <p className="text-center text-muted-foreground">Aucun produit vedette à afficher pour le moment.</p>;
-  }
-
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-      {products.map((product) => (
-        <ProductCard key={product.id} {...product} />
-      ))}
-    </div>
-  );
+  return <FeaturedProductsClientWrapper initialProducts={products} />;
 }
 
 function FeaturedProductsSkeleton() {

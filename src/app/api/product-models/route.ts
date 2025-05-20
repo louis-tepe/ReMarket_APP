@@ -6,6 +6,7 @@ import ProductModel from '@/models/ProductModel';
 import CategoryModel, { ICategory } from '@/models/CategoryModel';
 import BrandModel, { IBrand } from '@/models/BrandModel';
 import slugify from 'slugify';
+import { Types } from 'mongoose';
 
 // TODO: Connecter à la base de données et utiliser les modèles Mongoose
 // import dbConnect from '@/lib/db.Connect';
@@ -82,12 +83,12 @@ interface PostProductModelResponse {
  *       - ProductModels
  *     parameters:
  *       - in: query
- *         name: categoryId # Devrait être categorySlug
+ *         name: categorySlug
  *         schema:
  *           type: string
  *         description: Le SLUG de la catégorie (ex: telephones-mobiles).
  *       - in: query
- *         name: brandId # Devrait être brandSlug
+ *         name: brandSlug
  *         schema:
  *           type: string
  *         description: Le SLUG de la marque (ex: apple).
@@ -123,8 +124,8 @@ interface PostProductModelResponse {
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const categorySlug = searchParams.get('categoryId');
-  const brandSlug = searchParams.get('brandId');
+  const categorySlug = searchParams.get('categorySlug');
+  const brandSlug = searchParams.get('brandSlug');
   const searchTerm = searchParams.get('searchTerm');
 
   try {
@@ -184,8 +185,8 @@ export async function GET(request: NextRequest) {
       productModelItems.push({
         id: String(pm._id), // S'assurer que c'est bien _id de ProductModel
         name: pm.title,    // title de ProductModel
-        brand: pm.brand,   // brand de ProductModel
-        category: pm.category, // category de ProductModel
+        brand: String(pm.brand),   // Conversion de pm.brand (ObjectId) en string
+        category: String(pm.category), // Conversion de pm.category (ObjectId) en string
       });
       // if (pm.asin) seenAsins.add(pm.asin);
     });
@@ -420,7 +421,15 @@ export async function POST(request: NextRequest) {
     // Préparer la réponse
     const responsePayload: PostProductModelResponse = {
       scrapedProduct: existingScrapedProduct.toObject(), // Convertir en objet simple
-      productModel: productModel ? productModel.toObject() : null, // Convertir en objet simple
+      productModel: productModel 
+        ? { 
+            ...productModel.toObject(), 
+            _id: (productModel._id as unknown as Types.ObjectId).toString(), 
+            brand: (productModel.brand as unknown as Types.ObjectId).toString(), 
+            category: (productModel.category as unknown as Types.ObjectId).toString(), 
+            keyFeatures: (productModel.keyFeatures as unknown as string[] | undefined) || [] 
+          }
+        : null,
       pmError: pmError,
     };
 

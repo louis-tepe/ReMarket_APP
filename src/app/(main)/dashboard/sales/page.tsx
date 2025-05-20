@@ -12,7 +12,7 @@ import { Edit3, Trash2, PlusCircle, AlertTriangle, Info, Package } from 'lucide-
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from 'sonner';
 
-interface ProductModelInfo {
+export interface ProductModelInfo {
     id: string;
     name: string;
     imageUrl?: string;
@@ -57,58 +57,22 @@ const translateStatus = (status: SellerOffer['status']): string => {
 };
 
 async function fetchSellerOffers(userId: string): Promise<SellerOffer[]> {
-    // TODO: Remplacer par un appel réel à GET /api/users/${userId}/offers
-    // L'API devrait retourner IOffer[] avec productModel peuplé
     if (!userId) return [];
-    console.log(`Appel simulé à fetchSellerOffers pour l'utilisateur ${userId}`);
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            resolve([
-                {
-                    id: 'offer1',
-                    productModel: { id: 'prod1', name: 'iPhone 13 Pro', imageUrl: 'https://via.placeholder.com/80/FFA500/FFFFFF?Text=P1' },
-                    price: 700,
-                    currency: 'EUR',
-                    condition: 'used_good',
-                    status: 'available',
-                    sellerDescription: "En très bon état, quelques micro-rayures sur l'écran.",
-                    sellerPhotos: ['https://via.placeholder.com/150'],
-                    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-                },
-                {
-                    id: 'offer2',
-                    productModel: { id: 'prod2', name: 'MacBook Air M1', imageUrl: 'https://via.placeholder.com/80/4CAF50/FFFFFF?Text=P2' },
-                    price: 900,
-                    currency: 'EUR',
-                    condition: 'used_likenew',
-                    status: 'sold',
-                    sellerDescription: "Comme neuf, utilisé pour quelques présentations.",
-                    sellerPhotos: ['https://via.placeholder.com/150'],
-                    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-                },
-                {
-                    id: 'offer3',
-                    productModel: { id: 'prod3', name: 'Sony WH-1000XM4', imageUrl: 'https://via.placeholder.com/80/2196F3/FFFFFF?Text=P3' },
-                    price: 250,
-                    currency: 'EUR',
-                    condition: 'used_fair',
-                    status: 'pending_shipment',
-                    sellerPhotos: ['https://via.placeholder.com/150'],
-                    createdAt: new Date().toISOString(),
-                },
-                {
-                    id: 'offer4',
-                    productModel: { id: 'prod4', name: 'Samsung Odyssey G7' }, // Pas d'image
-                    price: 450,
-                    currency: 'EUR',
-                    condition: 'new',
-                    status: 'available',
-                    sellerPhotos: ['https://via.placeholder.com/150'],
-                    createdAt: new Date(Date.now() - 86400000 * 10).toISOString(),
-                },
-            ]);
-        }, 1000);
-    });
+
+    try {
+        const response = await fetch(`/api/users/${userId}/offers`);
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('API Error:', errorData.message || response.statusText);
+            throw new Error(`Failed to fetch offers: ${errorData.message || response.statusText}`);
+        }
+        const offers: SellerOffer[] = await response.json();
+        return offers;
+    } catch (error) {
+        console.error('Error fetching seller offers:', error);
+        // Propager l'erreur pour qu'elle soit gérée dans le useEffect
+        throw error;
+    }
 }
 
 function SellerDashboardSkeleton() {

@@ -11,6 +11,7 @@ export interface IUser extends Document {
   // Ajoutez d'autres champs selon les besoins de ReMarket
   // par exemple : role, adresses, etc.
   role: 'user' | 'seller' | 'admin'; // Ajout du champ role
+  favorites: mongoose.Types.ObjectId[]; // Champ pour les favoris
   createdAt: Date;
   updatedAt: Date;
 }
@@ -49,6 +50,12 @@ const UserSchema: Schema<IUser> = new Schema(
       default: 'user',
       required: true, // Le rôle est maintenant requis
     },
+    favorites: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'ProductModel', // Référence au modèle ProductModel
+      },
+    ],
   },
   {
     timestamps: true, // Ajoute createdAt et updatedAt automatiquement

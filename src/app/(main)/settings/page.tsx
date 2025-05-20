@@ -2,9 +2,71 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Settings as SettingsIcon } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { useEffect, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
 
 export default function SettingsPage() {
-    // TODO: Implémenter la logique des paramètres utilisateur (ex: profil, notifications, etc.)
+    const { data: session, status } = useSession();
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        if (session?.user) {
+            setName(session.user.name ?? '');
+            setEmail(session.user.email ?? '');
+        }
+    }, [session]);
+
+    if (status === "loading") {
+        return <p>Chargement...</p>;
+    }
+
+    if (!session?.user) {
+        return <p>Veuillez vous connecter pour accéder aux paramètres.</p>;
+    }
+
+    const handleProfileSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsLoading(true);
+
+        if (!session?.user?.id) {
+            toast.error("Erreur: ID utilisateur non trouvé.");
+            setIsLoading(false);
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/users/${session.user.id}`,
+                {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name, email }),
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || "Une erreur s'est produite lors de la mise à jour.");
+            }
+
+            toast.success("Profil mis à jour avec succès!");
+
+        } catch (error) {
+            console.error("Erreur lors de la mise à jour du profil:", error);
+            toast.error(error instanceof Error ? error.message : "Une erreur inconnue s'est produite.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     return (
         <div className="container mx-auto py-8">
@@ -20,10 +82,30 @@ export default function SettingsPage() {
                     <CardTitle>Informations du Profil</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <p className="text-muted-foreground">
-                        Section pour modifier les informations de profil (nom, email, mot de passe, etc.).
-                    </p>
-                    {/* TODO: Ajouter les champs de formulaire pour le profil */}
+                    <form onSubmit={handleProfileSubmit} className="space-y-4">
+                        <div>
+                            <Label htmlFor="name">Nom</Label>
+                            <Input
+                                id="name"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder="Votre nom"
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="email">Email</Label>
+                            <Input
+                                id="email"
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder="Votre email"
+                            />
+                        </div>
+                        <Button type="submit" disabled={isLoading}>
+                            {isLoading ? "Enregistrement..." : "Enregistrer les modifications"}
+                        </Button>
+                    </form>
                 </CardContent>
             </Card>
 
@@ -31,11 +113,52 @@ export default function SettingsPage() {
                 <CardHeader>
                     <CardTitle>Préférences de Notification</CardTitle>
                 </CardHeader>
-                <CardContent>
-                    <p className="text-muted-foreground">
-                        Gérez ici vos préférences de notification.
+                <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between space-x-2">
+                        <Label htmlFor="notification-offers" className="flex flex-col space-y-1">
+                            <span>Nouvelles offres</span>
+                            <span className="font-normal leading-snug text-muted-foreground">
+                                Recevoir des notifications pour les nouvelles offres correspondant à vos intérêts.
+                            </span>
+                        </Label>
+                        <Switch id="notification-offers" defaultChecked />
+                        {/* TODO: Lier à l'état et sauvegarder la préférence */}
+                    </div>
+                    <div className="flex items-center justify-between space-x-2">
+                        <Label htmlFor="notification-sales" className="flex flex-col space-y-1">
+                            <span>Confirmations de vente</span>
+                            <span className="font-normal leading-snug text-muted-foreground">
+                                Être notifié lorsque l&apos;un de vos articles est vendu.
+                            </span>
+                        </Label>
+                        <Switch id="notification-sales" />
+                        {/* TODO: Lier à l'état et sauvegarder la préférence */}
+                    </div>
+                    <div className="flex items-center justify-between space-x-2">
+                        <Label htmlFor="notification-updates" className="flex flex-col space-y-1">
+                            <span>Mises à jour du site</span>
+                            <span className="font-normal leading-snug text-muted-foreground">
+                                Recevoir des informations sur les nouveautés et mises à jour de ReMarket.
+                            </span>
+                        </Label>
+                        <Switch id="notification-updates" defaultChecked />
+                        {/* TODO: Lier à l'état et sauvegarder la préférence */}
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card className="mt-6">
+                <CardHeader>
+                    <CardTitle>Sécurité</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div>
+                        <Label htmlFor="confirmPassword">Confirmer le mot de passe</Label>
+                        <Input id="confirmPassword" type="password" />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                        Assurez-vous que c&apos;est bien vous. Votre mot de passe actuel est requis pour modifier l&apos;adresse e-mail ou le mot de passe.
                     </p>
-                    {/* TODO: Ajouter les options de notification */}
                 </CardContent>
             </Card>
 

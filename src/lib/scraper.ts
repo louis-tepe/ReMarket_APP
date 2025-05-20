@@ -290,10 +290,10 @@ export const scrapeAmazonProduct = async (
     productName: string
 ): Promise<AmazonProductDetails | null> => {
     log.info(`Starting Amazon scrape for product: "${productName}"`);
-    log.info(`[SCRAPER_DEBUG] productName reçu: "${productName}"`);
+    // log.info(`[SCRAPER_DEBUG] productName reçu: "${productName}"`);
 
     const searchUrl = `https://www.amazon.com/s?k=${encodeURIComponent(productName)}&language=en_US&ref=nb_sb_noss`;
-    log.info(`[SCRAPER_DEBUG] searchUrl construit: ${searchUrl}`);
+    // log.info(`[SCRAPER_DEBUG] searchUrl construit: ${searchUrl}`);
     let productUrl: string | null = null;
     let productDetails: AmazonProductDetails | null = null;
     // Déclarer une variable pour stocker le résultat du handler
@@ -323,12 +323,12 @@ export const scrapeAmazonProduct = async (
         navigationTimeoutSecs: 75, // Timeout appliqué ici
 
         async requestHandler({ $, request, log }: CheerioCrawlingContext) {
-            log.info(`Processing search results page: ${request.url}`);
+            // log.info(`Processing search results page: ${request.url}`);
             handleCaptchaBlocking($, request.url);
 
             // Itérer sur les conteneurs de résultats au lieu de prendre seulement le premier lien global
             const resultItems = $('div[role="listitem"][data-component-type="s-search-result"]');
-            log.info(`Found ${resultItems.length} potential result items.`);
+            // log.info(`Found ${resultItems.length} potential result items.`);
 
             for (let i = 0; i < resultItems.length; i++) {
                 const item = resultItems.eq(i);
@@ -340,21 +340,21 @@ export const scrapeAmazonProduct = async (
 
                     // Vérifier si le lien est sponsorisé (contient /sspa/)
                     if (resultHref.includes('/sspa/')) {
-                        log.info(`Item ${i + 1} is a sponsored link, skipping.`);
+                        // log.info(`Item ${i + 1} is a sponsored link, skipping.`);
                         continue; // Passer à l'élément suivant
                     }
 
                     // Construct absolute URL carefully
                     try {
                         const absoluteUrl = new URL(resultHref, 'https://www.amazon.com/').toString();
-                        log.info(`Found potential non-sponsored product URL: ${absoluteUrl}`);
-                        log.info(`[SCRAPER_DEBUG] Considération du lien: ${absoluteUrl}`);
+                        // log.info(`Found potential non-sponsored product URL: ${absoluteUrl}`);
+                        // log.info(`[SCRAPER_DEBUG] Considération du lien: ${absoluteUrl}`);
 
                         // Validate URL structure (basic check)
                         if (absoluteUrl.includes('/dp/') || absoluteUrl.includes('/gp/product/')) {
                             productUrl = absoluteUrl;
-                            log.info(`Validated product URL found: ${productUrl}`);
-                            log.info(`[SCRAPER_DEBUG] URL de produit sélectionnée pour la Phase 2: ${productUrl}`);
+                            // log.info(`Validated product URL found: ${productUrl}`);
+                            // log.info(`[SCRAPER_DEBUG] URL de produit sélectionnée pour la Phase 2: ${productUrl}`);
                             // Stop the search crawler once a valid, non-sponsored URL is found
                             await searchCrawler.autoscaledPool?.abort();
                             break; // Sortir de la boucle for
@@ -385,7 +385,7 @@ export const scrapeAmazonProduct = async (
     await searchCrawler.run();
     await searchQueue.drop();
 
-    log.info(`[SCRAPER_DEBUG] productUrl avant la Phase 2 (après searchCrawler.run): ${productUrl}`);
+    // log.info(`[SCRAPER_DEBUG] productUrl avant la Phase 2 (après searchCrawler.run): ${productUrl}`);
 
     // --- Phase 2: Scrape the product page if URL was found ---
     if (productUrl) {
@@ -413,7 +413,7 @@ export const scrapeAmazonProduct = async (
             navigationTimeoutSecs: 75, // Timeout appliqué ici
 
             async requestHandler({ $, request, log }: CheerioCrawlingContext) {
-                log.info(`Processing product page: ${request.loadedUrl ?? request.url}`);
+                // log.info(`Processing product page: ${request.loadedUrl ?? request.url}`);
                 handleCaptchaBlocking($, request.loadedUrl ?? request.url);
 
                 // Stocker dans la variable locale temporaire

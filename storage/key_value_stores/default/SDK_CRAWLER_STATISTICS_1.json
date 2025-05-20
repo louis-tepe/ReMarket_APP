@@ -1,27 +1,38 @@
 {
   "requestsFinished": 1,
   "requestsFailed": 0,
-  "requestsRetries": 0,
+  "requestsRetries": 1,
   "requestsFailedPerMinute": 0,
-  "requestsFinishedPerMinute": 22,
-  "requestMinDurationMillis": 2502,
-  "requestMaxDurationMillis": 2502,
+  "requestsFinishedPerMinute": 24,
+  "requestMinDurationMillis": 1795,
+  "requestMaxDurationMillis": 1795,
   "requestTotalFailedDurationMillis": 0,
-  "requestTotalFinishedDurationMillis": 2502,
-  "crawlerStartedAt": "2025-05-19T13:07:45.639Z",
-  "crawlerFinishedAt": "2025-05-19T13:07:48.379Z",
-  "statsPersistedAt": "2025-05-19T13:07:48.379Z",
-  "crawlerRuntimeMillis": 2753,
-  "crawlerLastStartTimestamp": 1747660065626,
+  "requestTotalFinishedDurationMillis": 1795,
+  "crawlerStartedAt": "2025-05-20T06:39:32.130Z",
+  "crawlerFinishedAt": "2025-05-20T06:39:34.620Z",
+  "statsPersistedAt": "2025-05-20T06:39:34.620Z",
+  "crawlerRuntimeMillis": 2495,
+  "crawlerLastStartTimestamp": 1747723172125,
   "requestRetryHistogram": [
+    null,
     1
   ],
   "statsId": 1,
   "requestAvgFailedDurationMillis": null,
-  "requestAvgFinishedDurationMillis": 2502,
-  "requestTotalDurationMillis": 2502,
+  "requestAvgFinishedDurationMillis": 1795,
+  "requestTotalDurationMillis": 1795,
   "requestsTotal": 1,
   "requestsWithStatusCode": {},
   "errors": {},
-  "retryErrors": {}
+  "retryErrors": {
+    "rsc": {
+      "missing error code": {
+        "Error": {
+          "CAPTCHA detected on page: https://www.amazon.com/Apple-2022-MacBook-Laptop-chip/dp/B0DLHGZCBD/ref=sr_1_1?dib=eyJ2IjoiMSJ9.n7WQSCbbKUd8QQRL132eJeD3S115RzXkJLrj0A3UPDanOhP_VkmtmfalI4RxgdpvxUNmEX9C0LUkQsGrc0CdDO6NBK1Q9GSFtCTzi6_hhau5CBA5_mOrI5QdUwbTHSuO-jBS-R0RN1aEvke7XJf9Q5M2rTh89zBhIVvIqcBUezRmkTyJHunfvgFpg-UEQyMzzLjqdVVdP9cNTDSInNzjs5j9rlRYU4aJ8fSrRIDkRfk.I4vCYxpI8xS0l-waDXEGhgQ8wGsO1N3R_hXH8Ls5xcc&dib_tag=se&keywords=Apple+macbook+air+m2&qid=1747723170&sr=8-1": {
+            "count": 1
+          }
+        }
+      }
+    }
+  }
 }

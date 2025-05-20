@@ -12,10 +12,6 @@ import '@/models/discriminators/SmartphoneModel';
 import '@/models/discriminators/LaptopModel';
 // Ajoutez d'autres imports de discriminateurs ici au fur et à mesure de leur création
 
-interface SessionWithId extends Session {
-  user?: Session['user'] & { id?: string };
-}
-
 /**
  * @swagger
  * /api/offers:
@@ -125,9 +121,9 @@ interface SessionWithId extends Session {
 export async function POST(request: NextRequest) {
   try {
     await dbConnect();
-    const session: SessionWithId | null = await getServerSession(authOptions);
+    const session: Session | null = await getServerSession(authOptions);
 
-    if (!session || !session.user || !session.user.id) {
+    if (!session || !session.user) {
       return NextResponse.json({ success: false, message: "Authentification requise." }, { status: 401 });
     }
     const userId = session.user.id;

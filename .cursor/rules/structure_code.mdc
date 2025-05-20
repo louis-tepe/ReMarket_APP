@@ -9,6 +9,3 @@ alwaysApply: true
 3.  **Efficiency:** Concise, performant code; remove redundancy.
 4.  **Error Handling:** Simple, clear, effective checks.
 5.  **Documentation:** Minimal comments (only for 'why' or complex 'what').
-
-**Modern Tooling & Documentation:**
-For tasks associated with modern or recent tools or libraries requiring up-to-date version information or specific documentation (ex: Next.js, NextAuth, shacdn, gemini ai, etc), generally use context7

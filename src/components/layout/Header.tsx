@@ -98,7 +98,7 @@ export default function Header() {
 
                 <div className="flex items-center space-x-3 sm:space-x-4">
                     <Button variant="ghost" size="icon" asChild>
-                        <Link href="/search" aria-label="Rechercher">
+                        <Link href="/categories" aria-label="Rechercher">
                             <Search className="h-5 w-5" />
                         </Link>
                     </Button>

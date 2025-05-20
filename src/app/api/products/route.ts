@@ -25,8 +25,9 @@ interface LeanProductModel {
   // N'inclut pas les méthodes Mongoose Document
 }
 
-interface ProductWithOffers extends LeanProductModel { // Modifié pour utiliser LeanProductModel
-  sellerOffers: IOffer[]; 
+interface ProductWithOffers extends Omit<LeanProductModel, 'slug'> {
+  slug: string; // Slug est maintenant garanti présent
+  sellerOffers: IOffer[];
 }
 
 // Type pour l'objet Category après .lean()
@@ -34,11 +35,32 @@ interface LeanCategory {
   _id: Types.ObjectId;
   name: string;
   slug: string;
+  parent?: Types.ObjectId | string | null; // Ajout pour la récursivité
+  children?: LeanCategory[]; // Ajout pour la récursivité
 }
 
 // Type pour l'objet Brand après .lean()
 interface LeanBrand {
   _id: Types.ObjectId;
+}
+
+// Helper function to get all descendant category IDs
+async function getCategoryWithDescendants(categoryId: Types.ObjectId): Promise<Types.ObjectId[]> {
+  const descendantIds: Types.ObjectId[] = [categoryId];
+  
+  // Recursive function to find children
+  async function findChildren(parentId: Types.ObjectId) {
+    // La requête ne sélectionne que _id, donc le type de children doit correspondre.
+    // Caster le résultat pour aider TypeScript avec l'inférence du type _id après .lean()
+    const children = (await CategoryModel.find({ parent: parentId }).select('_id').lean()) as unknown as { _id: Types.ObjectId }[];
+    for (const child of children) {
+      descendantIds.push(child._id);
+      await findChildren(child._id); // Recursively find grandchildren
+    }
+  }
+
+  await findChildren(categoryId);
+  return descendantIds;
 }
 
 export async function GET(request: NextRequest) {
@@ -62,10 +84,11 @@ export async function GET(request: NextRequest) {
 
     // Filtre par catégorie
     if (categorySlug) {
-      const category = await CategoryModel.findOne({ slug: categorySlug.toLowerCase() }).lean() as LeanCategory | null;
+      const category = await CategoryModel.findOne({ slug: categorySlug.toLowerCase() }).select('_id name slug parent').lean() as LeanCategory | null;
       if (category) {
-        query.category = category._id; 
-        console.log('[API_PRODUCTS_GET] Applied category filter to query. Category ID:', category._id);
+        const categoryIdsToFilter = await getCategoryWithDescendants(category._id);
+        query.category = { $in: categoryIdsToFilter }; 
+        console.log(`[API_PRODUCTS_GET] Applied category filter (including descendants) to query. Category ID: ${category._id}, Found ${categoryIdsToFilter.length} total category IDs (including descendants).`);
       } else {
         console.log('[API_PRODUCTS_GET] Category slug not found, returning empty for category filter:', categorySlug);
         return NextResponse.json({ success: true, data: [] }, { status: 200 });
@@ -123,10 +146,12 @@ export async function GET(request: NextRequest) {
         
         console.log(`[API_PRODUCTS_GET] Found ${sellerOffers.length} active/available offers for ProductModel ID: ${product._id}`);
         
-        // product est déjà un objet "lean", donc JSON.parse(JSON.stringify(product)) n'est pas strictement nécessaire
-        // sauf si product.brand ou product.category étaient des ObjectId non stringifiés par .lean() dans certains cas (ce qui ne devrait pas arriver ici)
+        // Générer le slug s'il est manquant
+        const generatedSlug = product.slug || product.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+
         return {
           ...product, // product est déjà un LeanProductModel
+          slug: generatedSlug, // Assurer que le slug est toujours présent
           sellerOffers,
         };
       })

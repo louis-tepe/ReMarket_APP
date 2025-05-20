@@ -47,11 +47,12 @@ interface CategoryNode extends LeanCategory { // Utilise LeanCategory
 }
 
 interface FiltersSidebarProps {
-    allCategories: LeanCategory[]; // Attend des LeanCategory
-    allBrands: LeanBrand[]; // Modifié pour utiliser LeanBrand
+    allCategories: LeanCategory[];
+    allBrands: LeanBrand[];
     activeCategorySlug?: string;
+    activeBrandSlugs?: string[];
     currentCategoryAncestors?: string[];
-    onFiltersChange: (filters: { categorySlug?: string; brandSlugs?: string[] }) => void;
+    onFiltersChange: (filters: { categorySlug?: string; brandSlugs?: string[]; searchQuery?: string }) => void;
     basePath?: string;
 }
 
@@ -61,13 +62,21 @@ const INDENT_PER_DEPTH = 10; // Augmentation du padding-left (en px) par niveau 
 export default function FiltersSidebar({
     allCategories,
     allBrands,
-    activeCategorySlug, // NOUVEAU
+    activeCategorySlug,
+    activeBrandSlugs,
     currentCategoryAncestors = [],
     onFiltersChange,
     basePath = '/categories',
 }: FiltersSidebarProps) {
-    const [selectedBrandSlugs, setSelectedBrandSlugs] = useState<string[]>([]);
+    const [selectedBrandSlugs, setSelectedBrandSlugs] = useState<string[]>(activeBrandSlugs || []);
     const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+
+    useEffect(() => {
+        const propBrands = activeBrandSlugs || [];
+        if (JSON.stringify(propBrands.sort()) !== JSON.stringify(selectedBrandSlugs.sort())) {
+            setSelectedBrandSlugs(propBrands);
+        }
+    }, [activeBrandSlugs, selectedBrandSlugs]);
 
     const categoriesTree = useMemo(() => {
         const map: Record<string, CategoryNode> = {};
@@ -197,7 +206,9 @@ export default function FiltersSidebar({
     };
 
     const clearCategoryFilter = () => {
-        onFiltersChange({ categorySlug: undefined, brandSlugs: selectedBrandSlugs }); // Garder les filtres de marque
+        // Réinitialise la catégorie, les marques ET la recherche
+        onFiltersChange({ categorySlug: undefined, brandSlugs: undefined, searchQuery: '' });
+        setSelectedBrandSlugs([]);
         setExpandedCategories({});
     }
 

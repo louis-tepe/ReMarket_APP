@@ -1,25 +1,27 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Heart as HeartIcon, Info } from "lucide-react";
 import ProductCard, { ProductCardProps } from '@/components/shared/ProductCard'; // Assurez-vous que le chemin est correct
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import Link from 'next/link';
 
-// Simuler la récupération des favoris
 async function fetchFavoriteProducts(): Promise<ProductCardProps[]> {
-    // TODO: Implémenter la logique réelle pour récupérer les favoris de l'utilisateur (ex: via API)
-    console.log("Simulation: fetchFavoriteProducts called");
-    return new Promise(resolve => {
-        setTimeout(() => {
-            // Exemple de données mockées
-            resolve([
-                { id: 'fav_prod_1', slug: 'iphone-13-pro-graphite-256go', name: 'iPhone 13 Pro 256Go - Graphite', imageUrl: '/images/placeholders/iphone1.jpg', price: 750 },
-                { id: 'fav_prod_2', slug: 'macbook-air-m2-minuit-512go', name: 'MacBook Air M2 13.6p 512Go - Minuit', imageUrl: '/images/placeholders/macbook1.jpg', price: 1100 },
-            ]);
-        }, 800);
-    });
+    // console.log("Appel à fetchFavoriteProducts pour récupérer les favoris via API"); // Commenté pour moins de verbosité
+    try {
+        const response = await fetch('/api/favorites');
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: response.statusText }));
+            console.error('Erreur API lors de la récupération des favoris:', errorData.message);
+            throw new Error(`Impossible de charger les favoris: ${errorData.message || 'Erreur serveur'}`);
+        }
+        const favorites: ProductCardProps[] = await response.json();
+        return favorites;
+    } catch (error) {
+        console.error("Erreur dans fetchFavoriteProducts:", error);
+        throw error;
+    }
 }
 
 function FavoritesPageSkeleton() {
@@ -59,6 +61,17 @@ export default function FavoritesPage() {
             .finally(() => setIsLoading(false));
     }, []);
 
+    const handleFavoriteToggled = useCallback((productId: string, isFavorite: boolean) => {
+        // Sur la page des favoris, si un produit n'est plus un favori (isFavorite == false),
+        // nous le retirons de la liste.
+        if (!isFavorite) {
+            setFavorites(prevFavorites => prevFavorites.filter(fav => fav.id !== productId));
+        }
+        // Si isFavorite est true, cela ne devrait pas arriver depuis un clic sur ProductCard
+        // car il serait déjà favori. On pourrait re-fetch pour être sûr, mais pour l'UI
+        // c'est surtout la suppression qui importe ici.
+    }, []);
+
     return (
         <div className="container mx-auto py-8">
             <div className="flex items-center justify-between mb-8">
@@ -95,7 +108,12 @@ export default function FavoritesPage() {
             {!isLoading && !error && favorites.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                     {favorites.map(product => (
-                        <ProductCard key={product.id} {...product} />
+                        <ProductCard
+                            key={product.id}
+                            {...product}
+                            initialIsFavorite={true} // Toujours vrai sur cette page
+                            onFavoriteToggle={handleFavoriteToggled}
+                        />
                     ))}
                 </div>
             )}

@@ -75,9 +75,14 @@ interface CartActionPayload {
 // GET: Récupérer le panier de l'utilisateur
 export async function GET() {
     const session = await getServerSession(authOptions);
-    console.log("GET /api/cart - Session récupérée:", JSON.stringify(session, null, 2));
+    if (session && session.user && (session.user as { id?: string }).id) {
+        console.log(`GET /api/cart - Session récupérée pour l'utilisateur ID: ${(session.user as { id: string }).id}`);
+    } else {
+        console.log("GET /api/cart - Session non récupérée ou ID utilisateur manquant.");
+    }
+
     if (!session || !session.user || !(session.user as { id?: string }).id) {
-        console.error("GET /api/cart - Échec auth ou ID utilisateur manquant. Session:", JSON.stringify(session, null, 2));
+        console.error("GET /api/cart - Échec auth ou ID utilisateur manquant. Session:", session ? JSON.stringify({ userId: (session.user as {id?: string})?.id }) : 'null');
         return NextResponse.json({ success: false, message: 'Authentification requise.' }, { status: 401 });
     }
     const userId = (session.user as { id: string }).id;
@@ -125,9 +130,14 @@ export async function GET() {
 // POST: Gérer les actions sur le panier (ajouter, supprimer, mettre à jour)
 export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
-    console.log("POST /api/cart - Session récupérée:", JSON.stringify(session, null, 2));
+    if (session && session.user && (session.user as { id?: string }).id) {
+        console.log(`POST /api/cart - Session récupérée pour l'utilisateur ID: ${(session.user as { id: string }).id}`);
+    } else {
+        console.log("POST /api/cart - Session non récupérée ou ID utilisateur manquant.");
+    }
+
     if (!session || !session.user || !(session.user as { id?: string }).id) {
-        console.error("POST /api/cart - Échec auth ou ID utilisateur manquant. Session:", JSON.stringify(session, null, 2));
+        console.error("POST /api/cart - Échec auth ou ID utilisateur manquant. Session:", session ? JSON.stringify({ userId: (session.user as {id?: string})?.id }) : 'null');
         return NextResponse.json({ success: false, message: 'Authentification requise.' }, { status: 401 });
     }
     const userId = (session.user as { id: string }).id;

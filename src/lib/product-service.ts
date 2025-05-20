@@ -8,17 +8,18 @@ const FEATURED_PRODUCTS_LIMIT = 4;
 export async function fetchFeaturedProductData(): Promise<ProductCardProps[]> {
   await dbConnect();
 
-  const featuredProductModels: IProductModel[] = await ProductModel.find({
-    isFeatured: true,
-  })
-    .limit(FEATURED_PRODUCTS_LIMIT)
-    .lean<IProductModel[]>();
+  const randomProductModels: IProductModel[] = await ProductModel.aggregate([
+    { $sample: { size: FEATURED_PRODUCTS_LIMIT * 2 } },
+  ]).exec();
 
-  const productsForCardPromises = featuredProductModels.map(
+  if (!randomProductModels || randomProductModels.length === 0) {
+    return [];
+  }
+
+  const productsForCardPromises = randomProductModels.map(
     async (product: IProductModel) => {
       const cheapestOffer: IProductBase | null = await ProductOfferModel.findOne({
         productModel: product._id,
-        listingStatus: "active",
         transactionStatus: "available",
       })
         .sort({ price: 1 })
@@ -39,10 +40,10 @@ export async function fetchFeaturedProductData(): Promise<ProductCardProps[]> {
   const productsForCard = await Promise.all(productsForCardPromises);
   
   const validProducts = productsForCard.filter(
-    (p): p is Omit<typeof p, 'price'> & { price: number } => p.price !== null
+    (p): p is Omit<typeof p, 'price'> & { price: number } => p.price !== null && p.price > 0
   );
 
-  return validProducts.map(p => ({
+  return validProducts.slice(0, FEATURED_PRODUCTS_LIMIT).map(p => ({
     ...p,
   })) as ProductCardProps[];
 } 

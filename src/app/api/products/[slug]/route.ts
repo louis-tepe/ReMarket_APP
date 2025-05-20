@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db.Connect';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import BrandModel from '@/models/BrandModel';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import CategoryModel from '@/models/CategoryModel';
 import ProductModel, { IProductModel } from '@/models/ProductModel';
 import ProductOfferModel, { IProductBase } from '@/models/ProductBaseModel';
 import UserModel from '@/models/User';
