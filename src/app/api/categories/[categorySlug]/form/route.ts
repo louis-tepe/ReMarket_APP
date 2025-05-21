@@ -6,6 +6,24 @@ import ProductOfferModel from '@/models/ProductBaseModel';
 // avant que cette route ne soit utilisée.
 import '@/models/discriminators/SmartphoneModel';
 import '@/models/discriminators/LaptopModel';
+import '@/models/discriminators/MonitorModel';
+import '@/models/discriminators/CasesCoversModel';
+import '@/models/discriminators/ChargersCablesModel';
+import '@/models/discriminators/CpuModel';
+import '@/models/discriminators/DesktopComputerModel';
+import '@/models/discriminators/FeaturePhoneModel';
+import '@/models/discriminators/FitnessTrackerModel';
+import '@/models/discriminators/GpuModel';
+import '@/models/discriminators/KeyboardModel';
+import '@/models/discriminators/MotherboardModel';
+import '@/models/discriminators/PcCaseModel';
+import '@/models/discriminators/PowerBanksModel';
+import '@/models/discriminators/PsuModel';
+import '@/models/discriminators/RamModel';
+import '@/models/discriminators/ScreenProtectorsModel';
+import '@/models/discriminators/SmartwatchModel';
+import '@/models/discriminators/StorageModel';
+import '@/models/discriminators/TabletModel';
 // ... ajoutez d'autres imports de discriminateurs au besoin
 
 function generateLabel(name: string): string {

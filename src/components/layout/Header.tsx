@@ -13,7 +13,17 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { UserCircle, LayoutDashboard, Settings, Heart, LogIn, LogOut, Search, ShoppingCart } from "lucide-react";
+import {
+    UserCircle,
+    LayoutDashboard,
+    Settings,
+    Heart,
+    LogIn,
+    LogOut,
+    Search,
+    ShoppingCart,
+    MessageCircle,
+} from "lucide-react";
 import Image from "next/image";
 
 // Interface pour la structure d'une catégorie
@@ -105,6 +115,11 @@ export default function Header() {
                     <Button variant="ghost" size="icon" asChild>
                         <Link href="/cart" aria-label="Panier">
                             <ShoppingCart className="h-5 w-5" />
+                        </Link>
+                    </Button>
+                    <Button variant="ghost" size="icon" asChild>
+                        <Link href="/chat" aria-label="Chat avec Gemini">
+                            <MessageCircle className="h-5 w-5" />
                         </Link>
                     </Button>
 

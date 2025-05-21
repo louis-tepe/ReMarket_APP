@@ -10,6 +10,7 @@ interface SeedCategoryDefinition {
   description?: string;
   children?: SeedCategoryDefinition[];
   // formFieldDefinitions?: any[]; // Décommentez et typez si vous ajoutez des formFieldDefinitions spécifiques
+  imageAnalysisPrompt?: string;
 }
 
 // Compteurs pour le résumé du seeding
@@ -55,6 +56,7 @@ async function createCategoryRecursive(
         description: categoryData.description || '',
         isLeafNode: isActuallyLeaf, // Défini en fonction des enfants dans les données de seed
         // formFieldDefinitions: categoryData.formFieldDefinitions, // Si utilisé
+        imageAnalysisPrompt: categoryData.imageAnalysisPrompt,
       };
 
       if (parentId) {
@@ -138,6 +140,36 @@ async function createCategoryRecursive(
   }
 }
 
+// Fonction pour générer un prompt d'analyse d'image générique pour une catégorie
+function generateCategoryAnalysisPrompt(categoryName: string): string {
+  // Échapper les apostrophes pour l'utilisation dans une chaîne de caractères JavaScript
+  const escapedCategoryName = categoryName.replace(/'/g, "\'");
+  return (
+    `Évalue l'état cosmétique de cet objet (catégorie: ${escapedCategoryName}) sur une échelle de 0 à 4. ` +
+    `Inspecte attentivement les signes d'usure, les rayures, les bosses, la propreté, et l'intégrité générale. ` +
+    `0 = très mauvais état/inutilisable/pièces ; 1 = défauts majeurs/fortement usé ; ` +
+    `2 = usure notable/plusieurs défauts mineurs ; 3 = usure légère/quelques défauts mineurs ; ` +
+    `4 = excellent état/comme neuf/aucun défaut visible. Réponds uniquement avec le chiffre.`
+  );
+}
+
+// Fonction pour ajouter/mettre à jour les prompts d'analyse d'image pour les catégories feuilles
+function addAnalysisPromptsToSeedData(categories: SeedCategoryDefinition[]): SeedCategoryDefinition[] {
+  return categories.map(category => {
+    let updatedCategory = { ...category };
+    if (!category.children || category.children.length === 0) {
+      // C'est une catégorie feuille
+      if (!updatedCategory.imageAnalysisPrompt) { // N'écrase pas un prompt déjà défini manuellement
+        updatedCategory.imageAnalysisPrompt = generateCategoryAnalysisPrompt(category.name);
+      }
+    } else {
+      // Ce n'est pas une feuille, traiter les enfants récursivement
+      updatedCategory.children = addAnalysisPromptsToSeedData(category.children);
+    }
+    return updatedCategory;
+  });
+}
+
 // Définition hiérarchique des catégories
 const HIERARCHICAL_CATEGORIES_TO_SEED: SeedCategoryDefinition[] = [
   {
@@ -152,7 +184,11 @@ const HIERARCHICAL_CATEGORIES_TO_SEED: SeedCategoryDefinition[] = [
             name: 'Mobile Phones',
             slug: 'mobile-phones',
             children: [
-              { name: 'Smartphones', slug: 'smartphones' },
+              {
+                name: 'Smartphones',
+                slug: 'smartphones',
+                imageAnalysisPrompt: "Évalue l'état cosmétique de ce smartphone sur une échelle de 0 à 4. Regarde attentivement l'écran pour les rayures ou fissures, le châssis pour les bosses ou éraflures, et l'objectif de la caméra. 0 = très endommagé, 1 = nombreuses rayures/bosses visibles, 2 = rayures/usure légères, 3 = très peu de signes d'usure, 4 = comme neuf. Réponds uniquement avec le chiffre."
+              },
               { name: 'Feature Phones', slug: 'feature-phones' },
             ],
           },
@@ -385,6 +421,9 @@ const HIERARCHICAL_CATEGORIES_TO_SEED: SeedCategoryDefinition[] = [
   // Gardez une profondeur variable et une structure pertinente.
 ];
 
+// Appliquer la fonction pour ajouter les prompts génériques aux feuilles qui n'en ont pas
+const HIERARCHICAL_CATEGORIES_TO_SEED_WITH_PROMPTS = addAnalysisPromptsToSeedData(HIERARCHICAL_CATEGORIES_TO_SEED);
+
 /**
  * Fonction principale pour exécuter le seeding des catégories.
  */
@@ -405,7 +444,7 @@ async function seedCategories() {
     // console.log('INFO: Anciennes catégories supprimées.');
 
     console.log('INFO: Début du seeding des catégories...');
-    for (const category of HIERARCHICAL_CATEGORIES_TO_SEED) {
+    for (const category of HIERARCHICAL_CATEGORIES_TO_SEED_WITH_PROMPTS) {
       await createCategoryRecursive(category, null, 0); // Les catégories racines ont une profondeur de 0
     }
 
@@ -413,7 +452,7 @@ async function seedCategories() {
 --- Fin du seed des catégories ---
 ${categoriesCreatedCount} catégorie(s) créée(s).
 ${categoriesSkippedCount} catégorie(s) ignorée(s) (existante(s) ou erreur).
-Total de catégories racines traitées: ${HIERARCHICAL_CATEGORIES_TO_SEED.length}.
+Total de catégories racines traitées: ${HIERARCHICAL_CATEGORIES_TO_SEED_WITH_PROMPTS.length}.
 Vérifiez les logs ci-dessus pour les détails.
 `);
 

@@ -15,6 +15,9 @@ export interface IProductBase extends Document {
   images: string[]; // URLs des images de l'offre
   stockQuantity: number; // Quantité en stock pour cette offre
   
+  visualConditionScore?: number; // Score de 0-4 de l'analyse visuelle par IA
+  visualConditionRawResponse?: string; // Réponse brute de l'IA pour référence/debug
+
   // Champs pour la gestion de l'annonce et le statut transactionnel
   listingStatus: 'pending_approval' | 'active' | 'inactive' | 'rejected' | 'sold'; // Statut de l'annonce elle-même
   transactionStatus?: 'available' | 'reserved' | 'pending_shipment' | 'shipped' | 'delivered' | 'cancelled' | 'sold'; // Statut de la transaction sur l'offre
@@ -83,6 +86,16 @@ const ProductBaseSchema = new Schema<IProductBase>(
       required: [true, "La quantité en stock est obligatoire."],
       min: [0, "La quantité en stock ne peut être négative."],
       default: 1,
+    },
+    visualConditionScore: { // Nouveau champ pour le score
+      type: Number,
+      min: 0,
+      max: 4,
+      required: false, // L'analyse peut échouer ou ne pas être faite initialement
+    },
+    visualConditionRawResponse: { // Pour stocker la réponse textuelle brute de Gemini
+        type: String,
+        required: false,
     },
     listingStatus: {
         type: String,

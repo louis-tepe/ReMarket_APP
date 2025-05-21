@@ -8,6 +8,7 @@ export interface ICategory extends Document {
   depth: number; // Profondeur de la catégorie dans la hiérarchie
   parent?: Types.ObjectId; // Catégorie parente, requise si depth > 0
   isLeafNode: boolean; // True si la catégorie est une feuille et peut avoir des champs de formulaire spécifiques
+  imageAnalysisPrompt?: string; // Nouveau champ pour le prompt d'analyse d'image
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,6 +37,10 @@ const CategorySchema = new Schema<ICategory>(
       type: Boolean,
       required: true,
       default: false,
+    },
+    imageAnalysisPrompt: {
+      type: String,
+      trim: true,
     },
     depth: {
       type: Number,

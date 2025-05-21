@@ -507,18 +507,69 @@ export default function SellPage() {
             }
         }
 
+        // Récupérer les valeurs spécifiques à la catégorie
+        // et s'assurer de leur bon typage avant de construire le payload final.
+        const typedOfferSpecificFieldValues: Record<string, any> = {};
+        if (finalSelectedLeafCategory?.slug === 'laptops') {
+            typedOfferSpecificFieldValues.screenSize_in = parseFloat(String(offerSpecificFieldValues.screenSize_in || '0'));
+            typedOfferSpecificFieldValues.processor = String(offerSpecificFieldValues.processor || '');
+            typedOfferSpecificFieldValues.ram_gb = parseInt(String(offerSpecificFieldValues.ram_gb || '0'), 10);
+            typedOfferSpecificFieldValues.storageType = String(offerSpecificFieldValues.storageType || 'SSD') as 'SSD' | 'HDD' | 'eMMC';
+            typedOfferSpecificFieldValues.storageCapacity_gb = parseInt(String(offerSpecificFieldValues.storageCapacity_gb || '0'), 10);
+            typedOfferSpecificFieldValues.graphicsCard = String(offerSpecificFieldValues.graphicsCard || '');
+            typedOfferSpecificFieldValues.operatingSystem = String(offerSpecificFieldValues.operatingSystem || '');
+            // Pour hasWebcam, on s'attend à ce que offerSpecificFieldValues.hasWebcam soit déjà un booléen
+            // si le champ de formulaire est un switch/checkbox. Sinon, il faudrait le convertir.
+            // Si FormFieldDefinition pour `hasWebcam` a un defaultValue: true/false, ce sera un booléen.
+            // Si c'est un select avec "Oui"/"Non", il faudra convertir.
+            // Supposons pour l'instant qu'il est booléen ou une string "true"/"false"
+            let webcamValue = offerSpecificFieldValues.hasWebcam;
+            if (typeof webcamValue === 'string') {
+                typedOfferSpecificFieldValues.hasWebcam = webcamValue.toLowerCase() === 'true';
+            } else {
+                typedOfferSpecificFieldValues.hasWebcam = Boolean(webcamValue); // default conversion
+            }
+            typedOfferSpecificFieldValues.color = String(offerSpecificFieldValues.color || '');
+        } else {
+            // Pour les autres catégories, copier les valeurs telles quelles pour l'instant,
+            // mais idéalement, chaque catégorie feuille devrait avoir son propre typage ici.
+            // Ou la conversion de type devrait être gérée de manière plus générique basée sur FormFieldDefinition.type
+            Object.assign(typedOfferSpecificFieldValues, offerSpecificFieldValues);
+        }
+
         const payload = {
             productModelId: selectedProductModel._id.toString(),
-            price: parseFloat(offerDetails.price),
+            price: parseFloat(offerDetails.price), // Assuré d'être un nombre
             currency: offerDetails.currency || 'EUR',
             condition: offerDetails.condition,
             sellerDescription: offerDetails.sellerDescription,
             images: uploadedPhotoUrls,
-            stockQuantity: parseInt(offerDetails.stockQuantity, 10) || 1,
-            ...offerSpecificFieldValues,
+            stockQuantity: parseInt(offerDetails.stockQuantity, 10) || 1, // Assuré d'être un nombre
+
+            ...typedOfferSpecificFieldValues, // Valeurs spécifiques à la catégorie, maintenant typées
+
             kind: finalSelectedLeafCategory?.slug || '',
             category: finalSelectedLeafCategory?._id || '',
         };
+
+        // Supprimer les clés où la valeur est undefined ou une chaîne vide si le backend ne les gère pas bien
+        // Cela dépend de la rigueur de vos modèles Mongoose pour les champs optionnels.
+        // Par exemple, si processor est une chaîne vide, vous pourriez vouloir l'omettre.
+        for (const key in payload) {
+            if (payload[key as keyof typeof payload] === undefined || payload[key as keyof typeof payload] === '') {
+                // Exception pour sellerDescription qui peut être une chaîne vide intentionnellement
+                if (key !== 'sellerDescription' && key !== 'graphicsCard') {
+                    // Ne pas supprimer graphicsCard s'il est vide, il peut être optionnel
+                    // Pour les autres, si vide et potentiellement numérique après parsing (ex: 0), ne pas supprimer
+                    if (typeof payload[key as keyof typeof payload] === 'number' && payload[key as keyof typeof payload] === 0) {
+                        // garder le 0 pour les champs numériques
+                    } else {
+                        // delete payload[key as keyof typeof payload];
+                        // Pour l'instant, on laisse les chaînes vides si elles ne sont pas des nombres. Le backend doit gérer.
+                    }
+                }
+            }
+        }
 
         if (!payload.kind) {
             toast.error("Erreur Catégorie", { description: "Le type de produit (kind/slug de catégorie) est manquant." });
