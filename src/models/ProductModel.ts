@@ -8,6 +8,17 @@ interface IStandardSpecification {
   unit?: string; // Ex: "Go", "mAh", "kg"
 }
 
+// Ajout des types pour les nouvelles données Idealo
+interface IIdealoOptionChoice {
+  optionName: string;
+  availableValues: string[];
+}
+
+interface IIdealoQA {
+  question: string;
+  answer: string;
+}
+
 // Interface de base pour les propriétés de ProductModel
 export interface IProductModelBase {
   title: string;
@@ -19,6 +30,13 @@ export interface IProductModelBase {
   keyFeatures?: string[];
   isFeatured?: boolean;
   specifications: IStandardSpecification[];
+  // Nouveaux champs pour les données Idealo
+  sourceUrlIdealo?: string;
+  variantTitle?: string;
+  priceNewIdealo?: number;
+  priceUsedIdealo?: number;
+  optionChoicesIdealo?: IIdealoOptionChoice[];
+  qasIdealo?: IIdealoQA[];
 }
 
 // Interface pour l'objet ProductModel tel qu'il pourrait être retourné (par ex. après .lean())
@@ -39,6 +57,23 @@ const StandardSpecificationSchema = new Schema<IStandardSpecification>(
     label: { type: String, required: true },
     value: { type: String, required: true },
     unit: { type: String },
+  },
+  { _id: false }
+);
+
+// Schémas pour les nouveaux types Idealo
+const IdealoOptionChoiceSchema = new Schema<IIdealoOptionChoice>(
+  {
+    optionName: { type: String, required: true },
+    availableValues: [{ type: String, required: true }],
+  },
+  { _id: false }
+);
+
+const IdealoQASchema = new Schema<IIdealoQA>(
+  {
+    question: { type: String, required: true },
+    answer: { type: String, required: true },
   },
   { _id: false }
 );
@@ -88,6 +123,13 @@ const ProductModelSchema = new Schema<IProductModelDocument>(
       index: true // Indexer si on filtre souvent dessus
     },
     specifications: [StandardSpecificationSchema],
+    // Nouveaux champs pour les données Idealo
+    sourceUrlIdealo: { type: String, trim: true },
+    variantTitle: { type: String, trim: true },
+    priceNewIdealo: { type: Number },
+    priceUsedIdealo: { type: Number },
+    optionChoicesIdealo: [IdealoOptionChoiceSchema],
+    qasIdealo: [IdealoQASchema],
     // Les lignes concernant 'status', 'approvedBy', 'approvedAt' sont supprimées ici
     // originalScrapedProductId: { type: Schema.Types.ObjectId, ref: 'ScrapedProduct' }, // Si vous décidez de garder ce champ, il reste ici.
   },

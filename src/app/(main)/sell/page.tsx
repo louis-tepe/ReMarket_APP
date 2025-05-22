@@ -518,22 +518,26 @@ export default function SellPage() {
             typedOfferSpecificFieldValues.storageCapacity_gb = parseInt(String(offerSpecificFieldValues.storageCapacity_gb || '0'), 10);
             typedOfferSpecificFieldValues.graphicsCard = String(offerSpecificFieldValues.graphicsCard || '');
             typedOfferSpecificFieldValues.operatingSystem = String(offerSpecificFieldValues.operatingSystem || '');
-            // Pour hasWebcam, on s'attend à ce que offerSpecificFieldValues.hasWebcam soit déjà un booléen
-            // si le champ de formulaire est un switch/checkbox. Sinon, il faudrait le convertir.
-            // Si FormFieldDefinition pour `hasWebcam` a un defaultValue: true/false, ce sera un booléen.
-            // Si c'est un select avec "Oui"/"Non", il faudra convertir.
-            // Supposons pour l'instant qu'il est booléen ou une string "true"/"false"
             let webcamValue = offerSpecificFieldValues.hasWebcam;
             if (typeof webcamValue === 'string') {
                 typedOfferSpecificFieldValues.hasWebcam = webcamValue.toLowerCase() === 'true';
             } else {
-                typedOfferSpecificFieldValues.hasWebcam = Boolean(webcamValue); // default conversion
+                typedOfferSpecificFieldValues.hasWebcam = Boolean(webcamValue);
             }
             typedOfferSpecificFieldValues.color = String(offerSpecificFieldValues.color || '');
+        } else if (finalSelectedLeafCategory?.slug === 'smartphones') {
+            typedOfferSpecificFieldValues.screenSize_in = parseFloat(String(offerSpecificFieldValues.screenSize_in || '0'));
+            typedOfferSpecificFieldValues.storageCapacity_gb = parseInt(String(offerSpecificFieldValues.storageCapacity_gb || '0'), 10);
+            typedOfferSpecificFieldValues.ram_gb = parseInt(String(offerSpecificFieldValues.ram_gb || '0'), 10);
+            typedOfferSpecificFieldValues.cameraResolution_mp = parseFloat(String(offerSpecificFieldValues.cameraResolution_mp || '0')) || undefined;
+            typedOfferSpecificFieldValues.batteryCapacity_mah = parseInt(String(offerSpecificFieldValues.batteryCapacity_mah || '0'), 10) || undefined;
+            typedOfferSpecificFieldValues.operatingSystem = String(offerSpecificFieldValues.operatingSystem || '');
+            typedOfferSpecificFieldValues.color = String(offerSpecificFieldValues.color || '');
+            typedOfferSpecificFieldValues.imei = String(offerSpecificFieldValues.imei || '') || undefined;
+            if (typedOfferSpecificFieldValues.cameraResolution_mp === 0) delete typedOfferSpecificFieldValues.cameraResolution_mp;
+            if (typedOfferSpecificFieldValues.batteryCapacity_mah === 0) delete typedOfferSpecificFieldValues.batteryCapacity_mah;
+            if (typedOfferSpecificFieldValues.imei === '') delete typedOfferSpecificFieldValues.imei;
         } else {
-            // Pour les autres catégories, copier les valeurs telles quelles pour l'instant,
-            // mais idéalement, chaque catégorie feuille devrait avoir son propre typage ici.
-            // Ou la conversion de type devrait être gérée de manière plus générique basée sur FormFieldDefinition.type
             Object.assign(typedOfferSpecificFieldValues, offerSpecificFieldValues);
         }
 
@@ -542,7 +546,7 @@ export default function SellPage() {
             price: parseFloat(offerDetails.price), // Assuré d'être un nombre
             currency: offerDetails.currency || 'EUR',
             condition: offerDetails.condition,
-            sellerDescription: offerDetails.sellerDescription,
+            description: offerDetails.sellerDescription,
             images: uploadedPhotoUrls,
             stockQuantity: parseInt(offerDetails.stockQuantity, 10) || 1, // Assuré d'être un nombre
 
@@ -556,17 +560,12 @@ export default function SellPage() {
         // Cela dépend de la rigueur de vos modèles Mongoose pour les champs optionnels.
         // Par exemple, si processor est une chaîne vide, vous pourriez vouloir l'omettre.
         for (const key in payload) {
-            if (payload[key as keyof typeof payload] === undefined || payload[key as keyof typeof payload] === '') {
-                // Exception pour sellerDescription qui peut être une chaîne vide intentionnellement
-                if (key !== 'sellerDescription' && key !== 'graphicsCard') {
-                    // Ne pas supprimer graphicsCard s'il est vide, il peut être optionnel
-                    // Pour les autres, si vide et potentiellement numérique après parsing (ex: 0), ne pas supprimer
-                    if (typeof payload[key as keyof typeof payload] === 'number' && payload[key as keyof typeof payload] === 0) {
-                        // garder le 0 pour les champs numériques
-                    } else {
-                        // delete payload[key as keyof typeof payload];
-                        // Pour l'instant, on laisse les chaînes vides si elles ne sont pas des nombres. Le backend doit gérer.
-                    }
+            const currentKey = key as string;
+            if (payload[currentKey as keyof typeof payload] === undefined) {
+                delete payload[currentKey as keyof typeof payload];
+            } else if (payload[currentKey as keyof typeof payload] === '') {
+                if (currentKey !== 'description' && currentKey !== 'graphicsCard') {
+                    delete payload[currentKey as keyof typeof payload];
                 }
             }
         }

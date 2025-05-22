@@ -17,6 +17,12 @@ const nextConfig: NextConfig = {
         port: "",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "cdn.idealo.com",
+        port: "",
+        pathname: "/**",
+      },
     ],
   },
   /* config options here */

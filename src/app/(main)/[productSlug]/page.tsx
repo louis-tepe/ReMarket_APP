@@ -42,6 +42,12 @@ interface ProductDetails {
     keyFeatures?: string[];
     specifications?: { label: string; value: string; unit?: string }[];
     offers: SellerOffer[];
+    sourceUrlIdealo?: string;
+    variantTitle?: string;
+    priceNewIdealo?: number;
+    priceUsedIdealo?: number;
+    optionChoicesIdealo?: { optionName: string; availableValues: string[] }[];
+    qasIdealo?: { question: string; answer: string }[];
 }
 
 async function getProductDetails(slug: string): Promise<ProductDetails | null> {
@@ -260,7 +266,10 @@ export default function ProductPage({ params }: ProductPageProps) {
                 {/* Colonne Informations Produit et Offres */}
                 <div>
                     <Badge variant="outline" className="mb-2">{product.category?.name} {product.brand?.name ? `> ${product.brand.name}` : ''}</Badge>
-                    <h1 className="text-3xl lg:text-4xl font-bold mb-2">{product.title}</h1>
+                    <h1 className="text-3xl lg:text-4xl font-bold mb-1">{product.title}</h1>
+                    {product.variantTitle && (
+                        <p className="text-lg text-muted-foreground mb-1">{product.variantTitle}</p>
+                    )}
                     <p className="text-lg text-muted-foreground mb-1">Par <span className="font-semibold text-foreground">{product.brand?.name || 'Marque inconnue'}</span></p>
                     {/* TODO: Afficher le nombre d'offres disponibles */}
                     <p className="text-sm text-primary mb-6">{product.offers.length} offre(s) disponible(s)</p>
@@ -317,11 +326,30 @@ export default function ProductPage({ params }: ProductPageProps) {
 
                     <Separator className="my-8" />
 
+                    {(product.priceNewIdealo || product.priceUsedIdealo || product.sourceUrlIdealo) && (
+                        <div className="mb-8 p-4 border rounded-lg bg-muted/50">
+                            <h3 className="text-lg font-semibold mb-3 flex items-center"><Info className="h-5 w-5 mr-2 text-blue-500" /> Informations de référence (Idealo)</h3>
+                            <div className="space-y-1 text-sm">
+                                {product.priceNewIdealo && (
+                                    <p>Prix neuf constaté : <span className="font-semibold">{product.priceNewIdealo.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</span></p>
+                                )}
+                                {product.priceUsedIdealo && (
+                                    <p>Prix occasion constaté : <span className="font-semibold">{product.priceUsedIdealo.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</span></p>
+                                )}
+                                {product.sourceUrlIdealo && (
+                                    <p>Source : <a href={product.sourceUrlIdealo} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Voir sur Idealo</a></p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     <Tabs defaultValue="description" className="w-full">
-                        <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 mb-4">
+                        <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-5 mb-4">
                             <TabsTrigger value="description">Description</TabsTrigger>
                             {product.keyFeatures && product.keyFeatures.length > 0 && <TabsTrigger value="features">Points Clés</TabsTrigger>}
                             {product.specifications && product.specifications.length > 0 && <TabsTrigger value="specs">Spécifications</TabsTrigger>}
+                            {product.optionChoicesIdealo && product.optionChoicesIdealo.length > 0 && <TabsTrigger value="options">Options</TabsTrigger>}
+                            {product.qasIdealo && product.qasIdealo.length > 0 && <TabsTrigger value="qas">Q&R</TabsTrigger>}
                         </TabsList>
                         <TabsContent value="description">
                             <Card>

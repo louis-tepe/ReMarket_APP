@@ -82,10 +82,10 @@ export async function GET(
                     },
                     price: offer.price,
                     currency: offer.currency,
-                    stockQuantity: offer.stockQuantity,
+                    quantity: offer.stockQuantity,
                     condition: offer.condition,
-                    description: offer.description,
-                    images: offer.images,
+                    sellerDescription: offer.description,
+                    sellerPhotos: offer.images,
                 };
             }),
         };

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { scrapeAmazonProduct, AmazonProductDetails } from '@/lib/scraper';
+import { scrapeIdealoProduct, IdealoProductDetails } from '@/lib/scraper';
 import dbConnect from '@/lib/db.Connect';
 import ScrapedProduct from '@/models/ScrapedProduct';
 import ProductModel from '@/models/ProductModel';
@@ -65,6 +65,12 @@ interface IProductModel {
   slug: string;
   createdAt?: string;
   updatedAt?: string;
+  sourceUrlIdealo?: string;
+  variantTitle?: string;
+  priceNewIdealo?: number;
+  priceUsedIdealo?: number;
+  optionChoicesIdealo?: { optionName: string; availableValues: string[] }[];
+  qasIdealo?: { question: string; answer: string }[];
 }
 
 interface PostProductModelResponse {
@@ -318,7 +324,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`[API POST /product-models] Lancement du scraping pour: "${name}" (Cat: ${categoryDoc.name}, Marque: ${brandDoc.name})`);
-    const scrapedProductData: AmazonProductDetails | null = await scrapeAmazonProduct(name);
+    const scrapedProductData: IdealoProductDetails | null = await scrapeIdealoProduct(name);
 
     if (!scrapedProductData) {
       console.warn(`[API POST /product-models] Produit non trouvé via scraping pour "${name}"`);
@@ -331,7 +337,7 @@ export async function POST(request: NextRequest) {
     const preparedScrapedData = {
       ...scrapedProductData,
       sourceUrl: scrapedProductData.url, // Supposant que l'URL du produit est dans scrapedProductData.url
-      source: 'amazon', // Assurez-vous que la source est définie si elle n'est pas dans scrapedProductData
+      source: 'idealo', // Modifié ici
       // Assurez-vous que les autres champs requis par IScrapedProduct sont présents ou mappés
       // Par exemple, si scrapedProductData n'a pas de champ 'status' pour ScrapedProduct,
       // il faudrait le définir ici, ou s'assurer que le modèle ScrapedProduct a une valeur par défaut.
@@ -379,23 +385,48 @@ export async function POST(request: NextRequest) {
     } else {
       console.log(`[API POST /product-models] Création d'un nouveau ProductModel pour: ${scrapedProductData.title}`);
       try {
-        // Recherche de la description dans les attributs
-        const descriptionAttribute = scrapedProductData.attributes?.find(
-          (attr) => attr.label.toLowerCase() === 'description'
-        );
-        const standardDescription = descriptionAttribute?.value || "Description non disponible.";
+        // La recherche de descriptionAttribute est supprimée car scrapedProductData.description est utilisé directement.
+        const standardDescription = scrapedProductData.description || "Description non disponible.";
+
+        // Préparation du nom du produit pour le slug
+        let productNameForSlug = scrapedProductData.title || "produit-inconnu";
+        const brandNameLower = brandDoc.name.toLowerCase();
+        const scrapedTitleLower = (scrapedProductData.title || "").toLowerCase();
+
+        if (scrapedTitleLower.startsWith(brandNameLower + " ")) {
+          productNameForSlug = (scrapedProductData.title || "").substring(brandNameLower.length + 1).trim();
+        } else if (scrapedTitleLower.includes(" " + brandNameLower)) {
+            // Gérer les cas où la marque est au milieu ou à la fin (moins courant pour le début)
+            // Cette partie peut nécessiter une logique plus robuste si les formats de titres varient beaucoup
+            productNameForSlug = (scrapedProductData.title || "").replace(new RegExp("\\s+" + brandNameLower + "\\b", 'ig'), '').trim();
+        }
+        // Si après suppression, le nom est vide (ex: titre était juste la marque), utiliser une partie du titre original ou un fallback
+        if (!productNameForSlug && scrapedProductData.title) {
+            productNameForSlug = scrapedProductData.title.split(" ")[0] || "produit"; // Prend le premier mot ou "produit"
+        }
+        if (!productNameForSlug) productNameForSlug = "produit-inconnu"; // Fallback final
+
+        const finalSlug = slugify(`${brandDoc.slug}_${productNameForSlug}`, { 
+            lower: true, 
+            strict: true, 
+            remove: /[*+~.()\'\"!:@]/g 
+        });
 
         productModel = new ProductModel({
-          title: scrapedProductData.title,
-          brand: brandDoc._id, // Utiliser l'ID de la marque ReMarket
-          category: categoryDoc._id, // Utiliser l'ID de la catégorie ReMarket
+          title: scrapedProductData.title || "Titre non disponible",
+          brand: brandDoc._id, 
+          category: categoryDoc._id, 
           standardDescription: standardDescription,
           standardImageUrls: scrapedProductData.imageUrls && scrapedProductData.imageUrls.length > 0 ? scrapedProductData.imageUrls : ['/placeholder-image.png'],
-          keyFeatures: [], // Initialiser avec un tableau vide, car scrapedProductData ne semble pas avoir keyFeatures
-          specifications: scrapedProductData.attributes ? scrapedProductData.attributes.map(attr => ({ label: attr.label, value: attr.value })) : [],
-          // status: 'approved', // Statut par défaut, maintenant implicitement approuvé
-          slug: slugify(`${brandDoc.name} ${scrapedProductData.title}`, { lower: true, strict: true }),
-          // originalScrapedProductId: existingScrapedProduct._id, // Décommenter si besoin
+          keyFeatures: scrapedProductData.features || [],
+          specifications: scrapedProductData.specifications ? scrapedProductData.specifications.map(spec => ({ label: spec.key, value: spec.value })) : [],
+          slug: finalSlug, // Utiliser le slug généré
+          sourceUrlIdealo: scrapedProductData.url,
+          variantTitle: scrapedProductData.variantTitle,
+          priceNewIdealo: scrapedProductData.priceNew,
+          priceUsedIdealo: scrapedProductData.priceUsed,
+          optionChoicesIdealo: scrapedProductData.optionChoices?.map(oc => ({ optionName: oc.optionName || "Inconnu", availableValues: oc.availableValues })),
+          qasIdealo: scrapedProductData.qas?.map(qa => ({ question: qa.question, answer: qa.answer })),
         });
         await productModel.save();
       } catch (error) {

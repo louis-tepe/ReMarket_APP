@@ -9,6 +9,7 @@ import type { Session } from 'next-auth';
 import User from '@/models/User';
 import { analyzeImageCondition, ImagePart } from '@/services/geminiService';
 import { ProductCategorySpecificModel } from '@/models/discriminators';
+import { Types } from 'mongoose';
 
 // Importer les modèles discriminateurs pour s'assurer qu'ils sont enregistrés auprès de Mongoose
 // Commenté car discriminators.ts devrait gérer l'enregistrement via ses imports.
@@ -144,6 +145,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Authentification requise." }, { status: 401 });
     }
     const userId = session.user.id;
+    console.log(`[POST /api/offers] Attempting to find seller with userId: ${userId}`);
+    const seller = await User.findById(userId);
+    if (!seller) {
+      console.error(`[POST /api/offers] Seller not found for userId: ${userId}`);
+      return NextResponse.json({ success: false, message: "Vendeur non trouvé." }, { status: 404 });
+    }
 
     const body: OfferCreationBody = await request.json();
     console.log("[POST /api/offers] Body reçu:", JSON.stringify(body, null, 2));
@@ -154,19 +161,25 @@ export async function POST(request: NextRequest) {
       images,
       price,
       condition,
-      sellerDescription: description,
+      description,
       stockQuantity = 1,
-      kind, // Le slug de la catégorie, utilisé comme discriminateur
-      ...specificFields // Champs spécifiques à la catégorie
+      kind,
+      ...specificFields
     } = body;
 
     if (!productModelId || !categoryId || !images || images.length === 0 || !price || !condition || !description || !kind) {
-      return NextResponse.json({ success: false, message: "Champs requis manquants pour créer l'offre." }, { status: 400 });
-    }
+      let missingFields = [];
+      if (!productModelId) missingFields.push("productModelId");
+      if (!categoryId) missingFields.push("categoryId");
+      if (!images || images.length === 0) missingFields.push("images");
+      if (price === undefined || price === null) missingFields.push("price");
+      if (!condition) missingFields.push("condition");
+      if (!description) missingFields.push("description");
+      if (!kind) missingFields.push("kind");
 
-    const seller = await User.findById(userId);
-    if (!seller) {
-      return NextResponse.json({ success: false, message: "Vendeur non trouvé." }, { status: 404 });
+      if (missingFields.length > 0) {
+        return NextResponse.json({ success: false, message: `Champs requis manquants pour créer l'offre: ${missingFields.join(', ')}.` }, { status: 400 });
+      }
     }
 
     const categoryDoc = await CategoryModel.findById(categoryId).lean() as ICategory | null;
@@ -244,25 +257,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const offerData: Partial<IProductBase> & { [key: string]: any } = {
-      ...specificFields, // Doit venir en premier pour que les champs définis ensuite ne soient pas écrasés
-      kind: categoryDoc.slug, // Utiliser le slug de la catégorie feuille comme discriminateur
-      seller: seller._id,
+    const newOfferData: Partial<IProductBase> & { category: Types.ObjectId, productModel: Types.ObjectId, seller: Types.ObjectId, kind: string } = {
       productModel: productModelDoc._id,
-      category: categoryDoc._id,
-      images: images,
+      seller: seller._id,
+      category: productModelDoc.category,
+      kind: categoryDoc.slug,
       price: price,
+      currency: body.currency || 'EUR',
       condition: condition,
       description: description,
+      images: images,
       stockQuantity: stockQuantity,
-      listingStatus: 'pending_approval', // Statut initial
+      listingStatus: 'active',
+      transactionStatus: 'available',
+      ...specificFields,
       ...(visualConditionScore !== null && { visualConditionScore }),
       ...(visualConditionRawResponse && { visualConditionRawResponse }),
     };
 
     // Utiliser le modèle discriminateur spécifique basé sur `kind`
-    const DiscriminatorModel = ProductCategorySpecificModel(offerData.kind);
-    const newOffer = new DiscriminatorModel(offerData);
+    const DiscriminatorModel = ProductCategorySpecificModel(newOfferData.kind);
+    const newOffer = new DiscriminatorModel(newOfferData);
     
     await newOffer.save();
 

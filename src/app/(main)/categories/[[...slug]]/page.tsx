@@ -150,7 +150,7 @@ async function getFilteredProducts(filters: FiltersState): Promise<DisplayProduc
                 price: cheapestOffer ? cheapestOffer.price : 0,
                 offerCount: offers.length,
             };
-        }).filter(p => p.offerCount > 0);
+        });
 
     } catch (error) {
         console.error(`Error in getFilteredProducts with URL ${fetchUrl}:`, error);

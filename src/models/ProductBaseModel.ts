@@ -19,7 +19,7 @@ export interface IProductBase extends Document {
   visualConditionRawResponse?: string; // Réponse brute de l'IA pour référence/debug
 
   // Champs pour la gestion de l'annonce et le statut transactionnel
-  listingStatus: 'pending_approval' | 'active' | 'inactive' | 'rejected' | 'sold'; // Statut de l'annonce elle-même
+  listingStatus: 'active' | 'inactive' | 'rejected' | 'sold'; // Statut de l'annonce elle-même
   transactionStatus?: 'available' | 'reserved' | 'pending_shipment' | 'shipped' | 'delivered' | 'cancelled' | 'sold'; // Statut de la transaction sur l'offre
   soldTo?: Types.ObjectId; // Référence à l'acheteur si vendu
   orderId?: Types.ObjectId; // Référence à la commande associée
@@ -100,8 +100,8 @@ const ProductBaseSchema = new Schema<IProductBase>(
     listingStatus: {
         type: String,
         required: true,
-        enum: ['pending_approval', 'active', 'inactive', 'rejected', 'sold'],
-        default: 'pending_approval',
+        enum: ['active', 'inactive', 'rejected', 'sold'],
+        default: 'active',
         index: true,
     },
     transactionStatus: {
@@ -130,12 +130,12 @@ const ProductBaseSchema = new Schema<IProductBase>(
 
 ProductBaseSchema.pre('save', function(this: IProductBase, next) {
   // Gérer la transition de transactionStatus lorsque listingStatus devient 'active'
-  if (this.isModified('listingStatus') && this.listingStatus === 'active' && !this.transactionStatus) {
+  if ((this.isModified('listingStatus') || this.isNew) && this.listingStatus === 'active' && this.transactionStatus !== 'sold') {
     this.transactionStatus = 'available';
   }
 
   // Si l'offre est marquée comme vendue (via l'un ou l'autre statut)
-  if ( (this.isModified('listingStatus') && this.listingStatus === 'sold') || 
+  if ( (this.isModified('listingStatus') && this.listingStatus === 'sold') ||
        (this.isModified('transactionStatus') && this.transactionStatus === 'sold') ) {
     this.listingStatus = 'sold'; 
     this.transactionStatus = 'sold'; 

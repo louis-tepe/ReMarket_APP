@@ -157,3 +157,17 @@ async function testCreateOffer() {
 
 // testCreateOffer();
 */ 
+
+// Interface pour les filtres de recherche d'offres
+export interface OfferFilters {
+    category?: string | string[];
+    brand?: string | string[];
+    condition?: string | string[];
+    priceMin?: number;
+    priceMax?: number;
+    productModelId?: string;
+    sellerId?: string;
+    transactionStatus?: 'available' | 'reserved' | 'pending_shipment' | 'shipped' | 'delivered' | 'cancelled' | 'sold';
+    listingStatus?: 'active' | 'inactive' | 'rejected' | 'sold'; // MODIFIÉ: pending_approval supprimé
+    // ... autres filtres potentiels
+} 
