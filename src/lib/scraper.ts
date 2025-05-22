@@ -1,451 +1,633 @@
 import {
-    CheerioCrawler,
-    CheerioCrawlingContext,
+    PlaywrightCrawler,
+    PlaywrightCrawlingContext,
     log,
     RequestQueue,
     Request,
 } from 'crawlee';
 import { CheerioAPI } from 'cheerio';
-// import * as cheerio from 'cheerio'; // Cheerio est déjà inclus dans Crawlee via CheerioCrawlingContext.$ et CheerioAPI
+import * as cheerio from 'cheerio';
 import { URL } from 'url';
+// import { Page } from 'playwright'; // Supprimé car non utilisé directement ici
 
-// Types definition based on documentation and common Amazon structure
-export type ProductAttribute = {
-    label: string;
+// Configuration pour le mode de fonctionnement (true pour production, false pour développement/debug)
+const IS_PRODUCTION_MODE = false; // Passer à false pour le débogage avec navigateur visible et logs détaillés
+
+// Redefined types based on new selectors
+export type ProductFeature = string; // For "Infos rapides produits"
+
+export type ProductOptionChoice = {
+    optionName: string | null;
+    availableValues: string[];
+};
+
+export type ProductSpecification = {
+    key: string;
     value: string;
 };
 
-export type AmazonProductDetails = {
-    asin?: string; // Added ASIN
-    url: string;
-    title: string | null;
-    price: number | null;
-    listPrice: number | null;
-    reviewRating: number | null;
-    reviewCount: number | null;
-    imageUrls: string[];
-    attributes: ProductAttribute[];
-    brand?: string | null; // Ajouté pour une meilleure correspondance avec ProductModel
-    category?: string | null; // Ajouté pour une meilleure correspondance avec ProductModel
+export type ProductDescription = string | null;
+
+export type QAItem = {
+    question: string;
+    answer: string;
 };
 
-// --- Utility Functions ---
+export type ProductQA = QAItem[];
 
-/**
- * Parses a number from a string by removing all non-numeric characters.
- * Keeps the decimal point. Returns null if parsing fails or string is empty.
- */
+export type IdealoProductDetails = {
+    url: string;
+    title: string | null;
+    variantTitle?: string | null; // For "titre secondaire"
+    priceNew: number | null;      // For "prix neuf"
+    priceUsed?: number | null;     // For "prix d'occasion"
+    imageUrls: string[];
+    features: ProductFeature[];       // For "Infos rapides produits"
+    optionChoices?: ProductOptionChoice[]; // For "Choix d'options du produit"
+    specifications?: ProductSpecification[]; // For "Détails du produit"
+    description?: ProductDescription;
+    qas?: ProductQA;
+};
+
+// --- Utility Functions (mostly unchanged) ---
+const randomDelay = async (minMs: number, maxMs: number): Promise<void> => {
+    const delay = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
+    log.debug(`Waiting for ${delay}ms`);
+    return new Promise(resolve => setTimeout(resolve, delay));
+};
+
 const parseNumberValue = (rawString: string | null | undefined): number | null => {
     if (!rawString) return null;
-    const cleanedString = rawString.replace(/[^\d.]+/g, '');
-    if (cleanedString === '') return null;
-    const value = Number(cleanedString);
+
+    // Remplacer &nbsp; par un espace pour la cohérence
+    let str = rawString.replace(/&nbsp;/g, ' ');
+
+    // Supprimer les symboles monétaires communs (dont €) et tous les types d'espaces (trimming global)
+    str = str.replace(/[€$£¥\s]+/g, '');
+
+    // Remplacer la virgule décimale par un point pour la conversion en nombre standard
+    str = str.replace(',', '.');
+    
+    // Gérer les cas où un point pourrait être utilisé comme séparateur de milliers
+    // S'il y a plusieurs points, on suppose que le dernier est le séparateur décimal
+    // et on supprime les autres (ex: "1.234.56" devient "1234.56")
+    const parts = str.split('.');
+    if (parts.length > 2) { 
+        str = parts.slice(0, -1).join('') + '.' + parts[parts.length - 1];
+    } 
+    // Si parts.length est 2, c'est déjà au format X.XX ou XXXX.XX
+    // Si parts.length est 1, c'est un entier XXXXX
+
+    const value = parseFloat(str); // parseFloat est généralement plus tolérant
+
     return isNaN(value) ? null : value;
 };
 
-/**
- * Parses a number value from the first element matching the given selector.
- */
-const parseNumberFromSelector = ($: CheerioAPI, selector: string): number | null => {
-    const rawValue = $(selector).first().text();
+const parseNumberFromSelector = ($: CheerioAPI, selector: string, context?: cheerio.Cheerio<cheerio.AnyNode>): number | null => {
+    const rawValue = extractText($, selector, context);
     return parseNumberValue(rawValue);
 };
 
-/**
- * Extracts text content from the first element matching the selector.
- */
-const extractText = ($: CheerioAPI, selector: string): string | null => {
-    const text = $(selector).first().text().trim();
+const extractText = ($: CheerioAPI, selector: string, context?: cheerio.Cheerio<cheerio.AnyNode>): string | null => {
+    const element = context ? context.find(selector).first() : $(selector).first();
+    const text = element.text().trim();
     return text || null;
 };
 
 // --- Selectors ---
 
-// Selectors might need adjustments based on Amazon's current structure
 const SEARCH_SELECTORS = {
-    // Ancien sélecteur : Cibler le lien <a> directement dans le div.s-title-instructions-style
-    // FIRST_RESULT_LINK: `div[data-component-type='s-search-result'] h2 a.a-link-normal[href*="/dp/"]`,
-    // Nouveau sélecteur : Cible l'élément <a> avec les classes appropriées et href contenant "/dp/"
-    // Ce sélecteur sera utilisé avec item.find(), où 'item' est un 'div[data-component-type='s-search-result']'
-    FIRST_RESULT_LINK: `a.a-link-normal.s-link-style[href*="/dp/"]`,
+    PRODUCT_LINK_IN_SEARCH: 'a[class^="sr-resultItemTile__link_"][class*="sr-resultItemTile__link--GRID"]',
 };
 
 const PRODUCT_SELECTORS = {
-    TITLE: 'span#productTitle',
-    PRICE: 'span.priceToPay span.a-offscreen, span.reinventPricePriceToPayMargin span.a-offscreen, #corePrice_feature_div .a-offscreen, #price_inside_buybox, .a-price .a-offscreen',
-    LIST_PRICE: 'span.basisPrice .a-offscreen, #listPrice .a-offscreen',
-    REVIEW_RATING: '#acrPopover .a-popover-trigger .a-icon-alt', // Extract rating from alt text (e.g., "4.5 out of 5 stars")
-    REVIEW_COUNT: '#acrCustomerReviewText',
-    IMAGES: '#altImages .item img',
-    PRODUCT_ATTRIBUTE_ROWS: '#productOverview_feature_div tr, #detailBullets_feature_div .a-list-item', // Check both overview and detail bullets
-    ATTRIBUTES_LABEL: 'td:nth-of-type(1) span, th .a-text-bold, .a-span3 .a-text-bold', // Label can be in td or th
-    ATTRIBUTES_VALUE: 'td:nth-of-type(2) span, td, .a-span9 span', // Value can be directly in td
-    // Correctly escape the selector string for action
-    CAPTCHA_CHECK: 'form[action*="Captcha"]',
-    ASIN_DETAIL_BULLETS: '#detailBullets_feature_div li:contains("ASIN") span:nth-child(2)',
-    ASIN_PROD_DETAILS: '#productDetails_detailBullets_sections1 tr:contains("ASIN") td',
-    ASIN_INPUT: 'input#ASIN',
-    ASIN_DATA_ATTRIBUTE: '[data-asin]',
-    BRAND_SELECTOR_1: '#bylineInfo_feature_div a[href*="/stores/"]', // "Visit the [Brand] Store"
-    BRAND_SELECTOR_2: '#bylineInfo_feature_div a[id*="brandLink"]', // Generic brand link
-    BRAND_SELECTOR_3: '#productDetails_techSpec_section_1 tr:contains("Brand") td', // Brand in tech specs
-    BRAND_SELECTOR_4: '#productDetails_detailBullets_sections1 tr:contains("Manufacturer") td', // Manufacturer as fallback
-    BRAND_FROM_ATTRIBUTES: 'Brand', // Case-insensitive check in attributes
+    // General product container: div.oopStage (useful for context setting if needed)
+    PRODUCT_WRAPPER: 'div.oopStage',
+
+    // Images - Modifié pour cibler directement les images de la galerie principale
+    // Ancien: IMAGES_THUMBNAIL_CONTAINER: 'div.simple-carousel-thumbnails',
+    // Ancien: IMAGE_IN_THUMBNAIL: 'div.simple-carousel-thumbnail-wrapper > img',
+    OOPSTAGE_GALLERY_IMAGE: 'img.oopStage-galleryCollageImage', // Nouveau sélecteur basé sur l'image HTML fournie
+
+    // Titles
+    TITLE_H1: 'h1#oopStage-title',
+    TITLE_MAIN: 'span:first-child', // Relative to TITLE_H1
+    TITLE_VARIANT: 'span.oopStage-variantTitle', // Relative to TITLE_H1
+
+    // Product Info / Features
+    PRODUCT_INFO_TOP_ITEMS_CONTAINER: 'div.oopStage-productInfoTopItems',
+    PRODUCT_INFO_TOP_ITEM: 'span.oopStage-productInfoTopItem', // Relative to PRODUCT_INFO_TOP_ITEMS_CONTAINER
+
+    // Product Option Choices (e.g., storage, color)
+    OPTION_CHOICES_CONTAINER: 'div#delta-filters',
+    OPTION_FILTER_BLOCK: 'div.oopStage-deltaFilter', // Relative to OPTION_CHOICES_CONTAINER
+    OPTION_NAME_STRONG: 'div.oopStage-deltaFilterLabel > strong', // Relative to OPTION_FILTER_BLOCK
+    OPTION_VALUE_BUTTONS_CONTAINER: 'div.oopStage-deltaFilterButtons', // Relative to OPTION_FILTER_BLOCK, c'est le conteneur des div "boutons"
+    OPTION_VALUE_BUTTON_ITEM: 'div.button', // Cible chaque div "bouton" de valeur (simplifié, en espérant que la classe .button soit assez spécifique ici)
+    OPTION_VALUE_TEXT_IN_BUTTON: 'span', // Cible le span à l'intérieur du bouton pour obtenir le texte de la valeur
+
+    // Prices
+    PRICE_NEW_STRONG: 'div#oopStage-conditionButton-new div.oopStage-conditionButton-wrapper-text-price > strong',
+    PRICE_USED_STRONG: 'div#oopStage-conditionButton-used div.oopStage-conditionButton-wrapper-text-price > strong',
+    
+    // Detailed Specifications (Datasheet)
+    DATASHEET_CONTAINER: 'div#datasheet',
+    DATASHEET_LIST_ITEM_PROPERTIES: 'tr.datasheet-listItem--properties', // Targets rows with key-value pairs
+    DATASHEET_LIST_ITEM_KEY: 'td.datasheet-listItemKey',       // Key within the row
+    DATASHEET_LIST_ITEM_VALUE: 'td.datasheet-listItemValue',   // Value within the row
+    // Note: DATASHEET_LIST_ITEM_GROUP ('tr.datasheet-listItem--group') can be used to identify sections if needed
+
+    CAPTCHA_CHECK: 'form[action*="Captcha"]', // Generic captcha check
+
+    // Description and Q&A selectors
+    DESCRIPTION_CONTENT: 'div#product-guide div.textris', 
+    QA_JSON_LD_SCRIPT: 'div.q-and-a-container script[type="application/ld+json"]',
+    QA_ITEMS_CONTAINER_FALLBACK: 'div.q-and-a-container div.items', 
+    QA_ITEM_FALLBACK: 'div.q-and-a-item', 
+    QA_QUESTION_FALLBACK: 'div.question p', 
+    QA_ANSWER_FALLBACK: 'div.answer p',   
 };
 
 // --- Extraction Logic ---
 
-/**
- * Extracts the product image URLs.
- */
-const extractImageUrls = ($: CheerioAPI): string[] => {
-    return $(PRODUCT_SELECTORS.IMAGES)
-        .map((_, imageEl) => $(imageEl).attr('src'))
+const extractImageUrls = ($: CheerioAPI, productWrapper: cheerio.Cheerio<cheerio.AnyNode>): string[] => {
+    // Modifié pour utiliser le nouveau sélecteur OOPSTAGE_GALLERY_IMAGE directement sur le productWrapper
+    return productWrapper.find(PRODUCT_SELECTORS.OOPSTAGE_GALLERY_IMAGE)
+        .map((_, imgEl) => {
+            let src = $(imgEl).attr('src');
+            if (src && src.startsWith('//')) {
+                src = 'https:' + src;
+            }
+            return src;
+        })
         .get()
-        .filter((src): src is string => !!src && src.startsWith('http'))
-        .map(src => src.replace(/\._.*_\./, '._SL1500_.'));
+        .filter((src): src is string => !!src && src.startsWith('http'));
 };
 
-/**
- * Extracts the product attributes. Robustly checks different structures.
- */
-const extractProductAttributes = ($: CheerioAPI): ProductAttribute[] => {
-    const attributeMap = new Map<string, string>();
+const extractProductFeatures = ($: CheerioAPI, productWrapper: cheerio.Cheerio<cheerio.AnyNode>): ProductFeature[] => {
+    const featuresContainer = productWrapper.find(PRODUCT_SELECTORS.PRODUCT_INFO_TOP_ITEMS_CONTAINER);
+    return featuresContainer.find(PRODUCT_SELECTORS.PRODUCT_INFO_TOP_ITEM)
+        .map((_, el) => $(el).text().trim())
+        .get()
+        .filter(feature => !!feature);
+};
 
-    // Function to add or update attribute, prioritizing existing non-empty values
-    const addOrUpdateAttribute = (label: string, value: string) => {
-        const cleanLabel = label.trim().replace(/:$/, '');
-        const cleanValue = value.trim();
-        if (cleanLabel && cleanValue && !attributeMap.has(cleanLabel)) {
-            attributeMap.set(cleanLabel, cleanValue);
+const extractProductOptionChoices = ($: CheerioAPI, productWrapper: cheerio.Cheerio<cheerio.AnyNode>): ProductOptionChoice[] => {
+    const optionsContainer = productWrapper.find(PRODUCT_SELECTORS.OPTION_CHOICES_CONTAINER);
+    const choices: ProductOptionChoice[] = [];
+    if (!IS_PRODUCTION_MODE) log.debug(`[OPTIONS_DEBUG] Found options container (selector: ${PRODUCT_SELECTORS.OPTION_CHOICES_CONTAINER}): ${optionsContainer.length > 0}`);
+
+    optionsContainer.find(PRODUCT_SELECTORS.OPTION_FILTER_BLOCK).each((i, blockEl) => {
+        const block = $(blockEl);
+        const optionName = extractText($, PRODUCT_SELECTORS.OPTION_NAME_STRONG, block);
+        if (!IS_PRODUCTION_MODE) log.debug(`[OPTIONS_DEBUG] Block ${i}: Found option name element (selector: ${PRODUCT_SELECTORS.OPTION_NAME_STRONG}). Raw text: "${block.find(PRODUCT_SELECTORS.OPTION_NAME_STRONG).text().trim()}". Parsed name: "${optionName}"`);
+        
+        const availableValues: string[] = [];
+        const valuesContainer = block.find(PRODUCT_SELECTORS.OPTION_VALUE_BUTTONS_CONTAINER);
+        if (!IS_PRODUCTION_MODE) log.debug(`[OPTIONS_DEBUG] Block ${i}, Option "${optionName}": Found values container (selector: ${PRODUCT_SELECTORS.OPTION_VALUE_BUTTONS_CONTAINER}): ${valuesContainer.length > 0}`);
+
+        // Itérer sur chaque bouton de valeur, puis trouver le span à l'intérieur
+        valuesContainer.find(PRODUCT_SELECTORS.OPTION_VALUE_BUTTON_ITEM).each((j, buttonEl) => {
+            // Le texte de la valeur est dans un span enfant du buttonEl
+            const valueText = $(buttonEl).find(PRODUCT_SELECTORS.OPTION_VALUE_TEXT_IN_BUTTON).first().text().trim();
+            if (!IS_PRODUCTION_MODE) log.debug(`[OPTIONS_DEBUG] Block ${i}, Option "${optionName}", Value Button ${j} (selector: ${PRODUCT_SELECTORS.OPTION_VALUE_BUTTON_ITEM}): Raw text from span (selector: ${PRODUCT_SELECTORS.OPTION_VALUE_TEXT_IN_BUTTON}): "${valueText}"`);
+            if (valueText) {
+                availableValues.push(valueText);
+            }
+        });
+
+        if (optionName && availableValues.length > 0) {
+            log.info(`[OPTIONS_INFO] Successfully extracted option: "${optionName}" with values: [${availableValues.join(', ')}]`);
+            choices.push({ optionName, availableValues });
+        } else {
+            if (!IS_PRODUCTION_MODE) log.debug(`[OPTIONS_DEBUG] Block ${i}: Option name "${optionName}" or availableValues (count: ${availableValues.length}) are empty. Not adding to choices.`);
         }
-    };
-
-    // 1. Try #productOverview_feature_div table rows
-    $('#productOverview_feature_div tr').each((_, rowEl) => {
-        const labelEl = $(rowEl).find(PRODUCT_SELECTORS.ATTRIBUTES_LABEL).first();
-        const valueEl = $(rowEl).find(PRODUCT_SELECTORS.ATTRIBUTES_VALUE).first();
-        addOrUpdateAttribute(labelEl.text(), valueEl.text());
     });
+    if (choices.length === 0) {
+        log.info('[OPTIONS_INFO] No product option choices were extracted.');
+    }
+    return choices;
+};
 
-    // 2. Try #detailBullets_feature_div list items (often includes ASIN, dimensions, etc.)
-    $('#detailBullets_feature_div .a-list-item').each((_, el) => {
-        const text = $(el).text().trim();
-        // Split only on the first colon using indexOf for broader compatibility
-        const colonIndex = text.indexOf(':');
-        if (colonIndex > -1) {
-            const label = text.substring(0, colonIndex);
-            const value = text.substring(colonIndex + 1);
-            addOrUpdateAttribute(label, value);
+const extractProductSpecifications = ($: CheerioAPI): ProductSpecification[] => {
+    const specs: ProductSpecification[] = [];
+    const datasheetContainer = $(PRODUCT_SELECTORS.DATASHEET_CONTAINER); // Search globally for datasheet
+    if (!IS_PRODUCTION_MODE) log.debug(`[SPECS_DEBUG] Found datasheet container (selector: ${PRODUCT_SELECTORS.DATASHEET_CONTAINER}): ${datasheetContainer.length > 0}`);
+
+    if (datasheetContainer.length === 0) {
+        log.info('[SPECS_INFO] Datasheet container not found.');
+        return specs;
+    }
+
+    datasheetContainer.find(PRODUCT_SELECTORS.DATASHEET_LIST_ITEM_PROPERTIES).each((i, el) => {
+        const row = $(el);
+        const key = extractText($, PRODUCT_SELECTORS.DATASHEET_LIST_ITEM_KEY, row)?.replace(/\s+/g, ' ').trim();
+        const value = extractText($, PRODUCT_SELECTORS.DATASHEET_LIST_ITEM_VALUE, row)?.replace(/\s+/g, ' ').trim();
+
+        if (!IS_PRODUCTION_MODE) log.debug(`[SPECS_DEBUG] Row ${i}: Raw Key: "${row.find(PRODUCT_SELECTORS.DATASHEET_LIST_ITEM_KEY).text()}", Raw Value: "${row.find(PRODUCT_SELECTORS.DATASHEET_LIST_ITEM_VALUE).text()}"`);
+
+        if (key && value) {
+            log.info(`[SPECS_INFO] Extracted specification: "${key}": "${value}"`);
+            specs.push({ key, value });
+        } else {
+            if (!IS_PRODUCTION_MODE) log.debug(`[SPECS_DEBUG] Row ${i}: Key "${key}" or Value "${value}" is empty. Not adding to specifications.`);
         }
     });
 
-     // 3. Try #productDetails generic tables (fallback)
-     $('#productDetails_detailBullets_sections1 tr, #productDetails_techSpec_section_1 tr').each((_, rowEl) => {
-         const labelEl = $(rowEl).find('th').first();
-         const valueEl = $(rowEl).find('td').first();
-         addOrUpdateAttribute(labelEl.text(), valueEl.text());
-     });
-
-
-    // Convert Map to array
-    return Array.from(attributeMap, ([label, value]) => ({ label, value }));
+    if (specs.length === 0) {
+        log.info('[SPECS_INFO] No product specifications were extracted from the datasheet.');
+    }
+    return specs;
 };
 
-/**
- * Extracts the ASIN from various potential locations.
- */
-const extractAsin = ($: CheerioAPI, attributes: ProductAttribute[], url: string): string | null => {
-    // 1. Check extracted attributes first
-    const asinAttr = attributes.find(attr => attr.label.toUpperCase() === 'ASIN');
-    if (asinAttr?.value) return asinAttr.value;
-
-    // 2. Check specific selectors in detail bullets/tables
-    let asin = extractText($, PRODUCT_SELECTORS.ASIN_DETAIL_BULLETS);
-    if (asin) return asin;
-
-    asin = extractText($, PRODUCT_SELECTORS.ASIN_PROD_DETAILS);
-    if (asin) return asin;
-
-     // 3. Check common input fields or data attributes
-     const asinInput = $(PRODUCT_SELECTORS.ASIN_INPUT);
-     if (asinInput.length) {
-         const val = asinInput.val();
-         asin = typeof val === 'string' ? val.trim() : null;
-         if (asin) return asin;
-     }
-
-     const asinData = $(PRODUCT_SELECTORS.ASIN_DATA_ATTRIBUTE).filter((i, el) => {
-      const asinVal = $(el).data('asin');
-      if (typeof asinVal === 'string' && asinVal.length === 10) {
-        return true;
-      }
-      return false;
-    });
-     if (asinData.length) {
-         const dataVal = asinData.first().data('asin');
-         asin = typeof dataVal === 'string' ? dataVal.trim() : null;
-         if (asin) return asin;
-     }
-
-    // 4. Fallback: Look for ASIN in the current URL
-     const urlMatch = url.match(/\/dp\/([A-Z0-9]{10})/);
-     if (urlMatch && urlMatch[1]) {
-         return urlMatch[1];
-     }
-
-
-    return null; // ASIN not found
-};
-
-/**
- * Extracts the brand from various potential locations.
- */
-const extractBrand = ($: CheerioAPI, attributes: ProductAttribute[]): string | null => {
-    let brand = extractText($, PRODUCT_SELECTORS.BRAND_SELECTOR_1);
-    if (brand && brand.toLowerCase().startsWith('visit the')) {
-        brand = brand.substring('visit the '.length).replace(/ store$/i, '').trim();
-        if(brand) return brand;
+const extractProductDescription = ($: CheerioAPI): ProductDescription => {
+    const descriptionContent = $(PRODUCT_SELECTORS.DESCRIPTION_CONTENT);
+    if (descriptionContent.length > 0) {
+        const textContent = descriptionContent.text();
+        if (textContent) {
+            log.info('[DESCRIPTION_INFO] Successfully extracted product description text.');
+            return textContent.replace(/\s+/g, ' ').trim();
+        } else {
+            log.info('[DESCRIPTION_INFO] Product description content element found but is empty.');
+            return null;
+        }
     }
-    if (brand && brand.toLowerCase().startsWith('brand:')) {
-        brand = brand.substring('brand:'.length).trim();
-        if(brand) return brand;
-    }
-
-    brand = extractText($, PRODUCT_SELECTORS.BRAND_SELECTOR_2);
-    if (brand && brand.toLowerCase().startsWith('brand:')) {
-        brand = brand.substring('brand:'.length).trim();
-        if(brand) return brand;
-    }
-    if(brand) return brand.trim();
-
-    brand = extractText($, PRODUCT_SELECTORS.BRAND_SELECTOR_3);
-    if(brand) return brand.trim();
-
-    const brandAttr = attributes.find(attr => attr.label.toLowerCase() === PRODUCT_SELECTORS.BRAND_FROM_ATTRIBUTES.toLowerCase());
-    if (brandAttr?.value) return brandAttr.value.trim();
-
-    brand = extractText($, PRODUCT_SELECTORS.BRAND_SELECTOR_4); // Manufacturer as fallback
-    if(brand) return brand.trim();
-
+    log.info('[DESCRIPTION_INFO] Product description content element not found.');
     return null;
 };
 
+const extractProductQAs = ($: CheerioAPI): ProductQA | undefined => {
+    const qas: ProductQA = [];
 
-/**
- * Scrapes the product details from the product page.
- */
-const extractProductDetails = ($: CheerioAPI, url: string): AmazonProductDetails => {
-    const title = extractText($, PRODUCT_SELECTORS.TITLE);
-    const price = parseNumberFromSelector($, PRODUCT_SELECTORS.PRICE);
-    const listPrice = parseNumberFromSelector($, PRODUCT_SELECTORS.LIST_PRICE);
+    // Attempt 1: Parse JSON-LD
+    const qaJsonLdScript = $(PRODUCT_SELECTORS.QA_JSON_LD_SCRIPT);
+    if (qaJsonLdScript.length > 0) {
+        try {
+            const jsonLdText = qaJsonLdScript.html();
+            if (jsonLdText) {
+                const jsonData = JSON.parse(jsonLdText);
+                // Define a more specific type for the JSON-LD item
+                type JsonLdQAItem = {
+                    '@type': string;
+                    name?: string;
+                    acceptedAnswer?: {
+                        '@type': string;
+                        text?: string;
+                    };
+                };
+                type JsonLdFAQPage = {
+                    '@type': string;
+                    mainEntity?: JsonLdQAItem[];
+                };
 
-    // Extract rating value specifically
-    const ratingText = $(PRODUCT_SELECTORS.REVIEW_RATING).first().text().trim();
-    const ratingMatch = ratingText.match(/^\d[\d.]*/);
-    const reviewRating = ratingMatch ? parseFloat(ratingMatch[0]) : null;
+                const faqPageData = jsonData as JsonLdFAQPage;
 
-    const reviewCountText = extractText($, PRODUCT_SELECTORS.REVIEW_COUNT);
-    const reviewCount = parseNumberValue(reviewCountText); // Parse count which might have commas/text
+                if (faqPageData && faqPageData['@type'] === 'FAQPage' && Array.isArray(faqPageData.mainEntity)) {
+                    faqPageData.mainEntity.forEach((item: JsonLdQAItem) => {
+                        if (item['@type'] === 'Question' && item.name && item.acceptedAnswer && item.acceptedAnswer.text) {
+                            // Correctly apply text() before replace() and trim()
+                            const questionText = cheerio.load(item.name).text().replace(/\s+/g, ' ').trim(); 
+                            const answerText = cheerio.load(item.acceptedAnswer.text).text().replace(/\s+/g, ' ').trim(); 
+                            qas.push({ question: questionText, answer: answerText });
+                        }
+                    });
+                    if (qas.length > 0) {
+                        log.info(`[QAS_INFO] Successfully extracted ${qas.length} Q&As from JSON-LD.`);
+                        return qas;
+                    }
+                }
+            }
+        } catch (e) {
+            log.warning('[QAS_WARN] Failed to parse Q&A JSON-LD.', { error: e instanceof Error ? e.message : String(e) });
+        }
+    } else {
+        if (!IS_PRODUCTION_MODE) log.debug('[QAS_DEBUG] Q&A JSON-LD script not found. Attempting HTML fallback.');
+        else log.info('[QAS_INFO] Q&A JSON-LD script not found. Attempting HTML fallback.');
+    }
+    
+    // Attempt 2: HTML scraping (fallback)
+    const qaItemsContainer = $(PRODUCT_SELECTORS.QA_ITEMS_CONTAINER_FALLBACK);
+    if (!IS_PRODUCTION_MODE) log.debug(`[QAS_DEBUG_HTML] Found Q&A items container (selector: ${PRODUCT_SELECTORS.QA_ITEMS_CONTAINER_FALLBACK}): ${qaItemsContainer.length > 0}`);
 
-    const imageUrls = extractImageUrls($);
-    const attributes = extractProductAttributes($);
-    const asin = extractAsin($, attributes, url);
-    const brand = extractBrand($, attributes);
-    // Category needs to be determined, perhaps from breadcrumbs or attributes if available
-    // For now, let's leave it as null or a placeholder
-    const category = attributes.find(attr => attr.label.toLowerCase() === 'category')?.value || null;
+    qaItemsContainer.find(PRODUCT_SELECTORS.QA_ITEM_FALLBACK).each((i, itemEl) => {
+        const item = $(itemEl);
+        const questionText = extractText($, PRODUCT_SELECTORS.QA_QUESTION_FALLBACK, item)?.replace(/\s+/g, ' ').trim();
+        const answerText = extractText($, PRODUCT_SELECTORS.QA_ANSWER_FALLBACK, item)?.replace(/\s+/g, ' ').trim();
+        
+        if (!IS_PRODUCTION_MODE) log.debug(`[QAS_DEBUG_HTML] Item ${i}: Raw Question: "${item.find(PRODUCT_SELECTORS.QA_QUESTION_FALLBACK).text()}", Raw Answer: "${item.find(PRODUCT_SELECTORS.QA_ANSWER_FALLBACK).text()}"`);
 
+        if (questionText && answerText) {
+            log.info(`[QAS_INFO_HTML] Extracted Q&A (HTML): Q: "${questionText}", A: "${answerText}"`);
+            qas.push({ question: questionText, answer: answerText });
+        } else {
+            if (!IS_PRODUCTION_MODE) log.debug(`[QAS_DEBUG_HTML] Item ${i}: Question or Answer is empty. Not adding.`);
+        }
+    });
 
+    if (qas.length > 0) {
+        log.info(`[QAS_INFO] Successfully extracted ${qas.length} Q&As using HTML fallback.`);
+        return qas;
+    }
+
+    log.info('[QAS_INFO] No Q&As extracted.');
+    return undefined;
+};
+
+const extractProductDetails = ($: CheerioAPI, url: string): IdealoProductDetails | null => {
+    const productWrapper = $(PRODUCT_SELECTORS.PRODUCT_WRAPPER).first();
+    if (!productWrapper.length) {
+        log.error(`[PRODUCT_DETAILS_ERROR] Product wrapper (selector: ${PRODUCT_SELECTORS.PRODUCT_WRAPPER}) not found on page ${url}. Cannot extract details.`);
+        return null; // Return null if the main product container is not found
+    }
+
+    const titleH1 = productWrapper.find(PRODUCT_SELECTORS.TITLE_H1);
+    const title = extractText($, PRODUCT_SELECTORS.TITLE_MAIN, titleH1);
+    const variantTitle = extractText($, PRODUCT_SELECTORS.TITLE_VARIANT, titleH1);
+
+    const priceNew = parseNumberFromSelector($, PRODUCT_SELECTORS.PRICE_NEW_STRONG, productWrapper);
+    const priceUsed = parseNumberFromSelector($, PRODUCT_SELECTORS.PRICE_USED_STRONG, productWrapper);
+
+    const imageUrls = extractImageUrls($, productWrapper);
+    const features = extractProductFeatures($, productWrapper);
+    const optionChoices = extractProductOptionChoices($, productWrapper);
+    const specifications = extractProductSpecifications($);
+    const description = extractProductDescription($);
+    const qas = extractProductQAs($);
+    
     return { 
-        asin: asin ?? undefined, 
         url, 
         title, 
-        price, 
-        listPrice, 
-        reviewRating, 
-        reviewCount, 
+        variantTitle,
+        priceNew,
+        priceUsed: priceUsed ?? undefined, // Make it optional
         imageUrls, 
-        attributes, 
-        brand,
-        category 
+        features,
+        optionChoices: optionChoices.length > 0 ? optionChoices : undefined,
+        specifications: specifications.length > 0 ? specifications : undefined,
+        description: description ?? undefined,
+        qas: qas && qas.length > 0 ? qas : undefined,
     };
 };
 
-/**
- * Handles potential CAPTCHA blocking. Throws error to trigger retry.
- */
 const handleCaptchaBlocking = ($: CheerioAPI, url: string): void => {
     const isCaptchaDisplayed = $(PRODUCT_SELECTORS.CAPTCHA_CHECK).length > 0;
     if (isCaptchaDisplayed) {
         log.warning(`CAPTCHA detected on page: ${url}`);
-        // Throwing an error signals Crawlee to retry the request (potentially with different session/headers)
         throw new Error(`CAPTCHA detected on page: ${url}`);
     }
 };
 
-// --- Main Scraper Function ---
+// Helper function to handle cookie consent banners
+const handleCookieConsent = async (page: PlaywrightCrawlingContext['page'], logger: PlaywrightCrawlingContext['log'], pageName: string): Promise<void> => {
+    try {
+        const cookieWrapperSelector = 'div.cmp-wrapper';
+        const acceptButtonSelector = 'button#accept';
+        const shadowRootButtonSelector = 'div#usercentrics-root button[data-testid="uc-accept-all-button"]';
 
-export const scrapeAmazonProduct = async (
+        // Attempt 1: Standard cookie banner
+        try {
+            // Attend que le wrapper du cookie soit visible
+            await page.waitForSelector(cookieWrapperSelector, { timeout: IS_PRODUCTION_MODE ? 7000 : 10000, state: 'visible' });
+            logger.info(`Cookie consent wrapper found on ${pageName}.`);
+            const acceptButton = page.locator(acceptButtonSelector);
+            
+            if (await acceptButton.isVisible({ timeout: 3000 }) && await acceptButton.isEnabled({ timeout: 1000 })) {
+                logger.info(`Standard accept button is visible and enabled on ${pageName}. Clicking accept...`);
+                await acceptButton.click({ timeout: 5000, force: !IS_PRODUCTION_MODE });
+                await randomDelay(1000, 2000); // Délai après le clic
+                logger.info(`Cookie consent (standard) accepted on ${pageName}.`);
+                return; // Consentement géré
+            } else {
+                logger.info(`Standard accept button in wrapper not actionable or not found on ${pageName}.`);
+            }
+        } catch (e) {
+            logger.debug(`Standard cookie wrapper not found or error during standard handling on ${pageName}.`, { error: e instanceof Error ? e.message : String(e) });
+        }
+
+        // Attempt 2: Shadow DOM button (si l'approche standard a échoué ou n'a pas trouvé le wrapper)
+        try {
+            const shadowRootButton = page.locator(shadowRootButtonSelector);
+            // Attend que le bouton lui-même soit visible, en supposant que son parent (shadow host) le serait aussi.
+            await shadowRootButton.waitFor({ state: 'visible', timeout: IS_PRODUCTION_MODE ? 7000 : 10000 });
+            logger.info(`Shadow DOM button potentially visible on ${pageName}.`);
+
+            if (await shadowRootButton.isEnabled({ timeout: 1000 })) { // Vérifie s'il est activé
+                logger.info(`Cookie consent banner (Shadow DOM) found and enabled on ${pageName}. Clicking accept...`);
+                await shadowRootButton.click({ timeout: 5000, force: !IS_PRODUCTION_MODE });
+                await randomDelay(1000, 2000);
+                logger.info(`Cookie consent (Shadow DOM) accepted on ${pageName}.`);
+                return; // Consentement géré
+            } else {
+                logger.info(`Shadow DOM accept button found but not enabled on ${pageName}.`);
+            }
+        } catch (e) {
+            logger.debug(`Shadow DOM cookie button not found or error during Shadow DOM handling on ${pageName}.`, { error: e instanceof Error ? e.message : String(e) });
+        }
+        
+        logger.info(`Cookie consent button not successfully handled on ${pageName} using known selectors/methods.`);
+
+    } catch (e) { // Catch externe pour toute la fonction
+        logger.debug(`General error in handleCookieConsent on ${pageName}.`, { error: e instanceof Error ? e.message : String(e) });
+    }
+};
+
+export const scrapeIdealoProduct = async (
     productName: string
-): Promise<AmazonProductDetails | null> => {
-    log.info(`Starting Amazon scrape for product: "${productName}"`);
-    // log.info(`[SCRAPER_DEBUG] productName reçu: "${productName}"`);
-
-    const searchUrl = `https://www.amazon.com/s?k=${encodeURIComponent(productName)}&language=en_US&ref=nb_sb_noss`;
-    // log.info(`[SCRAPER_DEBUG] searchUrl construit: ${searchUrl}`);
+): Promise<IdealoProductDetails | null> => {
+    log.info(`Starting Idealo scrape for product: "${productName}"`);
+    const searchUrl = `https://www.idealo.fr/prechcat.html?q=${encodeURIComponent(productName)}`;
+    log.info(`Idealo searchUrl constructed: ${searchUrl}`);
     let productUrl: string | null = null;
-    let productDetails: AmazonProductDetails | null = null;
-    // Déclarer une variable pour stocker le résultat du handler
-    let extractedDetailsLocally: AmazonProductDetails | null = null;
+    let productDetails: IdealoProductDetails | null = null;
+    let extractedDetailsLocally: IdealoProductDetails | null = null;
 
-    // Configuration : Laisser Crawlee utiliser son comportement de persistance par défaut (true)
-    // ou configurer explicitement si nécessaire.
-    // const baseConfig = new Configuration({ persistStorage: true }); // Optionnel, true est la valeur par défaut
-    // Supprimer la ligne `persistStorage: false` permet d'utiliser la valeur par défaut.
-    // Pour être explicite, on peut la mettre à true.
-    // const baseConfig = new Configuration({ persistStorage: true }); 
-    // Testons en désactivant explicitement la persistance pour éviter les conflits de cache.
-    // const baseConfig = new Configuration({ persistStorage: false }); // Supprimé car non utilisé
+    const searchQueue = await RequestQueue.open(`idealo-search-${Date.now()}`);
 
-    // Utiliser un nom de queue unique basé sur la date pour éviter les conflits potentiels
-    // Le config: baseConfig ici devient moins critique si la config globale est déjà persistante.
-    const searchQueue = await RequestQueue.open(`search-${Date.now()}`); // config: baseConfig peut être omis si on utilise la config par défaut
-
-    // --- Phase 1: Search for the product URL ---
-    log.info(`Searching for product URL: ${searchUrl}`);
-    const searchCrawler = new CheerioCrawler({
+    log.info(`Searching for product URL on Idealo: ${searchUrl}`);
+    const searchCrawler = new PlaywrightCrawler({
         requestQueue: searchQueue,
-        maxRequestsPerCrawl: 5, // Limit search page crawls (can be increased if needed)
+        headless: IS_PRODUCTION_MODE, // Contrôlé par la constante
+        launchContext: {
+            launchOptions: {
+                slowMo: IS_PRODUCTION_MODE ? 50 : 250, // Plus rapide en prod, plus lent en dév
+            },
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36', // User agent commun
+        },
+        maxRequestsPerCrawl: 3,
         minConcurrency: 1,
-        maxConcurrency: 2, // Slightly reduce concurrency for search
-        requestHandlerTimeoutSecs: 75, // Timeout appliqué ici
-        navigationTimeoutSecs: 75, // Timeout appliqué ici
+        maxConcurrency: 1,
+        requestHandlerTimeoutSecs: 180,
+        navigationTimeoutSecs: 180,
+        async requestHandler({ page, request, log }: PlaywrightCrawlingContext) {
+            log.info(`Processing Idealo search results page with Playwright: ${request.url}`);
+            
+            await handleCookieConsent(page, log, 'search page'); // Appel de la fonction helper
+            await randomDelay(1000, 3000); // Délai aléatoire après gestion cookies / chargement page
+            
+            const productLinkElements = page.locator(SEARCH_SELECTORS.PRODUCT_LINK_IN_SEARCH);
+            const count = await productLinkElements.count();
+            log.info(`Found ${count} potential product links on Idealo search page using Playwright with selector: "${SEARCH_SELECTORS.PRODUCT_LINK_IN_SEARCH}".`);
 
-        async requestHandler({ $, request, log }: CheerioCrawlingContext) {
-            // log.info(`Processing search results page: ${request.url}`);
-            handleCaptchaBlocking($, request.url);
+            if (count > 0) {
+                const firstResultHref = await productLinkElements.first().getAttribute('href');
 
-            // Itérer sur les conteneurs de résultats au lieu de prendre seulement le premier lien global
-            const resultItems = $('div[role="listitem"][data-component-type="s-search-result"]');
-            // log.info(`Found ${resultItems.length} potential result items.`);
-
-            for (let i = 0; i < resultItems.length; i++) {
-                const item = resultItems.eq(i);
-                const firstResultLink = item.find(SEARCH_SELECTORS.FIRST_RESULT_LINK).first();
-                const resultHref = firstResultLink.attr('href');
-
-                if (resultHref) {
-                    log.debug(`Checking item ${i + 1} link: ${resultHref}`);
-
-                    // Vérifier si le lien est sponsorisé (contient /sspa/)
-                    if (resultHref.includes('/sspa/')) {
-                        // log.info(`Item ${i + 1} is a sponsored link, skipping.`);
-                        continue; // Passer à l'élément suivant
-                    }
-
-                    // Construct absolute URL carefully
+                if (firstResultHref) {
                     try {
-                        const absoluteUrl = new URL(resultHref, 'https://www.amazon.com/').toString();
-                        // log.info(`Found potential non-sponsored product URL: ${absoluteUrl}`);
-                        // log.info(`[SCRAPER_DEBUG] Considération du lien: ${absoluteUrl}`);
-
-                        // Validate URL structure (basic check)
-                        if (absoluteUrl.includes('/dp/') || absoluteUrl.includes('/gp/product/')) {
+                        const absoluteUrl = new URL(firstResultHref, 'https://www.idealo.fr/').toString();
+                        log.info(`Found potential Idealo product URL: ${absoluteUrl}`);
+                        if (absoluteUrl.includes('/prix/') || absoluteUrl.match(/\/offre\//) || absoluteUrl.match(/\/fiche-technique\//) ) {
                             productUrl = absoluteUrl;
-                            // log.info(`Validated product URL found: ${productUrl}`);
-                            // log.info(`[SCRAPER_DEBUG] URL de produit sélectionnée pour la Phase 2: ${productUrl}`);
-                            // Stop the search crawler once a valid, non-sponsored URL is found
-                            await searchCrawler.autoscaledPool?.abort();
-                            break; // Sortir de la boucle for
+                            log.info(`Validated Idealo product URL found: ${productUrl}`);
                         } else {
-                            log.warning(`Non-sponsored link does not look like a standard product page: ${absoluteUrl}`);
-                            // Continuer à chercher le prochain lien non-sponsorisé valide
+                            log.warning(`Link does not look like an Idealo product page: ${absoluteUrl}`);
                         }
                     } catch (e) {
-                        log.error(`Failed to construct absolute URL from href: ${resultHref}`, { error: e });
+                        const err = e as Error;
+                        log.error(`Failed to construct absolute URL from Idealo href: ${firstResultHref}`, { message: err.message });
                     }
                 } else {
-                    log.debug(`No link found in item ${i + 1}.`);
+                    log.debug('First product link element found, but href is missing.');
                 }
             }
+            if (productUrl) {
+                log.info('Product URL found, intending to stop search crawler soon.');
+            }
 
-            // Si la boucle se termine sans trouver de productUrl
-            if (!productUrl) {
-                 log.warning('Could not find a valid, non-sponsored product link on this page.');
-                 // Le crawler s'arrêtera naturellement s'il n'y a plus de requêtes.
+            if (!productUrl && count === 0) {
+                 log.warning('Could not find a valid product link on this Idealo search page.');
             }
         },
         failedRequestHandler({ request, log }) {
-            log.error(`Search request failed: ${request.url}`, { errorMessage: request.errorMessages?.join(', ') });
+            log.error(`Idealo search (Playwright) request failed: ${request.url}`, { errorMessage: request.errorMessages?.join(', ') });
         },
     });
 
-    await searchQueue.addRequest({ url: searchUrl, uniqueKey: `search_${productName}` });
+    await searchQueue.addRequest({ url: searchUrl, uniqueKey: `idealo_search_${productName}` });
     await searchCrawler.run();
     await searchQueue.drop();
 
-    // log.info(`[SCRAPER_DEBUG] productUrl avant la Phase 2 (après searchCrawler.run): ${productUrl}`);
-
-    // --- Phase 2: Scrape the product page if URL was found ---
     if (productUrl) {
-        log.info(`Proceeding to scrape product page: ${productUrl}`);
-        // Utiliser un nom de queue unique
-        const productQueue = await RequestQueue.open(`product-${Date.now()}`); // config: baseConfig peut être omis
-
-        // Add request with the search URL as Referer in headers
+        log.info(`Proceeding to scrape Idealo product page: ${productUrl}`);
+        const productQueue = await RequestQueue.open(`idealo-product-${Date.now()}`);
         const productRequest = new Request({
             url: productUrl,
-            uniqueKey: `product_${productName}`,
-            headers: {
-                'Referer': searchUrl,
-            },
+            uniqueKey: `idealo_product_${productName}`,
+            headers: { 'Referer': searchUrl },
         });
-
         await productQueue.addRequest(productRequest);
 
-        const productCrawler = new CheerioCrawler({
+        // Temporairement productCrawler en mode Playwright visible pour test
+        const productCrawler = new PlaywrightCrawler({
             requestQueue: productQueue,
-            maxRequestsPerCrawl: 1, // Only this product page
+            headless: IS_PRODUCTION_MODE, // <<< POUR VOIR LE NAVIGATEUR
+            launchContext: {
+                launchOptions: {
+                    slowMo: IS_PRODUCTION_MODE ? 100 : 500, // Ralentit les actions pour mieux observer
+                },
+                userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Safari/537.36', // User agent différent
+            },
+            maxRequestsPerCrawl: 1,
             minConcurrency: 1,
-            maxConcurrency: 1, // Single request at a time for the product page
-            requestHandlerTimeoutSecs: 75, // Timeout appliqué ici
-            navigationTimeoutSecs: 75, // Timeout appliqué ici
+            maxConcurrency: 1,
+            requestHandlerTimeoutSecs: 120000, // Augmenté pour observation
+            navigationTimeoutSecs: 12000, // Augmenté pour observation  //debuguaggggeeeee
+            async requestHandler({ page, request, log }: PlaywrightCrawlingContext) { // Contexte Playwright
+                log.info(`Processing Idealo product page with Playwright: ${request.loadedUrl ?? request.url}`);
 
-            async requestHandler({ $, request, log }: CheerioCrawlingContext) {
-                // log.info(`Processing product page: ${request.loadedUrl ?? request.url}`);
-                handleCaptchaBlocking($, request.loadedUrl ?? request.url);
+                await handleCookieConsent(page, log, 'product page'); // Appel de la fonction helper
+                await randomDelay(1500, 3500); // Délai aléatoire après gestion cookies
+                
+                // Attentes pour les éléments clés de la page produit (déplacé ici après la gestion des cookies)
+                try {
+                    await page.waitForSelector(PRODUCT_SELECTORS.PRODUCT_WRAPPER, { state: 'visible', timeout: IS_PRODUCTION_MODE ? 15000: 10000 });
+                    log.info('Product wrapper is visible.');
 
-                // Stocker dans la variable locale temporaire
-                const details = extractProductDetails($, request.loadedUrl || request.url);
-                extractedDetailsLocally = details; // Assigner à la variable locale
-                const asinForLog = details?.asin ?? 'N/A';
-                log.info(`Successfully extracted details for ASIN: ${asinForLog}`);
+                    log.info('Attempting to wait for price container to be visible...');
+                    await page.waitForSelector('div#oopStage-conditionButton-new', { state: 'visible', timeout: IS_PRODUCTION_MODE ? 20000 : 15000 });
+                    log.info('Container for new price button is visible.');
+                    
+                    log.info('Attempting to wait for price strong element to be visible...');
+                    await page.waitForSelector(PRODUCT_SELECTORS.PRICE_NEW_STRONG, { state: 'visible', timeout: IS_PRODUCTION_MODE ? 15000 : 10000 });
+                    log.info('Price strong element is visible.');
+
+                    try {
+                        log.info('Attempting to wait for options container to be visible...');
+                        await page.waitForSelector(PRODUCT_SELECTORS.OPTION_CHOICES_CONTAINER, { state: 'visible', timeout: IS_PRODUCTION_MODE ? 15000 : 10000 });
+                        log.info('Options container (delta-filters) is visible.');
+                    } catch (optionsWaitError) {
+                        log.info('Options container (delta-filters) did not become visible or is not present.', { error: optionsWaitError });
+                    }
+                    
+                    try {
+                        log.info('Attempting to wait for datasheet container to be visible...');
+                        await page.waitForSelector(PRODUCT_SELECTORS.DATASHEET_CONTAINER, { state: 'visible', timeout: IS_PRODUCTION_MODE ? 15000 : 10000 });
+                        log.info('Datasheet container is visible.');
+                    } catch (datasheetWaitError) {
+                        log.info('Datasheet container did not become visible or is not present.', { error: datasheetWaitError });
+                    }
+
+                    if (!IS_PRODUCTION_MODE) {
+                        log.info('>>> DEV MODE: PAUSING for 5 seconds for manual DOM inspection after element waits...');
+                        await page.waitForTimeout(5000); 
+                    } else {
+                        await randomDelay(500, 1500); // Petite pause en production après les attentes
+                    }
+
+                } catch (waitError) {
+                    log.warning('Essential product page elements did not become visible within timeout.', { error: waitError });
+                     // En mode production, on pourrait vouloir échouer ici ou essayer une autre stratégie
+                    if (IS_PRODUCTION_MODE) throw new Error('Essential product elements not found.');
+                }
+                
+                // Log direct du contenu du prix avec Playwright
+                const priceNewElementForDebug = page.locator(PRODUCT_SELECTORS.PRICE_NEW_STRONG);
+                const priceTextFromPlaywright = await priceNewElementForDebug.textContent();
+                if (!IS_PRODUCTION_MODE) log.info(`[DEBUG_PRICE] Text content of PRICE_NEW_STRONG directly from Playwright: "${priceTextFromPlaywright}"`);
+                const priceHtmlFromPlaywright = await priceNewElementForDebug.innerHTML();
+                if (!IS_PRODUCTION_MODE) log.info(`[DEBUG_PRICE] Inner HTML of PRICE_NEW_STRONG directly from Playwright: "${priceHtmlFromPlaywright}"`);
+
+                await randomDelay(1000, 2500); // Délai avant de récupérer le contenu
+                const htmlContent = await page.content();
+                const $ = cheerio.load(htmlContent); 
+
+                handleCaptchaBlocking($, request.loadedUrl || request.url);
+                const details = extractProductDetails($, request.loadedUrl || request.url); // Utilise le $ chargé
+                
+                extractedDetailsLocally = details;
+                const titleForLog = details?.title ?? 'N/A';
+                log.info(`Successfully extracted details for Idealo product (Title: ${titleForLog})`);
+                
+                // Log des spécifications extraites pour vérification
+                if (details?.specifications && details.specifications.length > 0) {
+                    log.info(`Extracted ${details.specifications.length} specifications:`);
+                    details.specifications.forEach(spec => log.info(`  - ${spec.key}: ${spec.value}`));
+                } else {
+                    log.info('No specifications were extracted or found.');
+                }
+
+                // await page.waitForTimeout(3000); // Pause de 3s pour voir la page. Remplacé par un délai aléatoire ou supprimé.
+                if (!IS_PRODUCTION_MODE) {
+                    await randomDelay(2000, 4000); // Garder une petite pause en mode non-production
+                }
             },
             failedRequestHandler({ request, log }) {
-                 log.error(`Product page request failed: ${request.url}`, { errorMessage: request.errorMessages?.join(', ') });
+                 log.error(`Idealo product page request failed: ${request.url}`, { errorMessage: request.errorMessages?.join(', ') });
             },
-        }); // Pas besoin de passer baseConfig ici
-
+        });
         await productCrawler.run();
         await productQueue.drop();
-
-        // Assigner le résultat local à la variable externe APRES l'exécution complète
         productDetails = extractedDetailsLocally;
-
     } else {
-        log.error(`Could not find a valid product URL for "${productName}" after search.`);
+        log.error(`Could not find a valid Idealo product URL for "${productName}" after search.`);
     }
 
-    // Utiliser directement productDetails qui a le type correct AmazonProductDetails | null
     if (productDetails) {
-         // Caster explicitement en AmazonProductDetails pour résoudre le problème de type 'never'
-         const typedProductDetails = productDetails as AmazonProductDetails;
-         const finalAsin = typedProductDetails.asin ?? 'N/A';
-         log.info(`Scraping finished successfully for "${productName}" (ASIN: ${finalAsin}).`);
-         return typedProductDetails; // Retourner la variable typée
+         const typedProductDetails = productDetails as IdealoProductDetails;
+         const finalTitle = typedProductDetails.title ?? 'N/A';
+         log.info(`Idealo scraping finished successfully for "${productName}" (Title: ${finalTitle}).`);
+         return typedProductDetails;
     } else {
-         log.warning(`Scraping did not yield product details for "${productName}".`);
+         log.warning(`Idealo scraping did not yield product details for "${productName}".`);
          return null;
     }
 }; 

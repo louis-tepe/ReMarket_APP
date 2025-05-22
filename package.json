@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test:scrape": "tsx ./test-scraper.ts",
     "db:seed:categories": "tsx src/lib/seed/seedCategories.ts",
     "db:seed:brands": "tsx src/lib/seed/seedBrands.ts"
   },
@@ -31,13 +32,14 @@
     "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "crawlee": "^3.13.3",
+    "crawlee": "^3.9.2",
     "embla-carousel-react": "^8.6.0",
     "lucide-react": "^0.507.0",
     "mongoose": "^8.14.1",
     "next": "15.3.2",
     "next-auth": "^4.24.7",
     "next-themes": "^0.4.6",
+    "playwright": "^1.42.1",
     "puppeteer": "^24.8.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -45,9 +47,11 @@
     "slugify": "^1.6.6",
     "sonner": "^2.0.3",
     "tailwind-merge": "^3.2.0",
-    "zod": "^3.24.4"
+    "zod": "^3.24.4",
+    "cheerio": "^1.0.0-rc.12"
   },
   "devDependencies": {
+    "@apify/tsconfig": "^0.1.1",
     "@eslint/eslintrc": "^3",
     "@swc/core": "^1.11.24",
     "@tailwindcss/postcss": "^4",
@@ -69,6 +73,6 @@
     "ts-node": "^10.9.2",
     "tsx": "^4.19.4",
     "tw-animate-css": "^1.2.9",
-    "typescript": "^5.8.3"
+    "typescript": "^5"
   }
 }
