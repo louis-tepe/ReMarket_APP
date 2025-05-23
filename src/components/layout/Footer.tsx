@@ -18,18 +18,8 @@ export default function Footer() {
                             <li><Link href="/vendre" className="text-muted-foreground hover:text-primary">Vendre sur ReMarket</Link></li>
                             <li><Link href="/#comment-ca-marche" className="text-muted-foreground hover:text-primary">Comment ça marche ?</Link></li>
                             <li><Link href="/faq" className="text-muted-foreground hover:text-primary">FAQ</Link></li>
-                            {/* TODO: Liens Contact, CGV, Politique de confidentialité */}
                         </ul>
                     </div>
-                    {/* 
-                    TODO: Section Suivez-nous à réintégrer avec les icônes
-                    <div>
-                        <h4 className="font-semibold mb-3">Suivez-nous</h4>
-                        <div className="flex space-x-4">
-                           Placeholder pour icônes sociales
-                        </div>
-                    </div> 
-                    */}
                 </div>
                 <div className="border-t pt-8 text-center text-sm text-muted-foreground">
                     <p>&copy; {new Date().getFullYear()} ReMarket. Tous droits réservés.</p>

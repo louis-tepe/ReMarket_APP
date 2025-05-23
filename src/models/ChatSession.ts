@@ -1,65 +1,64 @@
-import mongoose, { Document, Model, Schema } from "mongoose";
-import { UserDoc } from "./User"; // Assurez-vous que le chemin vers votre modèle User est correct
+import mongoose, { Document, Model, Schema, Types } from "mongoose";
+import { IUser } from "./User"; // Correction: IUser au lieu de UserDoc
 
-// Interface pour une partie de message (similaire à l'API Gemini)
-export interface MessagePart {
+// Interface pour une partie d'un message (inspirée de l'API Gemini)
+export interface IMessagePart {
   text?: string;
   inlineData?: {
     mimeType: string;
-    data: string; // Base64 encoded data
+    data: string; // Données encodées en Base64
   };
 }
 
-// Interface pour un message dans l'historique de chat
-export interface ChatMessage {
-  role: "user" | "model";
-  parts: MessagePart[];
-  timestamp: Date;
+// Interface pour un message dans l'historique du chat
+export interface IChatMessage {
+  role: "user" | "model"; // Rôle de l'émetteur du message
+  parts: IMessagePart[]; // Contenu du message
+  timestamp: Date; // Horodatage du message
 }
 
 // Interface pour le document ChatSession
-export interface ChatSessionDoc extends Document {
-  userId?: UserDoc['_id']; // Optionnel si on autorise des chats anonymes sauvegardés localement plus tard
-  clientSessionId: string; // Un ID généré côté client pour identifier la session avant la sauvegarde initiale
-  title?: string; // Titre optionnel pour la session de chat
-  messages: ChatMessage[];
+export interface IChatSession extends Document {
+  userId?: Types.ObjectId | IUser; // Optionnel, pour chats anonymes ultérieurs
+  clientSessionId: string; // ID client unique pour la session (avant sauvegarde DB)
+  title?: string; // Titre optionnel de la session
+  messages: IChatMessage[]; // Historique des messages
   createdAt: Date;
   updatedAt: Date;
 }
 
-const messagePartSchema = new Schema<MessagePart>(
+const MessagePartSchema = new Schema<IMessagePart>(
   {
     text: { type: String },
     inlineData: {
       mimeType: { type: String },
-      data: { type: String },
+      data: { type: String }, // Données encodées en Base64
     },
   },
-  { _id: false }
+  { _id: false } // Pas d'ID propre pour les sous-documents de parties de message
 );
 
-const chatMessageSchema = new Schema<ChatMessage>(
+const ChatMessageSchema = new Schema<IChatMessage>(
   {
     role: { type: String, enum: ["user", "model"], required: true },
-    parts: { type: [messagePartSchema], required: true },
-    timestamp: { type: Date, default: Date.now }, 
+    parts: { type: [MessagePartSchema], required: true },
+    timestamp: { type: Date, default: Date.now },
   },
-  { _id: false }
+  { _id: false } // Pas d'ID propre pour les sous-documents de messages
 );
 
-const chatSessionSchema = new Schema<ChatSessionDoc>(
+const ChatSessionSchema = new Schema<IChatSession>(
   {
-    userId: { type: Schema.Types.ObjectId, ref: "User", index: true }, // Index pour recherche rapide par utilisateur
-    clientSessionId: { type: String, unique: true, required: true, index: true }, // Assurer l'unicité et recherche rapide
-    title: { type: String },
-    messages: { type: [chatMessageSchema], default: [] },
+    userId: { type: Schema.Types.ObjectId, ref: "User", index: true },
+    clientSessionId: { type: String, unique: true, required: true, index: true },
+    title: { type: String, trim: true }, // Ajout de trim
+    messages: { type: [ChatMessageSchema], default: [] },
   },
-  { timestamps: true } // Ajoute createdAt et updatedAt automatiquement
+  { timestamps: true } // Ajoute createdAt et updatedAt
 );
 
-// Nettoyage pour éviter la recréation du modèle lors du hot-reloading en développement
-const ChatSession =
-  (mongoose.models.ChatSession as Model<ChatSessionDoc>) ||
-  mongoose.model<ChatSessionDoc>("ChatSession", chatSessionSchema);
+const ChatSession: Model<IChatSession> =
+  mongoose.models.ChatSession ||
+  mongoose.model<IChatSession>("ChatSession", ChatSessionSchema);
 
 export default ChatSession; 

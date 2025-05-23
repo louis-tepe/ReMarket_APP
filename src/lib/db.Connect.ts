@@ -11,11 +11,7 @@
       );
     }
 
-    /**
-     * Cache global de connexion.
-     * Évite de recréer des connexions à chaque appel de fonction Next.js en mode développement.
-     * En production, les fonctions serverless peuvent s'exécuter dans des contextes différents.
-     */
+    /** Cache global de connexion pour éviter de recréer des connexions. */
     let cached = global.mongooseCache;
 
     if (!cached) {
@@ -29,18 +25,22 @@
 
       if (!cached.promise) {
         const opts = {
-          bufferCommands: false, // Désactive la mise en mémoire tampon des commandes si la connexion est perdue
+          bufferCommands: false,
         };
-
-        cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongooseInstance) => {
-          return mongooseInstance;
+        // Tente la connexion et stocke la promesse.
+        cached.promise = mongoose.connect(MONGODB_URI!, opts).catch(err => {
+          // Réinitialise la promesse en cas d'erreur pour permettre une nouvelle tentative.
+          cached.promise = null;
+          throw err;
         });
       }
 
       try {
+        // Attend la résolution de la promesse de connexion.
         cached.conn = await cached.promise;
       } catch (e) {
-        cached.promise = null;
+        // Si la connexion échoue, la promesse a déjà été réinitialisée.
+        // Il suffit de propager l'erreur.
         throw e;
       }
 

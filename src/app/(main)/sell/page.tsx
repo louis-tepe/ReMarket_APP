@@ -10,7 +10,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from "sonner";
-import type { IScrapedProduct } from '@/models/ScrapedProduct';
 import type { IProductModel as IProductModelReMarketType } from '@/models/ProductModel';
 import { useSession } from "next-auth/react";
 import type {
@@ -19,6 +18,7 @@ import type {
     AttributeItem,
     Specifications
 } from './types';
+import type { FormFieldDefinition } from '@/types/form.types.ts';
 import type { ICategory as BackendCategory } from '@/models/CategoryModel';
 import { IBrand } from '@/models/BrandModel';
 import { Loader2, CheckCircle, ArrowRight, RefreshCcw, ArrowLeft } from 'lucide-react';
@@ -43,20 +43,6 @@ interface CategoryDropdownLevel {
     options: FrontendCategory[];
     selectedId: string | null;
     placeholder: string;
-}
-
-export interface FormFieldDefinition {
-    name: string;
-    label: string;
-    type: 'text' | 'number' | 'select' | 'textarea';
-    required: boolean;
-    placeholder?: string;
-    options?: Array<{ value: string; label: string }>;
-    min?: number;
-    max?: number;
-    minLength?: number;
-    maxLength?: number;
-    defaultValue?: string | number | boolean;
 }
 
 export interface OfferDetails {
@@ -414,19 +400,13 @@ export default function SellPage() {
                     const errorData = await pmResponse.json().catch(() => ({ message: "Erreur interne en rechargeant le produit standardisé." }));
                     throw new Error(errorData.message);
                 }
-                const fullProductModelForDisplay = await pmResponse.json() as IProductModelReMarketType & { _id: string };
+                const fullProductModelForDisplay = await pmResponse.json() as DisplayableProductModel;
                 setSelectedProductModel(fullProductModelForDisplay);
                 setStep(2);
                 toast.success("Produit Prêt !", { description: `Les informations pour "${fullProductModelForDisplay.title}" sont prêtes pour votre offre.` });
-            } else if (data.scrapedProduct) {
-                toast.warning("Produit Scrapé, Standardisation Partielle", {
-                    description: `Nous avons trouvé "${data.scrapedProduct.title}", mais la standardisation ReMarket nécessite une vérification. Vous pouvez continuer, mais certains détails pourraient manquer.`
-                });
-                setSelectedProductModel(data.scrapedProduct as DisplayableProductModel);
-                setStep(2);
-            } else if (data.pmError) {
-                toast.error("Erreur Standardisation Produit", { description: `Le produit "${data.scrapedProduct?.title || nameForScraping}" a été trouvé mais n'a pas pu être standardisé: ${data.pmError}. Essayez de modifier le nom.` });
-                if (data.scrapedProduct) setSelectedProductModel(data.scrapedProduct as DisplayableProductModel);
+            } else if (data.error) {
+                toast.error("Erreur Standardisation Produit", { description: `Le produit "${data.productModel?.rawTitle || nameForScraping}" n'a pas pu être correctement traité: ${data.error}. Essayez de modifier le nom.` });
+                if (data.productModel) setSelectedProductModel(data.productModel as DisplayableProductModel);
             } else {
                 toast.error("Produit Non Trouvé/Standardisé", { description: `Aucune information pour "${nameForScraping}" n'a pu être trouvée ou standardisée. Veuillez réessayer.` });
             }
@@ -595,7 +575,7 @@ export default function SellPage() {
                 throw new Error(createdOfferData.message || `Erreur HTTP: ${response.status}`);
             }
             toast.success("Offre Publiée !", {
-                description: `Votre offre pour "${selectedProductModel.title}" à ${createdOfferData.price}€ est en ligne.`,
+                description: `Votre offre pour "${selectedProductModel.title}" à ${createdOfferData.data?.price || payload.price}€ est en ligne.`,
                 action: { label: "Vendre un autre article", onClick: () => resetSellProcess() },
                 cancel: { label: "Voir mes offres", onClick: () => router.push('/dashboard/sales') }
             });
@@ -628,22 +608,24 @@ export default function SellPage() {
     };
 
     const displayBrand = selectedProductModel?.brand ? getDisplayString(selectedProductModel.brand) : 'N/A';
-    const displayCategory = finalSelectedLeafCategory?.name || (selectedProductModel?.category ? getDisplayString(selectedProductModel.category) : 'N/A');
-    const displayAsin = selectedProductModel && 'asin' in selectedProductModel ? (selectedProductModel as IScrapedProduct).asin : undefined;
+    const displayCategory = finalSelectedLeafCategory?.name || (selectedProductModel?.category ? getDisplayString((selectedProductModel.category as any).name || selectedProductModel.rawCategoryName) : 'N/A');
+    const displayAsin = selectedProductModel?.rawAsin;
+
     let displayStandardDescription: string | undefined = 'N/A';
     if (selectedProductModel) {
-        if ('standardDescription' in selectedProductModel && typeof selectedProductModel.standardDescription === 'string') {
+        if (selectedProductModel.standardDescription) {
             displayStandardDescription = selectedProductModel.standardDescription;
-        } else if ('description' in selectedProductModel && typeof selectedProductModel.description === 'string') {
-            displayStandardDescription = selectedProductModel.description;
+        } else if (selectedProductModel.rawDescription) {
+            displayStandardDescription = selectedProductModel.rawDescription + " (Description brute)";
         }
     }
+
     let displayImageUrls: string[] = ['/images/placeholder-product.png'];
     if (selectedProductModel) {
-        const urls = ('standardImageUrls' in selectedProductModel && Array.isArray(selectedProductModel.standardImageUrls) && selectedProductModel.standardImageUrls.length > 0)
+        const urls = (selectedProductModel.standardImageUrls && selectedProductModel.standardImageUrls.length > 0)
             ? selectedProductModel.standardImageUrls
-            : (('imageUrls' in selectedProductModel && Array.isArray(selectedProductModel.imageUrls) && selectedProductModel.imageUrls.length > 0)
-                ? selectedProductModel.imageUrls
+            : (selectedProductModel.rawImageUrls && selectedProductModel.rawImageUrls.length > 0
+                ? selectedProductModel.rawImageUrls
                 : null);
         if (urls) displayImageUrls = urls;
     }
@@ -651,12 +633,17 @@ export default function SellPage() {
     const prepareDisplayData = () => {
         let displayAttributes: Specifications = [];
         if (selectedProductModel) {
-            if ('specifications' in selectedProductModel && Array.isArray((selectedProductModel as IProductModelReMarketType).specifications)) {
-                displayAttributes = (selectedProductModel as IProductModelReMarketType).specifications;
-            } else if ('attributes' in selectedProductModel && Array.isArray((selectedProductModel as IScrapedProduct).attributes)) {
-                displayAttributes = (selectedProductModel as IScrapedProduct).attributes.map(attr => ({
+            if (selectedProductModel.specifications && selectedProductModel.specifications.length > 0) {
+                displayAttributes = selectedProductModel.specifications.map(spec => ({
+                    label: spec.label,
+                    value: spec.value,
+                    unit: spec.unit
+                }));
+            } else if (selectedProductModel.rawAttributes && selectedProductModel.rawAttributes.length > 0) {
+                displayAttributes = selectedProductModel.rawAttributes.map(attr => ({
                     label: attr.label,
-                    value: attr.value
+                    value: attr.value,
+                    // unit: undefined // rawAttributes n'ont pas d'unité définie dans IProductModel pour l'instant
                 }));
             }
         }
@@ -855,8 +842,8 @@ export default function SellPage() {
                             </div>
                             <div>
                                 <Label htmlFor="sellerDescription">Description de votre offre (optionnel)</Label>
-                                <Textarea id="sellerDescription" name="sellerDescription" value={offerDetails.sellerDescription} onChange={handleOfferDetailsChange} placeholder="Ex: Vendu avec boîte d&apos;origine..." rows={4} className="bg-input" />
-                                <p className="text-xs text-muted-foreground mt-1">Soyez précis pour éviter les surprises !</p>
+                                <Textarea id="sellerDescription" name="sellerDescription" value={offerDetails.sellerDescription} onChange={handleOfferDetailsChange} placeholder="Ex: Vendu avec boîte d&apos;origine... (min. 10 caractères)" rows={4} className="bg-input" minLength={10} />
+                                <p className="text-xs text-muted-foreground mt-1">Soyez précis pour éviter les surprises ! (10 caractères minimum)</p>
                             </div>
 
                             {categorySpecificFormFields.length > 0 && (

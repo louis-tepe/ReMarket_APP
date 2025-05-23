@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
-import { authOptions } from '@/lib/authOptions';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import dbConnect from '@/lib/db.Connect';
 import ProductOfferModel, { IProductBase } from '@/models/ProductBaseModel';
 import CategoryModel, { ICategory } from '@/models/CategoryModel';
 import ProductModel from '@/models/ProductModel';
 import type { Session } from 'next-auth';
 import User from '@/models/User';
-import { analyzeImageCondition, ImagePart } from '@/services/geminiService';
+import { analyzeImageCondition, ImagePart } from '@/services/ai/geminiService';
 import { ProductCategorySpecificModel } from '@/models/discriminators';
 import { Types } from 'mongoose';
 
@@ -145,15 +145,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Authentification requise." }, { status: 401 });
     }
     const userId = session.user.id;
-    console.log(`[POST /api/offers] Attempting to find seller with userId: ${userId}`);
+    // console.log(`[POST /api/offers] Attempting to find seller with userId: ${userId}`);
     const seller = await User.findById(userId);
     if (!seller) {
-      console.error(`[POST /api/offers] Seller not found for userId: ${userId}`);
+      // console.error(`[POST /api/offers] Seller not found for userId: ${userId}. Returning 404.`);
       return NextResponse.json({ success: false, message: "Vendeur non trouvé." }, { status: 404 });
     }
+    // console.log(`[POST /api/offers] Seller found: ${seller.name || seller.email}`);
 
     const body: OfferCreationBody = await request.json();
-    console.log("[POST /api/offers] Body reçu:", JSON.stringify(body, null, 2));
+    // console.log("[POST /api/offers] Body reçu:", JSON.stringify(body, null, 2));
 
     const {
       productModelId,
@@ -193,8 +194,10 @@ export async function POST(request: NextRequest) {
 
     const productModelDoc = await ProductModel.findById(productModelId);
     if (!productModelDoc) {
+      // console.error(`[POST /api/offers] ProductModel not found for productModelId: ${productModelId}. Returning 404.`);
       return NextResponse.json({ success: false, message: "Modèle de produit ReMarket non trouvé." }, { status: 404 });
     }
+    // console.log(`[POST /api/offers] ProductModel found: ${productModelDoc.title}`);
 
     let visualConditionScore: number | null = null;
     let visualConditionRawResponse: string | undefined = undefined;
@@ -202,7 +205,7 @@ export async function POST(request: NextRequest) {
     // Analyse de l'image principale si le prompt est défini pour la catégorie
     if (categoryDoc.imageAnalysisPrompt && images.length > 0) {
       const mainImageRelativeUrl = images[0]; // Analyser la première image
-      console.log(`[POST /api/offers] Analyse de l'image: ${mainImageRelativeUrl} avec le prompt: "${categoryDoc.imageAnalysisPrompt}"`);
+      // console.log(`[POST /api/offers] Analyse de l'image: ${mainImageRelativeUrl} avec le prompt: "${categoryDoc.imageAnalysisPrompt}"`);
       
       // Pour utiliser analyzeImageCondition, nous avons besoin de l'image en base64.
       // Ici, nous avons une URL. Il faudrait soit :
@@ -228,7 +231,7 @@ export async function POST(request: NextRequest) {
         const protocol = request.headers.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https');
         const mainImageUrl = `${protocol}://${host}${mainImageRelativeUrl}`;
         
-        console.log(`[POST /api/offers] Fetching image from absolute URL: ${mainImageUrl}`);
+        // console.log(`[POST /api/offers] Fetching image from absolute URL: ${mainImageUrl}`);
         const imageResponse = await fetch(mainImageUrl);
         if (!imageResponse.ok) {
             console.warn(`Impossible de récupérer l'image ${mainImageUrl} pour l'analyse.`);
@@ -247,7 +250,7 @@ export async function POST(request: NextRequest) {
             if (analysisResult) {
               visualConditionScore = analysisResult.score;
               visualConditionRawResponse = analysisResult.rawResponse;
-              console.log(`[POST /api/offers] Résultat de l'analyse Gemini:`, { visualConditionScore, visualConditionRawResponse });
+              // console.log(`[POST /api/offers] Résultat de l'analyse Gemini:`, { visualConditionScore, visualConditionRawResponse });
             }
         }
       } catch (analysisError) {
@@ -299,3 +302,52 @@ export async function POST(request: NextRequest) {
 
 // TODO: Ajouter une méthode GET pour lister les offres si nécessaire (par exemple, pour un utilisateur)
 // export async function GET(request: Request) { ... } 
+
+export async function GET(request: NextRequest) {
+  try {
+    await dbConnect();
+    const session = await getServerSession(authOptions);
+    // Optionnel: Vérifier la session si certaines offres sont protégées ou si le listage dépend de l'utilisateur
+    // if (!session || !session.user) {
+    //   return NextResponse.json({ success: false, message: "Authentification requise pour certaines opérations." }, { status: 401 });
+    // }
+
+    const { searchParams } = new URL(request.url);
+    // TODO: Implémenter la logique de filtres (par exemple, sellerId, categoryId, productModelId, status, etc.)
+    // Exemple: const sellerId = searchParams.get('sellerId');
+    // const categorySlug = searchParams.get('categorySlug');
+
+    const query: any = {};
+    // if (sellerId) query.seller = sellerId;
+    // if (categorySlug) { ... find category by slug then query.category = category._id ... }
+    // query.listingStatus = 'active'; // Par défaut, ne montrer que les offres actives ?
+
+    // TODO: Implémenter la pagination
+    // const page = parseInt(searchParams.get('page') || '1', 10);
+    // const limit = parseInt(searchParams.get('limit') || '10', 10);
+    // const skip = (page - 1) * limit;
+
+    const offers = await ProductOfferModel.find(query)
+      // .populate('productModel', 'title slug standardImageUrls brand category') // TODO: Ajuster le populate selon les besoins
+      // .populate('seller', 'name username')
+      .sort({ createdAt: -1 })
+      // .skip(skip)
+      // .limit(limit)
+      .lean();
+
+    // TODO: Calculer le nombre total d'offres pour la pagination
+    // const totalOffers = await ProductOfferModel.countDocuments(query);
+
+    return NextResponse.json({ 
+      success: true, 
+      data: offers, 
+      // currentPage: page, 
+      // totalPages: Math.ceil(totalOffers / limit),
+      // totalOffers 
+    }, { status: 200 });
+
+  } catch (error: any) {
+    console.error("[API_OFFERS_GET]", error);
+    return NextResponse.json({ success: false, message: "Erreur serveur lors de la récupération des offres.", error: error.message }, { status: 500 });
+  }
+} 

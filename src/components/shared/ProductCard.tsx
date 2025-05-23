@@ -3,9 +3,8 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { toast } from 'sonner';
+import { useFavoriteProduct } from '@/hooks/useFavoriteProduct';
 
 export interface ProductCardProps {
     id: string;
@@ -30,57 +29,22 @@ export default function ProductCard({
     initialIsFavorite = false,
     onFavoriteToggle
 }: ProductCardProps) {
-    const { data: session, status } = useSession();
-    const [isFavorite, setIsFavorite] = useState(initialIsFavorite);
-    const [isLoadingFavorite, setIsLoadingFavorite] = useState(false);
+    const { status } = useSession();
+    const {
+        isFavorite,
+        isLoadingFavorite,
+        toggleFavorite,
+        isInteractionDisabled
+    } = useFavoriteProduct({
+        productId: id,
+        initialIsFavorite,
+        onFavoriteToggle
+    });
 
-    // Synchroniser l'état si la prop initiale change
-    useEffect(() => {
-        setIsFavorite(initialIsFavorite);
-    }, [initialIsFavorite]);
-
-    const handleToggleFavorite = async (event: React.MouseEvent) => {
-        event.preventDefault(); // Empêche la navigation si la carte est un lien
-        event.stopPropagation(); // Empêche la propagation si le bouton est dans un autre élément cliquable
-
-        if (status !== 'authenticated' || !session?.user) {
-            toast.info("Veuillez vous connecter pour ajouter des favoris.");
-            // Optionnel: rediriger vers la page de connexion
-            // router.push('/signin');
-            return;
-        }
-
-        setIsLoadingFavorite(true);
-        const newFavoriteStatus = !isFavorite;
-
-        try {
-            const response = await fetch('/api/favorites', {
-                method: newFavoriteStatus ? 'POST' : 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ productId: id }),
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.message || 'Erreur lors de la mise à jour des favoris');
-            }
-
-            setIsFavorite(newFavoriteStatus);
-            toast.success(newFavoriteStatus ? "Ajouté aux favoris!" : "Retiré des favoris.");
-            if (onFavoriteToggle) {
-                onFavoriteToggle(id, newFavoriteStatus);
-            }
-            // Optionnel: déclencher un événement global ou invalider un cache SWR/React Query ici
-
-        } catch (error) {
-            console.error("Erreur lors de la mise à jour des favoris:", error);
-            toast.error(error instanceof Error ? error.message : "Une erreur s'est produite.");
-        } finally {
-            setIsLoadingFavorite(false);
-        }
+    const handleFavoriteButtonClick = async (event: React.MouseEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+        await toggleFavorite();
     };
 
     const placeholderImage = '/images/placeholder-product.webp'; // Assurez-vous que cette image existe dans public/images
@@ -108,8 +72,8 @@ export default function ProductCard({
                             isLoadingFavorite && "opacity-50 cursor-not-allowed",
                             isFavorite && "text-red-500 hover:text-red-600"
                         )}
-                        onClick={handleToggleFavorite}
-                        disabled={isLoadingFavorite}
+                        onClick={handleFavoriteButtonClick}
+                        disabled={isInteractionDisabled}
                         aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
                     >
                         <Heart className={cn("h-5 w-5", isFavorite && "fill-current")} />

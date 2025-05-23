@@ -1,97 +1,130 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/authOptions";
-import dbConnect from "@/lib/db.Connect";
-import ChatSession, { ChatMessage } from "@/models/ChatSession";
-import User from "@/models/User"; // Assurez-vous que le chemin est correct
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import dbConnect from '@/lib/db.Connect';
+import ChatSession from '@/models/ChatSession';
+import ChatMessage from '@/models/ChatMessage';
 
-interface SaveChatRequestBody {
-  clientSessionId: string;
-  messages: ChatMessage[]; // L'historique complet des messages de la session en cours
-  title?: string;
-}
+// TODO: Implémenter GET /api/chat/history/[sessionId] pour récupérer les messages d'une session spécifique
+// Cette fonctionnalité semble déjà implémentée dans src/app/api/chat/history/[sessionId]/route.ts
+// et devrait être testée et ce commentaire supprimé ou mis à jour.
 
-// POST /api/chat/history - Sauvegarde ou met à jour une session de chat
-export async function POST(request: Request) {
-  try {
+export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user?.id) {
-      return NextResponse.json({ success: false, error: "Non autorisé. Utilisateur non connecté." }, { status: 401 });
+
+    if (!session || !session.user || !session.user.id) {
+        return NextResponse.json({ success: false, message: "Non autorisé. Session utilisateur manquante." }, { status: 401 });
     }
 
-    const body: SaveChatRequestBody = await request.json();
-    const { clientSessionId, messages, title } = body;
+    // La vérification de l'existence de l'utilisateur via User.findById(session.user.id) a été supprimée
+    // car l'obtention d'une session valide garantit déjà que session.user.id est un ID utilisateur valide.
 
-    if (!clientSessionId || !messages) {
-      return NextResponse.json(
-        { success: false, error: "clientSessionId et messages sont requis." },
-        { status: 400 }
-      );
+    const { clientSessionId, firstMessageContent } = await request.json();
+
+    if (!clientSessionId || typeof clientSessionId !== 'string') {
+        return NextResponse.json({ success: false, message: "clientSessionId est requis et doit être une chaîne de caractères." }, { status: 400 });
+    }
+    if (!firstMessageContent || typeof firstMessageContent !== 'string') {
+        return NextResponse.json({ success: false, message: "firstMessageContent est requis et doit être une chaîne de caractères." }, { status: 400 });
     }
 
-    await dbConnect();
+    try {
+        await dbConnect();
 
-    // Vérifier si l'utilisateur existe (juste au cas où)
-    const user = await User.findById(session.user.id);
-    if (!user) {
-      return NextResponse.json({ success: false, error: "Utilisateur non trouvé." }, { status: 404 });
+        const existingSession = await ChatSession.findOne({
+            clientSessionId: clientSessionId,
+            userId: session.user.id 
+        });
+
+        let chatSession;
+        let isNewSession = false;
+
+        if (existingSession) {
+            existingSession.lastActivity = new Date();
+            // Optionnel: Mettre à jour le titre si le premier message change de manière significative?
+            // Pour l'instant, on ne met à jour que lastActivity pour une session existante.
+            await existingSession.save();
+            chatSession = existingSession;
+        } else {
+            chatSession = new ChatSession({
+                userId: session.user.id,
+                clientSessionId: clientSessionId,
+                title: firstMessageContent.substring(0, 75), // Un titre un peu plus long
+                lastActivity: new Date(),
+            });
+            await chatSession.save();
+            isNewSession = true;
+        }
+
+        // Créer le premier message dans la session de chat
+        const newMessage = new ChatMessage({
+            chatSessionId: chatSession._id,
+            sender: session.user.id, 
+            contentType: 'text',
+            content: firstMessageContent,
+        });
+        await newMessage.save();
+        
+        // Mettre à jour la session de chat avec le dernier message et incrémenter le compteur
+        chatSession.lastMessage = newMessage._id;
+        chatSession.messageCount = (chatSession.messageCount || 0) + 1;
+        if (isNewSession) { // Si c'est une nouvelle session, définir également le premier message
+            chatSession.firstMessage = newMessage._id;
+        }
+        await chatSession.save();
+
+        return NextResponse.json({ 
+            success: true, 
+            message: isNewSession ? "Nouvelle session de chat créée avec le premier message." : "Activité de session de chat mise à jour et message ajouté.", 
+            chatSession: {
+                _id: chatSession._id.toString(),
+                title: chatSession.title,
+                clientSessionId: chatSession.clientSessionId,
+                lastActivity: chatSession.lastActivity,
+                isNewSession: isNewSession
+            },
+            firstMessage: {
+                _id: newMessage._id.toString(),
+                content: newMessage.content,
+                timestamp: newMessage.createdAt
+            }
+        }, { status: isNewSession ? 201 : 200 });
+
+    } catch (error) {
+        console.error("[API_CHAT_HISTORY_POST]", error);
+        const errorMessage = error instanceof Error ? error.message : "Une erreur inconnue est survenue";
+        return NextResponse.json({ success: false, message: "Erreur serveur lors de la création/mise à jour de la session de chat.", error: errorMessage }, { status: 500 });
     }
-
-    // Créer ou mettre à jour la session de chat
-    // Upsert basé sur clientSessionId et userId pour garantir que la session est unique par utilisateur et clientSessionId
-    // Si une session avec ce clientSessionId existe déjà pour cet utilisateur, elle sera mise à jour.
-    // Sinon, une nouvelle session sera créée.
-    const chatSession = await ChatSession.findOneAndUpdate(
-      {
-        clientSessionId: clientSessionId,
-        userId: user._id, 
-      },
-      {
-        $set: {
-          messages: messages,
-          userId: user._id,
-          clientSessionId: clientSessionId,
-          ...(title && { title: title }), // Ajoute le titre seulement s'il est fourni
-        },
-      },
-      {
-        upsert: true, // Crée le document s'il n'existe pas
-        new: true, // Retourne le document modifié/nouveau
-        setDefaultsOnInsert: true, // Applique les valeurs par défaut du schéma lors de l'insertion
-      }
-    );
-
-    return NextResponse.json({ success: true, data: chatSession }, { status: 200 });
-
-  } catch (error) {
-    console.error("Erreur lors de la sauvegarde de l'historique du chat:", error);
-    const errorMessage = error instanceof Error ? error.message : "Erreur serveur inconnue";
-    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
-  }
 }
 
-// GET /api/chat/history - Récupérer la liste des sessions pour l'utilisateur
-export async function GET() {
-  try {
+export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user?.id) {
-      return NextResponse.json({ success: false, error: "Non autorisé." }, { status: 401 });
+
+    if (!session || !session.user || !session.user.id) {
+        return NextResponse.json({ success: false, message: "Non autorisé" }, { status: 401 });
     }
 
-    await dbConnect();
+    try {
+        await dbConnect();
 
-    const userChatSessions = await ChatSession.find({ userId: session.user.id })
-      .sort({ updatedAt: -1 }) // Les plus récents en premier
-      .select("_id clientSessionId title updatedAt createdAt") // Sélectionner les champs nécessaires
-      .lean(); // .lean() pour des objets JS simples, plus rapide
+        const chatSessions = await ChatSession.find({ userId: session.user.id })
+            .sort({ lastActivity: -1 })
+            .populate('lastMessage', 'content contentType createdAt sender')
+            .lean();
+        
+        const formattedSessions = chatSessions.map(cs => ({
+            _id: cs._id.toString(),
+            clientSessionId: cs.clientSessionId,
+            title: cs.title,
+            lastActivity: cs.lastActivity,
+            messageCount: cs.messageCount || 0,
+            lastMessagePreview: cs.lastMessage ? (cs.lastMessage as any).content.substring(0, 100) : "Aucun message",
+        }));
 
-    return NextResponse.json({ success: true, data: userChatSessions });
-
-  } catch (error) {
-    console.error("Erreur lors de la récupération des sessions de chat:", error);
-    const errorMessage = error instanceof Error ? error.message : "Erreur serveur inconnue";
-    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
-  }
-}
-
-// TODO: Implémenter GET /api/chat/history/[sessionId] pour récupérer les messages d'une session spécifique 
+        return NextResponse.json({ success: true, sessions: formattedSessions });
+    } catch (error) {
+        console.error("[API_CHAT_HISTORY_GET]", error);
+        const errorMessage = error instanceof Error ? error.message : "Une erreur inconnue est survenue";
+        return NextResponse.json({ success: false, message: "Erreur serveur lors de la récupération de l'historique des chats.", error: errorMessage }, { status: 500 });
+    }
+} 

@@ -1,78 +1,47 @@
 /**
- * Ce fichier centralise le mapping entre les slugs des catégories feuilles
- * et les valeurs 'kind' utilisées par les discriminateurs Mongoose pour les offres de produits.
+ * Centralise le mapping entre les slugs des catégories feuilles et les valeurs 'kind'
+ * des discriminateurs Mongoose pour les offres de produits.
  *
- * IMPORTANT : Les clés (slugs) de cet objet DOIVENT correspondre EXACTEMENT
- * aux slugs générés par slugify dans CategoryModel.ts avec les options :
- * { lower: true, strict: true, remove: /[*+~.()'"!:@]/g }
+ * IMPORTANT : Les slugs ici DOIVENT correspondre aux slugs générés par
+ * CategoryModel.ts (slugify avec options : { lower: true, strict: true, remove: /[*+~.()'"!:@]/g }).
  *
- * Utilisez la console Node ou un script pour générer le slug à partir du nom de la catégorie
- * avant de l'ajouter ici. Exemple :
+ * Vérifiez/générez les slugs via la console Node ou un script :
  * const slugify = require('slugify');
- * const categoryName = "Nom De Ma Catégorie";
- * const options = { lower: true, strict: true, remove: /[*+~.()'"!:@]/g };
- * const generatedSlug = slugify(categoryName, options);
- * console.log(generatedSlug);
+ * console.log(slugify("Nom Catégorie", { lower: true, strict: true, remove: /[*+~.()'"!:@]/g }));
  */
 
-// Définition des valeurs 'kind' pour la cohérence
-export const LAPTOP_KIND = 'laptops';
-export const SMARTPHONE_KIND = 'smartphones';
-export const FEATURE_PHONES_KIND = 'feature-phones';
-export const TABLET_KIND = 'tablets';
-export const SMARTWATCH_KIND = 'smartwatches';
-export const FITNESS_TRACKER_KIND = 'fitness-trackers';
-export const CASES_COVERS_KIND = 'cases-covers';
-export const CHARGERS_CABLES_KIND = 'chargers-cables';
-export const POWER_BANKS_KIND = 'power-banks';
-export const SCREEN_PROTECTORS_KIND = 'screen-protectors';
-export const DESKTOP_COMPUTER_KIND = 'desktop-computers';
-export const MONITOR_KIND = 'monitors';
-export const CPU_KIND = 'cpus-processors';
-export const GPU_KIND = 'gpus-graphics-cards';
-export const MOTHERBOARD_KIND = 'motherboards';
-export const RAM_KIND = 'ram-memory';
-export const STORAGE_KIND = 'storage-ssd-hdd';
-export const PSU_KIND = 'power-supplies-psu';
-export const PC_CASE_KIND = 'pc-cases';
-export const KEYBOARD_KIND = 'keyboards';
-// Ajoutez d'autres kinds ici au fur et à mesure que vous créez des discriminateurs
-// export const TABLET_KIND = 'tablets';
-
-// Centralisation des kinds dans un objet pour une utilisation facilitée
+// Centralisation des kinds pour une utilisation facilitée et cohérente
 export const KINDS = {
-  LAPTOP: LAPTOP_KIND,
-  SMARTPHONE: SMARTPHONE_KIND,
-  FEATURE_PHONES: FEATURE_PHONES_KIND,
-  TABLET: TABLET_KIND,
-  SMARTWATCH: SMARTWATCH_KIND,
-  FITNESS_TRACKER: FITNESS_TRACKER_KIND,
-  CASES_COVERS: CASES_COVERS_KIND,
-  CHARGERS_CABLES: CHARGERS_CABLES_KIND,
-  POWER_BANKS: POWER_BANKS_KIND,
-  SCREEN_PROTECTORS: SCREEN_PROTECTORS_KIND,
-  DESKTOP_COMPUTER: DESKTOP_COMPUTER_KIND,
-  MONITOR: MONITOR_KIND,
-  CPU: CPU_KIND,
-  GPU: GPU_KIND,
-  MOTHERBOARD: MOTHERBOARD_KIND,
-  RAM: RAM_KIND,
-  STORAGE: STORAGE_KIND,
-  PSU: PSU_KIND,
-  PC_CASE: PC_CASE_KIND,
-  KEYBOARD: KEYBOARD_KIND,
-  // TABLET: TABLET_KIND,
-} as const; // 'as const' pour des types littéraux plus stricts si utilisé en TypeScript
+  LAPTOP: 'laptops',
+  SMARTPHONE: 'smartphones',
+  FEATURE_PHONES: 'feature-phones',
+  TABLET: 'tablets',
+  SMARTWATCH: 'smartwatches',
+  FITNESS_TRACKER: 'fitness-trackers',
+  CASES_COVERS: 'cases-covers',
+  CHARGERS_CABLES: 'chargers-cables',
+  POWER_BANKS: 'power-banks',
+  SCREEN_PROTECTORS: 'screen-protectors',
+  DESKTOP_COMPUTER: 'desktop-computers',
+  MONITOR: 'monitors',
+  CPU: 'cpus-processors',
+  GPU: 'gpus-graphics-cards',
+  MOTHERBOARD: 'motherboards',
+  RAM: 'ram-memory',
+  STORAGE: 'storage-ssd-hdd',
+  PSU: 'power-supplies-psu',
+  PC_CASE: 'pc-cases',
+  KEYBOARD: 'keyboards',
+  // Ajoutez d'autres kinds ici
+} as const; // 'as const' pour des types littéraux stricts
 
+// Type dérivé des valeurs de l'objet KINDS
 export type ProductKind = typeof KINDS[keyof typeof KINDS];
 
-// Le mapping principal
+// Mapping principal : slug de catégorie -> kind
 export const categorySlugToKindMap: Record<string, ProductKind> = {
-  // Exemples - REMPLACEZ-LES PAR VOS SLUGS ET KINDS RÉELS
-  'ordinateurs-portables': KINDS.LAPTOP, // Slug existant, gardé pour exemple de structure
-  'laptops': KINDS.LAPTOP, // Slug probable pour "Laptops"
-  'telephones-mobiles': KINDS.SMARTPHONE, // Slug existant, gardé pour exemple
-  'smartphones': KINDS.SMARTPHONE, // Slug probable pour "Smartphones"
+  'laptops': KINDS.LAPTOP,
+  'smartphones': KINDS.SMARTPHONE,
   'feature-phones': KINDS.FEATURE_PHONES,
   'tablets': KINDS.TABLET,
   'smartwatches': KINDS.SMARTWATCH,
@@ -91,16 +60,17 @@ export const categorySlugToKindMap: Record<string, ProductKind> = {
   'power-supplies-psu': KINDS.PSU,
   'pc-cases': KINDS.PC_CASE,
   'keyboards': KINDS.KEYBOARD,
-  // 'tablettes-graphiques': KINDS.TABLET, // Exemple si vous aviez un TABLET_KIND
-  // ... ajoutez ici tous vos mappings slug de catégorie feuille vers kind
+  // Ajoutez ici tous vos mappings slug de catégorie feuille vers kind.
+  // Exemples de slugs précédemment présents et leurs kinds (à vérifier/conserver si toujours pertinents) :
+  // 'ordinateurs-portables': KINDS.LAPTOP,
+  // 'telephones-mobiles': KINDS.SMARTPHONE,
 };
 
-// Optionnel : Mapping inverse pour trouver un nom de modèle ou une référence
-// Peut être utile pour certaines logiques côté serveur ou admin.
-// Les valeurs ici devraient correspondre aux noms de vos modèles discriminateurs.
+// Mapping inverse : kind -> nom du modèle discriminateur Mongoose
+// Utile pour des logiques côté serveur ou admin.
 export const kindToModelNameMap: Record<ProductKind, string> = {
-  [KINDS.LAPTOP]: 'LaptopOffer', // Nom du discriminateur tel que défini dans LaptopModel.ts
-  [KINDS.SMARTPHONE]: 'SmartphoneOffer', // Nom du discriminateur tel que défini dans SmartphoneModel.ts
+  [KINDS.LAPTOP]: 'LaptopOffer',
+  [KINDS.SMARTPHONE]: 'SmartphoneOffer',
   [KINDS.FEATURE_PHONES]: 'FeaturePhoneOffer',
   [KINDS.TABLET]: 'TabletOffer',
   [KINDS.SMARTWATCH]: 'SmartwatchOffer',
@@ -119,11 +89,10 @@ export const kindToModelNameMap: Record<ProductKind, string> = {
   [KINDS.PSU]: 'PsuOffer',
   [KINDS.PC_CASE]: 'PcCaseOffer',
   [KINDS.KEYBOARD]: 'KeyboardOffer',
-  // [KINDS.TABLET]: 'TabletOffer',
 };
 
 /**
- * Helper function pour obtenir le 'kind' à partir d'un slug.
+ * Récupère le 'kind' à partir d'un slug de catégorie.
  * @param slug Le slug de la catégorie.
  * @returns Le 'kind' correspondant ou undefined si non trouvé.
  */

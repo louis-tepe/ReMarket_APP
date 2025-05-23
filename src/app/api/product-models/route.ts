@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { scrapeIdealoProduct, IdealoProductDetails } from '@/lib/scraper';
+import { scrapeIdealoProduct, IdealoProductDetails } from '@/services/scraping/scraper';
 import dbConnect from '@/lib/db.Connect';
-import ScrapedProduct from '@/models/ScrapedProduct';
-import ProductModel from '@/models/ProductModel';
+import ProductModel, { IProductModel, IProductModelBase } from '@/models/ProductModel';
 import CategoryModel, { ICategory } from '@/models/CategoryModel';
 import BrandModel, { IBrand } from '@/models/BrandModel';
 import slugify from 'slugify';
@@ -17,6 +16,7 @@ interface ProductModelQueryFilters {
   // status?: string; // Supprimé car on ne filtre plus par statut
   category?: string;
   brand?: string;
+  status?: string | { $in: string[] }; // Permet de filtrer par statut ou un tableau de statuts
   $text?: { $search: string };
 }
 
@@ -31,52 +31,19 @@ interface IProductAttribute {
   value: string;
 }
 
-// Basé sur le schéma Swagger dans les commentaires de ce fichier
-interface IScrapedProduct {
-  _id?: string; 
-  asin?: string;
-  source: string;
-  sourceUrl: string;
-  title: string;
-  brand?: string;
-  model?: string;
-  category?: string;
-  description?: string;
-  imageUrls: string[];
-  currentPrice?: number | null;
-  listPrice?: number | null;
-  currency?: string;
-  reviewRating?: number | null;
-  reviewCount?: number | null;
-  attributes?: IProductAttribute[];
-  createdAt?: string; 
-  updatedAt?: string;
+// Interface pour la structure des données du produit envoyées dans le corps de la requête POST
+interface PostProductData {
+  name: string;
+  categoryId: string; // Slug de la catégorie
+  brandId: string; // Slug de la marque
 }
 
-interface IProductModel {
-  _id?: string;
-  title: string;
-  brand: string; 
-  category: string; 
-  standardDescription: string;
-  standardImageUrls: string[];
-  keyFeatures: string[]; // Peut être précisé si la structure des keyFeatures est connue
-  specifications: IProductAttribute[];
-  slug: string;
-  createdAt?: string;
-  updatedAt?: string;
-  sourceUrlIdealo?: string;
-  variantTitle?: string;
-  priceNewIdealo?: number;
-  priceUsedIdealo?: number;
-  optionChoicesIdealo?: { optionName: string; availableValues: string[] }[];
-  qasIdealo?: { question: string; answer: string }[];
-}
-
+// Interface pour la réponse de la création de produit
+// Elle retournera directement le ProductModel complet (qui contient maintenant les infos brutes et standardisées)
 interface PostProductModelResponse {
-  scrapedProduct: IScrapedProduct;
-  productModel: IProductModel | null;
-  pmError?: string;
+  productModel: IProductModel; // Peut inclure les données brutes et standardisées
+  message?: string;
+  error?: string; // Pour les erreurs spécifiques
 }
 
 /**
@@ -136,7 +103,7 @@ export async function GET(request: NextRequest) {
 
   try {
     await dbConnect();
-    console.log(`[API GET /product-models] Recherche de ProductModel avec CatSlug: ${categorySlug}, BrandSlug: ${brandSlug}, Terme: ${searchTerm || 'N/A'}`);
+    // console.log(`[API GET /product-models] Recherche de ProductModel avec CatSlug: ${categorySlug}, BrandSlug: ${brandSlug}, Terme: ${searchTerm || 'N/A'}`);
 
     let categoryDocForFilter: ICategory | null = null;
     let brandDocForFilter: IBrand | null = null;
@@ -164,48 +131,46 @@ export async function GET(request: NextRequest) {
       productModelQueryFilters.$text = { $search: searchTerm };
     }
 
-    const commonProjection = { title: 1, brand: 1, category: 1, asin: 1 }; // ASIN est utile pour la déduplication ou référence
+    const commonProjection = { title: 1, asin: 1 }; // brand et category seront peuplés
 
-    const productModels = await ProductModel.find(productModelQueryFilters, commonProjection).limit(20).lean().exec();
-    // const scrapedProductsPromise = ScrapedProduct.find(queryFilters, commonProjection).limit(20).lean().exec(); // Supprimé
+    const productModelsQuery = ProductModel.find(productModelQueryFilters, commonProjection)
+      .populate<{ brand: { name: string, slug: string } }>('brand', 'name slug')      // Peupler brand
+      .populate<{ category: { name: string, slug: string } }>('category', 'name slug') // Peupler category
+      .limit(20);
 
-    // const [productModels, scrapedProducts] = await Promise.all([
-    //   productModelsPromise,
-    //   scrapedProductsPromise
-    // ]); // Supprimé
+    if (searchTerm) {
+      // Si searchTerm est présent, on ne trie pas par score par défaut mais on pourrait l'ajouter
+      // productModelsQuery.select({ score: { $meta: "textScore" } }).sort({ score: { $meta: "textScore" } });
+    } else {
+      productModelsQuery.sort({ title: 1 }); // Trier par titre si pas de recherche textuelle
+    }
+    
+    const productModels = await productModelsQuery.lean().exec() as (IProductModel & { brand?: { name: string, slug: string }, category?: { name: string, slug: string } })[];
 
     interface ProductSelectItem {
       id: string;
-      name: string; // Correspond au `title` du ProductModel
-      brand?: string;
-      category?: string;
+      name: string; 
+      brandName?: string; // Ajout pour le nom de la marque
+      categoryName?: string; // Ajout pour le nom de la catégorie
+      // brandId?: string; // Optionnel si on veut aussi les IDs
+      // categoryId?: string;
     }
-    const productModelItems: ProductSelectItem[] = [];
-    // const seenAsins = new Set<string>(); // Plus forcément nécessaire si on ne fusionne plus avec ScrapedProducts, sauf si des PM peuvent avoir même ASIN.
-                                         // Gardons-le pour la robustesse au cas où des ProductModels non uniques par ASIN existeraient (même si title est unique)
-
-    // Formatter et ajouter les ProductModel approuvés
-    productModels.forEach(pm => {
-      // if (pm.asin && seenAsins.has(pm.asin)) return; // La contrainte unique sur title devrait suffire, mais ASIN peut être partagé par des variants.
-                                                  // Pour la sélection de modèle, on se base sur l'ID unique du ProductModel.
-      productModelItems.push({
-        id: String(pm._id), // S'assurer que c'est bien _id de ProductModel
-        name: pm.title,    // title de ProductModel
-        brand: String(pm.brand),   // Conversion de pm.brand (ObjectId) en string
-        category: String(pm.category), // Conversion de pm.category (ObjectId) en string
-      });
-      // if (pm.asin) seenAsins.add(pm.asin);
-    });
-
-    // La section pour ScrapedProduct est supprimée
-    // scrapedProducts.forEach(sp => { ... });
+    const productModelItems: ProductSelectItem[] = productModels.map(pm => ({
+      id: String(pm._id),
+      name: pm.title,
+      brandName: pm.brand?.name,
+      // brandId: pm.brand?._id.toString(),
+      categoryName: pm.category?.name,
+      // categoryId: pm.category?._id.toString(),
+    }));
     
-    productModelItems.sort((a, b) => a.name.localeCompare(b.name));
+    // La section pour ScrapedProduct est supprimée
+    // productModelItems.sort((a, b) => a.name.localeCompare(b.name)); // Déjà trié par la requête si pas de searchTerm
     
     return NextResponse.json(productModelItems, { status: 200 });
 
   } catch (error) {
-    console.error('[GET /api/product-models]', error);
+    // console.error('[GET /api/product-models]', error);
     return NextResponse.json({ message: 'Erreur lors de la recherche des modèles de produits.', error: (error as Error).message }, { status: 500 });
   }
 }
@@ -235,7 +200,7 @@ export async function GET(request: NextRequest) {
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/IScrapedProduct' # Référence au schéma IScrapedProduct
+ *               $ref: '#/components/schemas/IProductModel' # Modifié de IScrapedProduct à IProductModel
  *       400:
  *         description: Nom du produit manquant.
  *       404:
@@ -302,204 +267,194 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     await dbConnect();
-    const body = await request.json();
-    const { name, categoryId, brandId } = body; // categoryId et brandId sont des slugs
+    const body: PostProductData = await request.json();
+    const { name: productNameToScrape, categoryId: categorySlug, brandId: brandSlugFromRequest } = body;
 
-    console.log(`[API POST /product-models] Attempting to process request. Received body fields: name='${name}', categoryId='${categoryId}', brandId='${brandId}'`);
-
-    if (!name || !categoryId || !brandId) {
-      console.error(`[API POST /product-models] Missing required fields. Evaluation: name=${!!name}, categoryId=${!!categoryId}, brandId=${!!brandId}. Request body:`, body);
-      return NextResponse.json({ message: 'Le nom du produit, categoryId (slug) et brandId (slug) sont requis.' }, { status: 400 });
+    if (!productNameToScrape || !categorySlug || !brandSlugFromRequest) {
+      return NextResponse.json({ 
+        productModel: null, 
+        error: "Nom du produit, slug de catégorie et slug de marque sont requis." 
+      }, { status: 400 });
     }
 
-    // Récupérer les noms de catégorie et marque ReMarket à partir des slugs
-    const categoryDoc = (await CategoryModel.findOne({ slug: categoryId }).lean()) as ICategory | null;
+    const categoryDoc = await CategoryModel.findOne({ slug: categorySlug }).lean() as ICategory | null;
     if (!categoryDoc) {
-      return NextResponse.json({ message: `Catégorie ReMarket avec slug '${categoryId}' non trouvée.` }, { status: 404 });
+      return NextResponse.json({ productModel: null, error: `Catégorie non trouvée pour le slug: ${categorySlug}` }, { status: 404 });
     }
 
-    const brandDoc = (await BrandModel.findOne({ slug: brandId }).lean()) as IBrand | null;
+    const brandDoc = await BrandModel.findOne({ slug: brandSlugFromRequest }).lean() as IBrand | null;
     if (!brandDoc) {
-      return NextResponse.json({ message: `Marque ReMarket avec slug '${brandId}' non trouvée.` }, { status: 404 });
+      return NextResponse.json({ productModel: null, error: `Marque non trouvée pour le slug: ${brandSlugFromRequest}` }, { status: 404 });
+    }
+    // Slug de la marque vérifié
+    const actualBrandSlug = brandDoc.slug;
+    if (!actualBrandSlug) {
+      return NextResponse.json({ productModel: null, error: `Le slug de la marque (ID: ${brandDoc._id}, Name: ${brandDoc.name}) est vide ou manquant.` }, { status: 500 });
     }
 
-    console.log(`[API POST /product-models] Lancement du scraping pour: "${name}" (Cat: ${categoryDoc.name}, Marque: ${brandDoc.name})`);
-    const scrapedProductData: IdealoProductDetails | null = await scrapeIdealoProduct(name);
+    const scrapedData = await scrapeIdealoProduct(productNameToScrape, brandDoc.name);
 
-    if (!scrapedProductData) {
-      console.warn(`[API POST /product-models] Produit non trouvé via scraping pour "${name}"`);
-      return NextResponse.json({ message: `Produit non trouvé ou informations insuffisantes pour "${name}" via scraping.` }, { status: 404 });
+    if (!scrapedData || !scrapedData.title) {
+      return NextResponse.json({ 
+        productModel: null, 
+        error: `Aucune donnée n'a pu être scrapée pour "${productNameToScrape}". Vérifiez le nom du produit ou réessayez.` 
+      }, { status: 404 });
     }
     
-    console.log(`[API POST /product-models] Données scrapées pour "${name}": ${scrapedProductData.title}`);
+    let existingProductModel = await ProductModel.findOne({ 
+      scrapedSourceUrl: scrapedData.url,
+      scrapedSource: 'idealo'
+    });
 
-    // Préparer les données pour ScrapedProduct, en s'assurant que sourceUrl est défini
-    const preparedScrapedData = {
-      ...scrapedProductData,
-      sourceUrl: scrapedProductData.url, // Supposant que l'URL du produit est dans scrapedProductData.url
-      source: 'idealo', // Modifié ici
-      // Assurez-vous que les autres champs requis par IScrapedProduct sont présents ou mappés
-      // Par exemple, si scrapedProductData n'a pas de champ 'status' pour ScrapedProduct,
-      // il faudrait le définir ici, ou s'assurer que le modèle ScrapedProduct a une valeur par défaut.
-      // Pour l'instant, le modèle ScrapedProduct a un statut par défaut 'pending_review'
+    if (existingProductModel) {
+      console.log(`[API ProductModels POST] Produit existant trouvé par URL source: ${existingProductModel.title}`);
+      const rawUpdateData = mapIdealoToRawProductModelData(scrapedData, brandDoc, categoryDoc);
+      Object.assign(existingProductModel, rawUpdateData);
+      // Si le titre a changé, le slug doit potentiellement être mis à jour.
+      // Pour simplifier ici, on ne régénère pas le slug pour un produit existant,
+      // mais on pourrait ajouter cette logique si nécessaire.
+      await existingProductModel.save();
+      return NextResponse.json({ productModel: existingProductModel.toObject() as IProductModel, message: "Produit existant mis à jour avec les nouvelles données scrapées." });
+    }
+    
+    const initialRawData = mapIdealoToRawProductModelData(scrapedData, brandDoc, categoryDoc);
+    const standardizedDataAttempt = standardizeScrapedData(initialRawData, brandDoc, categoryDoc);
+    
+    // S'assurer que le titre standardisé est présent pour la génération du slug
+    const titleForSlug = standardizedDataAttempt.title || initialRawData.rawTitle || `Produit sans titre - ${new Date().toISOString()}`;
+    if (!titleForSlug.trim()) {
+        // console.error("[API ProductModels POST] Erreur: Titre pour génération de slug est vide après tentative de standardisation et fallback.");
+        return NextResponse.json({ productModel: null, error: "Impossible de générer un slug, le titre du produit est vide." }, { status: 400 });
+    }
+
+    // Suppression de la génération manuelle du slug. Le hook pre-save du modèle s'en chargera.
+    // const titleSlug = slugify(titleForSlug, { lower: true, strict: true, remove: /[*+~.()'"!:@]/g });
+    // if (!titleSlug && titleForSlug.trim() !== '') {
+    //     console.error(`[API ProductModels POST] Erreur: titleSlug généré est vide pour un titre non vide "${titleForSlug}".`);
+    //     return NextResponse.json({ productModel: null, error: `Erreur lors de la génération du slug à partir du titre "${titleForSlug}".` }, { status: 500 });
+    // }
+    // const finalGeneratedSlug = `${actualBrandSlug}_${titleSlug}`;
+    // if (!finalGeneratedSlug || finalGeneratedSlug === `${actualBrandSlug}_` || finalGeneratedSlug.startsWith('_') || finalGeneratedSlug.endsWith('_')) {
+    //   console.error(`[API ProductModels POST] Erreur: Slug final généré est invalide ou vide ("${finalGeneratedSlug}") pour titre "${titleForSlug}" et brand slug "${actualBrandSlug}".`);
+    //   return NextResponse.json({ productModel: null, error: `Slug final généré ("${finalGeneratedSlug}") est invalide.` }, { status: 500 });
+    // }
+    // console.log(`[API ProductModels POST] Slug généré dans l'API route: "${finalGeneratedSlug}"`);
+
+    const newProductModelData: Partial<IProductModelBase> /*& { slug: string }*/ = { // slug n'est plus ajouté manuellement ici
+      ...initialRawData,
+      ...standardizedDataAttempt,
+      brand: brandDoc._id,
+      category: categoryDoc._id,
+      // slug: finalGeneratedSlug, // Le slug sera généré par le hook pre-save
+      title: titleForSlug, 
+      status: 'standardization_pending',
     };
-
-    if (!preparedScrapedData.sourceUrl) {
-        console.error("[API POST /product-models] Erreur: impossible de déterminer sourceUrl à partir des données scrapées.", scrapedProductData);
-        return NextResponse.json({ message: 'Erreur critique: URL source manquante après scraping.' }, { status: 500 });
-    }
-
-    // Sauvegarder le produit scrapé
-    let existingScrapedProduct = await ScrapedProduct.findOne({ sourceUrl: preparedScrapedData.sourceUrl });
     
-    if (existingScrapedProduct) {
-      console.log(`[API POST /product-models] ScrapedProduct existant trouvé pour sourceUrl: ${preparedScrapedData.sourceUrl}. Mise à jour.`);
-      // Lors de la mise à jour, assurez-vous de ne pas écraser des champs importants avec undefined si scrapedProductData ne les contient pas.
-      // Il est plus sûr de spécifier les champs à mettre à jour.
-      existingScrapedProduct = await ScrapedProduct.findByIdAndUpdate(existingScrapedProduct._id, preparedScrapedData, { new: true });
-    } else {
-      console.log(`[API POST /product-models] Aucun ScrapedProduct existant pour sourceUrl: ${preparedScrapedData.sourceUrl}. Création.`);
-      existingScrapedProduct = await ScrapedProduct.create(preparedScrapedData);
-    }
-    if (!existingScrapedProduct) { // Sécurité, si la création/MAJ a échoué
-        return NextResponse.json({ message: 'Erreur lors de la sauvegarde du produit scrapé.' }, { status: 500 });
-    }
-    console.log(`[API POST /product-models] Nouvelle entrée ScrapedProduct sauvegardée/mise à jour pour "${name}" avec ID: ${existingScrapedProduct._id}.`);
+    try {
+      const productModelInstance = new ProductModel(newProductModelData);
+      const savedProductModel = await productModelInstance.save();
+      
+      return NextResponse.json({ 
+        productModel: savedProductModel.toObject() as IProductModel, 
+        message: "Nouveau produit créé et en attente de révision/standardisation." 
+      }, { status: 201 });
 
-
-    // Tenter de trouver ou créer un ProductModel ReMarket
-    // Utiliser le titre du produit scrapé pour rechercher un ProductModel existant
-    let productModel = await ProductModel.findOne({ title: scrapedProductData.title });
-    let pmError: string | undefined = undefined;
-
-    if (productModel) {
-      console.log(`[API POST /product-models] ProductModel existant trouvé pour le titre: "${scrapedProductData.title}". ID: ${productModel._id}`);
-      // Mettre à jour si nécessaire (par exemple, si les standardImageUrls ou specs ont changé)
-      // Pour l'instant, on considère que si le titre match, on ne le modifie pas automatiquement via scraping.
-      // Un processus d'admin pourrait gérer les mises à jour.
-      // On s'assure juste qu'il n'a plus de statut 'pending_approval' s'il en avait un.
-      // if (productModel.status !== 'approved') {
-      // productModel.status = 'approved'; // Plus de statut, donc cette logique est inutile
-      //   await productModel.save();
-      // }
-    } else {
-      console.log(`[API POST /product-models] Création d'un nouveau ProductModel pour: ${scrapedProductData.title}`);
-      try {
-        // La recherche de descriptionAttribute est supprimée car scrapedProductData.description est utilisé directement.
-        const standardDescription = scrapedProductData.description || "Description non disponible.";
-
-        // Préparation du nom du produit pour le slug
-        let productNameForSlug = scrapedProductData.title || "produit-inconnu";
-        const brandNameLower = brandDoc.name.toLowerCase();
-        const scrapedTitleLower = (scrapedProductData.title || "").toLowerCase();
-
-        if (scrapedTitleLower.startsWith(brandNameLower + " ")) {
-          productNameForSlug = (scrapedProductData.title || "").substring(brandNameLower.length + 1).trim();
-        } else if (scrapedTitleLower.includes(" " + brandNameLower)) {
-            // Gérer les cas où la marque est au milieu ou à la fin (moins courant pour le début)
-            // Cette partie peut nécessiter une logique plus robuste si les formats de titres varient beaucoup
-            productNameForSlug = (scrapedProductData.title || "").replace(new RegExp("\\s+" + brandNameLower + "\\b", 'ig'), '').trim();
-        }
-        // Si après suppression, le nom est vide (ex: titre était juste la marque), utiliser une partie du titre original ou un fallback
-        if (!productNameForSlug && scrapedProductData.title) {
-            productNameForSlug = scrapedProductData.title.split(" ")[0] || "produit"; // Prend le premier mot ou "produit"
-        }
-        if (!productNameForSlug) productNameForSlug = "produit-inconnu"; // Fallback final
-
-        const finalSlug = slugify(`${brandDoc.slug}_${productNameForSlug}`, { 
-            lower: true, 
-            strict: true, 
-            remove: /[*+~.()\'\"!:@]/g 
-        });
-
-        productModel = new ProductModel({
-          title: scrapedProductData.title || "Titre non disponible",
-          brand: brandDoc._id, 
-          category: categoryDoc._id, 
-          standardDescription: standardDescription,
-          standardImageUrls: scrapedProductData.imageUrls && scrapedProductData.imageUrls.length > 0 ? scrapedProductData.imageUrls : ['/placeholder-image.png'],
-          keyFeatures: scrapedProductData.features || [],
-          specifications: scrapedProductData.specifications ? scrapedProductData.specifications.map(spec => ({ label: spec.key, value: spec.value })) : [],
-          slug: finalSlug, // Utiliser le slug généré
-          sourceUrlIdealo: scrapedProductData.url,
-          variantTitle: scrapedProductData.variantTitle,
-          priceNewIdealo: scrapedProductData.priceNew,
-          priceUsedIdealo: scrapedProductData.priceUsed,
-          optionChoicesIdealo: scrapedProductData.optionChoices?.map(oc => ({ optionName: oc.optionName || "Inconnu", availableValues: oc.availableValues })),
-          qasIdealo: scrapedProductData.qas?.map(qa => ({ question: qa.question, answer: qa.answer })),
-        });
-        await productModel.save();
-      } catch (error) {
-        const mongoError = error as MongoError;
-        console.error('[API POST /product-models] Erreur lors de la création/mise à jour du ProductModel:', mongoError.code === 11000 ? `Doublon (titre): ${scrapedProductData.title}` : mongoError);
-        if (mongoError.code === 11000) { // Erreur de clé dupliquée
-          // Si c'est un doublon, on essaie de récupérer le ProductModel existant par son titre.
-          // Cela peut arriver si deux requêtes quasi-simultanées tentent de créer le même produit.
-          productModel = await ProductModel.findOne({ title: scrapedProductData.title });
-          if (!productModel) { // Vraiment pas de chance, le findOne a échoué après un E11000
-             pmError = `Un produit avec un titre similaire existe déjà, mais n'a pas pu être récupéré. (${scrapedProductData.title})`;
-          } else {
-             console.log(`[API POST /product-models] Récupération du ProductModel existant après erreur de doublon pour titre: "${scrapedProductData.title}". ID: ${productModel._id}`);
-             // Pas besoin de re-sauvegarder si on vient de le trouver
-          }
-        } else {
-            const messages = mongoError.errors ? Object.values(mongoError.errors).map(err => err.message).join(', ') : mongoError.message;
-            pmError = `Erreur lors de la création du ProductModel standardisé: ${messages}`;
-        }
+    } catch (error: any) {
+      // console.error("Erreur lors de la sauvegarde du nouveau ProductModel:", error);
+      if (error.name === 'ValidationError') {
+        const messages = Object.values(error.errors).map((err: any) => err.message).join(', ');
+        return NextResponse.json({ productModel: null, error: `Erreur de validation: ${messages}` }, { status: 400 });
       }
-    }
-    
-    // Préparer la réponse
-    const responsePayload: PostProductModelResponse = {
-      scrapedProduct: existingScrapedProduct.toObject(), // Convertir en objet simple
-      productModel: productModel 
-        ? { 
-            ...productModel.toObject(), 
-            _id: (productModel._id as unknown as Types.ObjectId).toString(), 
-            brand: (productModel.brand as unknown as Types.ObjectId).toString(), 
-            category: (productModel.category as unknown as Types.ObjectId).toString(), 
-            keyFeatures: (productModel.keyFeatures as unknown as string[] | undefined) || [] 
-          }
-        : null,
-      pmError: pmError,
-    };
-
-    // Si productModel est null et qu'il n'y a pas d'erreur spécifique de création de PM (pmError),
-    // cela signifie que le scraping a eu lieu, mais le PM n'a pas été créé/trouvé et aucune erreur n'a été explicitement mise dans pmError.
-    // Cela ne devrait pas arriver avec la logique actuelle (soit on trouve, soit on crée, soit on a une erreur E11000 qui trouve ou pmError).
-    // On pourrait ajouter un pmError générique si productModel est null à la fin sans autre explication.
-    if (!responsePayload.productModel && !responsePayload.pmError) {
-        // Ce cas peut se produire si on trouve un PM existant, mais qu'ensuite on ne le retourne pas
-        // ou si le try/catch de création ne set pas productModel et ne set pas pmError.
-        // La logique actuelle devrait couvrir ça, mais par sécurité :
-        // S'il n'y a pas de productModel à la fin de tout ça (même après une tentative de récupération sur E11000)
-        // et pas d'erreur pmError spécifique, alors c'est un problème.
-        // Cependant, la page de vente s'attend à un productModel ou un pmError.
-        // Si productModel est null ici, la page de vente affichera une erreur.
+      if (error.code === 11000) {
+        const field = Object.keys(error.keyPattern)[0];
+        return NextResponse.json({ 
+          productModel: null, 
+          error: `Un produit avec une valeur similaire pour '${field}' (probablement le slug '${newProductModelData.slug}' ou le titre '${newProductModelData.title}') existe déjà.` 
+        }, { status: 409 });
+      }
+      return NextResponse.json({ productModel: null, error: error.message || "Erreur interne du serveur lors de la création du produit." }, { status: 500 });
     }
 
-
-    return NextResponse.json(responsePayload, { status: productModel && !pmError ? 201 : (pmError ? 201 : 500) }); // 201 même si pmError pour que le client gère
-
-  } catch (error) {
-    console.error(`[POST /api/product-models] Erreur:`, error);
-    // Typage pour l'erreur MongoDB et l'erreur de validation Mongoose
-    const typedError = error as MongoError;
-    const errorMessage = typedError.message || 'Erreur inconnue.';
-    
-    if (typedError.code === 11000) { // Code d'erreur MongoDB pour clé dupliquée (unique index)
-      return NextResponse.json({ message: 'Erreur: Un produit avec des identifiants similaires (ex: ASIN ou URL source) existe déjà.', error: errorMessage }, { status: 409 });
-    }
-    // Pour les erreurs de validation Mongoose
-    if (typedError.name === 'ValidationError' && typedError.errors) {
-        const validationErrors: Record<string, string> = {};
-        for (const field in typedError.errors) {
-            if (typedError.errors[field] && typedError.errors[field].message) {
-                validationErrors[field] = typedError.errors[field].message;
-            }
-        }
-        return NextResponse.json({ message: 'Erreur de validation des données du produit.', errors: validationErrors }, { status: 400 });
-    }
-    return NextResponse.json({ message: 'Erreur lors du scraping ou de la sauvegarde du produit.', error: errorMessage }, { status: 500 });
+  } catch (error: any) {
+    // console.error("[API ProductModels POST] Erreur générale:", error);
+    return NextResponse.json({ productModel: null, error: error.message || "Erreur serveur inattendue." }, { status: 500 });
   }
-} 
+}
+
+// Fonction pour mapper IdealoProductDetails vers les champs raw de IProductModelBase
+const mapIdealoToRawProductModelData = (
+  scrapedData: IdealoProductDetails,
+  brandDoc: IBrand,
+  categoryDoc: ICategory
+): Partial<IProductModelBase> => {
+  return {
+    scrapedSource: 'idealo',
+    scrapedSourceUrl: scrapedData.url,
+    rawTitle: scrapedData.title ?? undefined,
+    rawBrandName: brandDoc.name, // Utiliser le nom de la marque trouvée
+    rawCategoryName: categoryDoc.name, // Utiliser le nom de la catégorie trouvée
+    rawDescription: scrapedData.description ?? undefined,
+    rawImageUrls: scrapedData.imageUrls,
+    rawCurrentPrice: scrapedData.priceNew ?? undefined,
+    rawListPrice: undefined, // Idealo ne fournit pas de "listPrice" directement de cette manière
+    rawCurrency: 'EUR', // Supposons EUR pour idealo.fr
+    rawReviewRating: undefined, // Pas de review rating direct d'Idealo
+    rawReviewCount: undefined,  // Pas de review count direct d'Idealo
+    rawAttributes: scrapedData.specifications?.map(spec => ({ label: spec.key, value: spec.value })) || [],
+    // Champs spécifiques Idealo (qui sont maintenant aussi des champs directs sur ProductModel)
+    variantTitle: scrapedData.variantTitle ?? undefined,
+    priceNewIdealo: scrapedData.priceNew ?? undefined,
+    priceUsedIdealo: scrapedData.priceUsed ?? undefined,
+    optionChoicesIdealo: scrapedData.optionChoices,
+    qasIdealo: scrapedData.qas,
+    // keyFeatures pourrait être mappé depuis scrapedData.features si pertinent
+    keyFeatures: scrapedData.features, 
+  };
+};
+
+// Fonction pour tenter de standardiser les données scrapées en ProductModel
+// Cette fonction est un placeholder et devrait être beaucoup plus sophistiquée,
+// utilisant potentiellement l'IA ou des règles de mapping complexes.
+const standardizeScrapedData = (
+  rawData: Partial<IProductModelBase>,
+  brandDoc: IBrand,
+  categoryDoc: ICategory
+): Partial<IProductModelBase> => {
+  
+  // Exemple simple de standardisation
+  // Dans un cas réel, ceci serait beaucoup plus complexe, impliquant de l'IA,
+  // des transformations de données, des validations, etc.
+  
+  const standardTitle = rawData.rawTitle || "Titre standardisé manquant"; // Logique de nettoyage/IA ici
+  const standardDescription = rawData.rawDescription || "Description standardisée manquante"; // Logique de nettoyage/IA ici
+  
+  // Pour les images, on pourrait sélectionner les meilleures, les redimensionner, etc.
+  const standardImageUrls = rawData.rawImageUrls && rawData.rawImageUrls.length > 0 ? rawData.rawImageUrls : ['/images/placeholder-product.png'];
+  
+  // Exemple de transformation des spécifications brutes en spécifications standardisées
+  // Cela nécessiterait une logique de mapping basée sur `categoryDoc.attributeMappings` ou similaire.
+  const specifications: IProductModelBase['specifications'] = rawData.rawAttributes?.map(attr => ({
+    label: attr.label, // Devrait être mappé à un label standard
+    value: attr.value, // Devrait être nettoyé/transformé
+    // unit: ... // Extraire/mapper l'unité si possible
+  })) || [];
+
+  return {
+    title: standardTitle,
+    // slug sera généré par le pre-save hook
+    brand: brandDoc._id,
+    category: categoryDoc._id,
+    standardDescription: standardDescription,
+    standardImageUrls: standardImageUrls,
+    specifications: specifications,
+    keyFeatures: rawData.keyFeatures, // Conserver les keyFeatures bruts pour l'instant
+    // Les champs spécifiques à Idealo comme priceNewIdealo, etc. sont déjà au bon niveau
+    sourceUrlIdealo: rawData.scrapedSourceUrl, // Si on garde une URL source Idealo spécifique
+    variantTitle: rawData.variantTitle,
+    priceNewIdealo: rawData.priceNewIdealo,
+    priceUsedIdealo: rawData.priceUsedIdealo,
+    optionChoicesIdealo: rawData.optionChoicesIdealo,
+    qasIdealo: rawData.qasIdealo,
+    status: 'standardization_pending', // ou 'active' si la standardisation est jugée complète et réussie
+  };
+};

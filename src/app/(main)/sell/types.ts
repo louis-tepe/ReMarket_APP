@@ -1,4 +1,3 @@
-import type { IScrapedProduct } from '@/models/ScrapedProduct';
 import type { IProductModel as IProductModelReMarketType } from '@/models/ProductModel';
 
 export interface Category {
@@ -28,9 +27,7 @@ export interface OfferDetails {
   photos: File[];
 }
 
-export type DisplayableProductModel =
-  (IProductModelReMarketType & { _id: string; /* status?: string */ }) |
-  (IScrapedProduct & { _id: string });
+export type DisplayableProductModel = IProductModelReMarketType & { _id: string };
 
 export interface ScrapedProductAttribute {
   label: string;

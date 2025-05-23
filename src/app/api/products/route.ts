@@ -48,14 +48,11 @@ interface LeanBrand {
 async function getCategoryWithDescendants(categoryId: Types.ObjectId): Promise<Types.ObjectId[]> {
   const descendantIds: Types.ObjectId[] = [categoryId];
   
-  // Recursive function to find children
   async function findChildren(parentId: Types.ObjectId) {
-    // La requête ne sélectionne que _id, donc le type de children doit correspondre.
-    // Caster le résultat pour aider TypeScript avec l'inférence du type _id après .lean()
-    const children = (await CategoryModel.find({ parent: parentId }).select('_id').lean()) as unknown as { _id: Types.ObjectId }[];
+    const children = (await CategoryModel.find({ parent: parentId }).select('_id').lean()) as { _id: Types.ObjectId }[]; // Cast plus précis
     for (const child of children) {
       descendantIds.push(child._id);
-      await findChildren(child._id); // Recursively find grandchildren
+      await findChildren(child._id);
     }
   }
 
@@ -68,62 +65,71 @@ export async function GET(request: NextRequest) {
   const categorySlug = searchParams.get('categorySlug');
   const brandSlugsQuery = searchParams.get('brandSlugs');
   const searchQuery = searchParams.get('search');
+  const productModelIdsQuery = searchParams.get('productModelIds'); 
   
-  console.log('[API_PRODUCTS_GET] Received request with params:', { categorySlug, brandSlugsQuery, searchQuery });
+  // console.log('[API_PRODUCTS_GET] Received request with params:', { categorySlug, brandSlugsQuery, searchQuery, productModelIdsQuery });
 
   try {
     await dbConnect();
 
-    const query: FilterQuery<IProductModel> = {}; // Le FilterQuery peut toujours se baser sur IProductModel pour la structure de requête
+    const query: FilterQuery<IProductModel> = { /* status: 'active' */ }; // Supposant que ProductModel a un champ status. À confirmer.
+    // Si ProductModel n'a pas de champ 'status', cette ligne doit être ajustée ou supprimée.
+    // Pour l'instant, je la commente car elle n'est pas utilisée et IProductModel ne le définit pas par défaut.
 
-    // Recherche textuelle
-    if (searchQuery) {
-      query.$text = { $search: searchQuery };
-      console.log('[API_PRODUCTS_GET] Applied text search to query:', searchQuery);
+    if (productModelIdsQuery) {
+      const modelIds = productModelIdsQuery.split(',').filter(id => Types.ObjectId.isValid(id)).map(id => new Types.ObjectId(id));
+      if (modelIds.length > 0) {
+        query._id = { $in: modelIds };
+      }
     }
 
-    // Filtre par catégorie
-    if (categorySlug) {
+    if (searchQuery) {
+      query.$text = { $search: searchQuery };
+      // console.log('[API_PRODUCTS_GET] Applied text search to query:', searchQuery);
+    }
+
+    if (categorySlug && !query._id) { 
       const category = await CategoryModel.findOne({ slug: categorySlug.toLowerCase() }).select('_id name slug parent').lean() as LeanCategory | null;
       if (category) {
         const categoryIdsToFilter = await getCategoryWithDescendants(category._id);
         query.category = { $in: categoryIdsToFilter }; 
-        console.log(`[API_PRODUCTS_GET] Applied category filter (including descendants) to query. Category ID: ${category._id}, Found ${categoryIdsToFilter.length} total category IDs (including descendants).`);
+        // console.log(`[API_PRODUCTS_GET] Applied category filter (including descendants) to query. Category ID: ${category._id}, Found ${categoryIdsToFilter.length} total category IDs (including descendants).`);
       } else {
-        console.log('[API_PRODUCTS_GET] Category slug not found, returning empty for category filter:', categorySlug);
+        // console.log('[API_PRODUCTS_GET] Category slug not found, returning empty for category filter:', categorySlug);
         return NextResponse.json({ success: true, data: [] }, { status: 200 });
       }
     }
 
-    // Filtre par marques
-    if (brandSlugsQuery) {
+    if (brandSlugsQuery && !query._id) { 
       const brandSlugs = brandSlugsQuery.split(',');
       const brands = await BrandModel.find({ slug: { $in: brandSlugs } }).select('_id').lean() as LeanBrand[] | null;
       if (brands && brands.length > 0) {
         query.brand = { $in: brands.map(b => b._id) }; 
-        console.log('[API_PRODUCTS_GET] Applied brand filter to query. Brand IDs:', brands.map(b => b._id));
+        // console.log('[API_PRODUCTS_GET] Applied brand filter to query. Brand IDs:', brands.map(b => b._id));
       } else {
-        console.log('[API_PRODUCTS_GET] Brand slugs not found, returning empty for brand filter:', brandSlugsQuery);
+        // console.log('[API_PRODUCTS_GET] Brand slugs not found, returning empty for brand filter:', brandSlugsQuery);
         return NextResponse.json({ success: true, data: [] }, { status: 200 });
       }
     }
 
-    console.log('[API_PRODUCTS_GET] Final ProductModel query:', JSON.stringify(query));
+    // console.log('[API_PRODUCTS_GET] Final ProductModel query:', JSON.stringify(query));
 
-    let sortOptions: { [key: string]: SortOrder | { $meta: string } } = {};
+    let sortOptions: { [key: string]: SortOrder | { $meta: string } } = { updatedAt: -1 }; 
     if (searchQuery) {
-      sortOptions = { score: { $meta: "textScore" } };
+      sortOptions = { score: { $meta: "textScore" }, ...sortOptions }; 
     }
 
     const products = (await ProductModel.find(query, searchQuery ? { score: { $meta: "textScore" } } : {})
+      .populate('brand', 'name slug') // Peupler la marque
+      .populate('category', 'name slug') // Peupler la catégorie
       .sort(sortOptions)
       .lean()
-      .exec()) as unknown as LeanProductModel[]; // Modifié pour utiliser LeanProductModel[]
+      .exec()) as LeanProductModel[]; 
 
-    console.log(`[API_PRODUCTS_GET] Found ${products.length} ProductModels matching query.`);
+    // console.log(`[API_PRODUCTS_GET] Found ${products.length} ProductModels matching query.`);
 
     if (!products.length) {
-      console.log('[API_PRODUCTS_GET] No ProductModels found, returning empty data.');
+      // console.log('[API_PRODUCTS_GET] No ProductModels found, returning empty data.');
       return NextResponse.json(
         {
           success: true,
@@ -136,36 +142,40 @@ export async function GET(request: NextRequest) {
 
     const productsWithOffers: ProductWithOffers[] = await Promise.all(
       products.map(async (product) => {
-        console.log(`[API_PRODUCTS_GET] Processing ProductModel ID: ${product._id}, Title: ${product.title}`);
+        // console.log(`[API_PRODUCTS_GET] Processing ProductModel ID: ${product._id}, Title: ${product.title}`);
         const sellerOffers = await ProductOfferModel.find({
           productModel: product._id, 
-          transactionStatus: 'available'
+          transactionStatus: 'available',
+          listingStatus: 'active' // Ajout explicite du filtre listingStatus pour les offres
         })
-          .populate('seller', 'name email')
-          .lean() as unknown as IOffer[];
+          .populate('seller', 'name username _id') // Modifié pour inclure _id et username
+          .lean() as IOffer[]; // IOffer est déjà défini comme IProductBase, qui est correct
         
-        console.log(`[API_PRODUCTS_GET] Found ${sellerOffers.length} active/available offers for ProductModel ID: ${product._id}`);
+        // console.log(`[API_PRODUCTS_GET] Found ${sellerOffers.length} active/available offers for ProductModel ID: ${product._id}`);
         
-        // Générer le slug s'il est manquant
         const generatedSlug = product.slug || product.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
 
         return {
-          ...product, // product est déjà un LeanProductModel
-          slug: generatedSlug, // Assurer que le slug est toujours présent
+          ...product, 
+          slug: generatedSlug, 
           sellerOffers,
         };
       })
     );
     
-    const finalProductCount = productsWithOffers.filter(p => p.sellerOffers && p.sellerOffers.length > 0).length;
-    console.log(`[API_PRODUCTS_GET] Returning ${productsWithOffers.length} products, of which ${finalProductCount} have active/available offers.`);
+    // const finalProductCount = productsWithOffers.filter(p => p.sellerOffers && p.sellerOffers.length > 0).length;
+    // console.log(`[API_PRODUCTS_GET] Returning ${productsWithOffers.length} products, of which ${finalProductCount} have active/available offers.`);
+
+    const finalResults = productModelIdsQuery 
+        ? productsWithOffers 
+        : productsWithOffers.filter(p => p.sellerOffers && p.sellerOffers.length > 0);
 
     return NextResponse.json(
-      { success: true, data: productsWithOffers },
+      { success: true, data: finalResults }, 
       { status: 200 }
     );
   } catch (error) {
-    console.error("[API_PRODUCTS_GET]", error);
+    // console.error("[API_PRODUCTS_GET]", error);
     const errorMessage =
       error instanceof Error ? error.message : "An unknown error occurred";
     return NextResponse.json(

@@ -1,4 +1,4 @@
-import ChatInterface from "@/components/chat/chat-interface";
+import ChatInterface from "@/components/features/chat/chat-interface";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 
 export default function ChatPage() {

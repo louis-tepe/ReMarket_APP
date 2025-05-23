@@ -4,6 +4,8 @@ import "./globals.css";
 import NextAuthProvider from "@/components/providers/NextAuthProvider";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import { Toaster } from "@/components/ui/sonner";
+import { cn } from "@/lib/utils";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -26,16 +28,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" className="h-full">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
-      >
+    <html lang="fr" className="h-full" suppressHydrationWarning>
+      <body className={cn(
+        "min-h-screen bg-background font-sans antialiased",
+        geistSans.variable,
+        geistMono.variable
+      )}>
         <NextAuthProvider>
           <Header />
           <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {children}
           </main>
           <Footer />
+          <Toaster />
         </NextAuthProvider>
       </body>
     </html>

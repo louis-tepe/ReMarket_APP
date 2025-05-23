@@ -7,10 +7,9 @@ function loadEnvironmentVariables() {
 
   if (result.error) {
     console.warn(
-      `Avertissement : Le fichier .env.local à ${envPath} n'a pas pu être chargé. Erreur : ${result.error.message}`
+      `Avertissement: Fichier .env.local non trouvé ou erreur de chargement à ${envPath}. Erreur: ${result.error.message}`
     );
-    // Si des variables d'environnement cruciales manquent après cette tentative,
-    // des vérifications supplémentaires pourraient être ajoutées ici pour lever une erreur.
+    // Des vérifications supplémentaires pour les variables critiques pourraient être ajoutées ici.
   }
 }
 

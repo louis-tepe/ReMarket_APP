@@ -1,18 +1,25 @@
-import { Schema, model, models, Document, Types } from 'mongoose';
+import { Schema, model, models, Document, Types, Model as MongooseModel } from 'mongoose';
 
+// Interface pour un article du panier
 interface ICartItem extends Document {
-  _id: Types.ObjectId; // Ajout explicite de l'identifiant unique de l'item
-  offer: Types.ObjectId; // Référence à OfferModel
-  quantity: number;
-  productModel: Types.ObjectId; // Référence à ProductModel (pour faciliter l'affichage du produit dans le panier)
-  addedAt: Date;
+  _id: Types.ObjectId; // ID unique de l'item dans le panier
+  offer: Types.ObjectId; // Réf. à ProductOfferModel
+  quantity: number; // Quantité de l'offre
+  productModel: Types.ObjectId; // Réf. à ProductModel (pour affichage)
+  addedAt: Date; // Date d'ajout au panier
 }
 
+// Interface pour le document Cart
 export interface ICart extends Document {
-  user: Types.ObjectId; // Référence à UserModel
-  items: ICartItem[];
+  user: Types.ObjectId; // Réf. à UserModel
+  items: ICartItem[]; // Articles dans le panier
   createdAt: Date;
   updatedAt: Date;
+
+  // Déclaration des méthodes pour l'interface
+  addItem(itemDetails: { offerId: string | Types.ObjectId; productModelId: string | Types.ObjectId; quantity?: number }): Promise<ICart>;
+  removeItem(cartItemId: string | Types.ObjectId): Promise<ICart>;
+  clearCart(): Promise<ICart>;
 }
 
 const CartItemSchema = new Schema<ICartItem>({
@@ -21,7 +28,7 @@ const CartItemSchema = new Schema<ICartItem>({
     ref: 'ProductOffer',
     required: true,
   },
-  productModel: { // Dénormalisation pour un accès plus facile aux détails du produit depuis le panier
+  productModel: { // Dénormalisation pour accès facile aux détails du produit
     type: Schema.Types.ObjectId,
     ref: 'ProductModel',
     required: true,
@@ -36,7 +43,7 @@ const CartItemSchema = new Schema<ICartItem>({
     type: Date,
     default: Date.now,
   }
-}, { _id: true }); // _id: true pour que chaque item ait son propre ID, utile pour la suppression/modification
+}, { _id: true }); // Chaque item a son propre _id
 
 const CartSchema = new Schema<ICart>(
   {
@@ -44,7 +51,7 @@ const CartSchema = new Schema<ICart>(
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      unique: true, // Chaque utilisateur a un seul panier
+      unique: true, // Un seul panier par utilisateur
       index: true,
     },
     items: [CartItemSchema],
@@ -55,58 +62,46 @@ const CartSchema = new Schema<ICart>(
   }
 );
 
-// Méthode pour ajouter ou mettre à jour un article dans le panier
-CartSchema.methods.addItem = async function ({ offerId, productModelId, quantity = 1 }: { offerId: string | Types.ObjectId, productModelId: string | Types.ObjectId, quantity?: number }) {
-  const cart = this as ICart;
+// Méthode pour ajouter ou mettre à jour un article
+CartSchema.methods.addItem = async function (
+  { offerId, productModelId, quantity = 1 }: 
+  { offerId: string | Types.ObjectId; productModelId: string | Types.ObjectId; quantity?: number }
+) {
   const offerObjectId = typeof offerId === 'string' ? new Types.ObjectId(offerId) : offerId;
   const productModelObjectId = typeof productModelId === 'string' ? new Types.ObjectId(productModelId) : productModelId;
 
-  const existingItemIndex = cart.items.findIndex(
-    (item) => item.offer.equals(offerObjectId)
-  );
+  const existingItem = this.items.find((item: ICartItem) => item.offer.equals(offerObjectId));
 
-  if (existingItemIndex > -1) {
-    // L'offre est déjà dans le panier, met à jour la quantité
-    cart.items[existingItemIndex].quantity += quantity;
-    if (cart.items[existingItemIndex].quantity <= 0) {
-      // Si la quantité devient 0 ou moins, supprimer l'article
-      cart.items.splice(existingItemIndex, 1);
+  if (existingItem) {
+    existingItem.quantity += quantity;
+    if (existingItem.quantity <= 0) {
+      this.items = this.items.filter((item: ICartItem) => !item.offer.equals(offerObjectId));
     }
-  } else {
-    // Nouvelle offre, l'ajouter au panier
-    if (quantity > 0) {
-      cart.items.push({
-        offer: offerObjectId,
-        productModel: productModelObjectId,
-        quantity: quantity,
-        addedAt: new Date(),
-      } as ICartItem); // Assertion de type
-    }
+  } else if (quantity > 0) {
+    this.items.push({
+      _id: new Types.ObjectId(), // Générer un nouvel ObjectId pour l'item
+      offer: offerObjectId,
+      productModel: productModelObjectId,
+      quantity: quantity,
+      addedAt: new Date(),
+    } as ICartItem);
   }
-  await cart.save();
-  return cart;
+  return this.save();
 };
 
-// Méthode pour supprimer un article du panier
+// Méthode pour supprimer un article
 CartSchema.methods.removeItem = async function (cartItemId: string | Types.ObjectId) {
-  const cart = this as ICart;
-  const cartItemIdAsObject = typeof cartItemId === 'string' ? new Types.ObjectId(cartItemId) : cartItemId;
-  cart.items = cart.items.filter(
-    (item: ICartItem) => !item._id.equals(cartItemIdAsObject)
-  );
-  await cart.save();
-  return cart;
+  const idToRemove = typeof cartItemId === 'string' ? new Types.ObjectId(cartItemId) : cartItemId;
+  this.items = this.items.filter((item: ICartItem) => !item._id.equals(idToRemove));
+  return this.save();
 };
 
 // Méthode pour vider le panier
 CartSchema.methods.clearCart = async function () {
-  const cart = this as ICart;
-  cart.items = [];
-  await cart.save();
-  return cart;
+  this.items = [];
+  return this.save();
 };
 
-
-const CartModel = models.Cart || model<ICart>('Cart', CartSchema);
+const CartModel = (models.Cart as MongooseModel<ICart>) || model<ICart>('Cart', CartSchema);
 
 export default CartModel; 

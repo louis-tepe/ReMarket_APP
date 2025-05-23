@@ -1,31 +1,34 @@
-import { Schema, model, models, Document, Types } from 'mongoose';
-import { ICategory } from './CategoryModel'; // Assurez-vous que le chemin est correct
+import { Schema, model, models, Document, Types, Model as MongooseModel } from 'mongoose';
+import { ICategory } from './CategoryModel';
+import CategoryModel from './CategoryModel'; // Import direct pour la validation
 
-// Interface pour les champs communs à toutes les offres de produits
+// Interface de base pour toutes les offres de produits
 export interface IProductBase extends Document {
-  category: Types.ObjectId | ICategory; // Référence à la catégorie (feuille) pour les champs spécifiques
-  productModel: Types.ObjectId; // Référence au ProductModel ReMarket pertinent (fiche produit standard)
+  category: Types.ObjectId | ICategory; // Réf. à Category (doit être une feuille)
+  productModel: Types.ObjectId;         // Réf. à ProductModel (fiche produit standard ReMarket)
 
-  // Champs communs pour une offre
-  seller: Types.ObjectId; // Référence à l'utilisateur vendeur
-  price: number; // Prix de vente de l'offre
-  currency: string; // Devise (ex: "EUR")
+  // Informations sur l'offre spécifique du vendeur
+  seller: Types.ObjectId;               // Réf. à User (vendeur)
+  price: number;                        // Prix de vente
+  currency: string;                     // Devise (ex: "EUR")
   condition: 'new' | 'like-new' | 'good' | 'fair' | 'poor'; // État du produit
-  description: string; // Description de l'offre par le vendeur
-  images: string[]; // URLs des images de l'offre
-  stockQuantity: number; // Quantité en stock pour cette offre
+  description: string;                  // Description par le vendeur
+  images: string[];                     // URLs des images de l'offre (au moins une)
+  stockQuantity: number;                // Quantité disponible (0 si plus en stock)
   
-  visualConditionScore?: number; // Score de 0-4 de l'analyse visuelle par IA
-  visualConditionRawResponse?: string; // Réponse brute de l'IA pour référence/debug
+  // Analyse IA (optionnelle)
+  visualConditionScore?: number;        // Score (0-4) de l'analyse visuelle par IA
+  visualConditionRawResponse?: string;  // Réponse brute de l'IA (pour debug/référence)
 
-  // Champs pour la gestion de l'annonce et le statut transactionnel
-  listingStatus: 'active' | 'inactive' | 'rejected' | 'sold'; // Statut de l'annonce elle-même
-  transactionStatus?: 'available' | 'reserved' | 'pending_shipment' | 'shipped' | 'delivered' | 'cancelled' | 'sold'; // Statut de la transaction sur l'offre
-  soldTo?: Types.ObjectId; // Référence à l'acheteur si vendu
-  orderId?: Types.ObjectId; // Référence à la commande associée
+  // Statuts de l'offre
+  listingStatus: 'active' | 'inactive' | 'rejected' | 'sold'; // Statut de visibilité de l'annonce
+  transactionStatus?: 'available' | 'reserved' | 'pending_shipment' | 'shipped' | 'delivered' | 'cancelled' | 'sold'; // Statut transactionnel
+  
+  // Informations post-vente (si applicable)
+  soldTo?: Types.ObjectId;               // Réf. à User (acheteur)
+  orderId?: Types.ObjectId;              // Réf. à Order (commande associée)
 
-  // Discriminator key
-  kind: string;
+  kind: string; // Clé de discriminateur (slug de la catégorie feuille)
 
   createdAt: Date;
   updatedAt: Date;
@@ -36,24 +39,24 @@ const ProductBaseSchema = new Schema<IProductBase>(
     category: {
       type: Schema.Types.ObjectId,
       ref: 'Category',
-      required: [true, "La catégorie du produit est obligatoire pour déterminer les champs spécifiques."],
-      // Validation que la catégorie est une feuille est dans le hook pre-validate
+      required: [true, "La catégorie (feuille) du produit est obligatoire."],
     },
     productModel: {
       type: Schema.Types.ObjectId,
-      ref: 'ProductModel', // Assurez-vous que 'ProductModel' est le nom correct de votre modèle de fiche produit
-      required: [true, "La référence au ProductModel (fiche produit) est obligatoire."],
+      ref: 'ProductModel',
+      required: [true, "La référence au ProductModel (fiche produit standard) est obligatoire."],
       index: true,
     },
     seller: {
       type: Schema.Types.ObjectId,
-      ref: 'User', // Assurez-vous que 'User' est le nom correct de votre modèle utilisateur
+      ref: 'User',
       required: [true, "Le vendeur est obligatoire."],
+      index: true, 
     },
     price: {
       type: Number,
       required: [true, "Le prix de l'offre est obligatoire."],
-      min: [0, "Le prix doit être positif."], // Permettre 0 si gratuit, sinon 0.01
+      min: [0, "Le prix doit être une valeur positive (0 admis si gratuit)."], 
     },
     currency: {
         type: String,
@@ -65,36 +68,41 @@ const ProductBaseSchema = new Schema<IProductBase>(
       required: [true, "L'état du produit est obligatoire."],
       enum: {
         values: ['new', 'like-new', 'good', 'fair', 'poor'],
-        message: "L'état '{VALUE}' n'est pas supporté.",
+        message: "L'état '{VALUE}' n'est pas un état supporté.",
       },
     },
     description: {
       type: String,
-      required: [true, "La description de l'offre est obligatoire."],
+      required: [true, "La description de l'offre par le vendeur est obligatoire."],
       trim: true,
-      minlength: [10, "La description doit contenir au moins 10 caractères."],
+      minlength: [10, "La description doit comporter au moins 10 caractères."],
     },
     images: {
       type: [String],
       validate: {
-        validator: (v: string[]) => Array.isArray(v) && v.length > 0,
-        message: "Au moins une image est requise pour l'offre.",
+        validator: (v: string[]) => Array.isArray(v) && v.length > 0 && v.every(url => typeof url === 'string'),
+        message: "Au moins une URL d'image valide est requise pour l'offre.",
       },
     },
     stockQuantity: {
       type: Number,
       required: [true, "La quantité en stock est obligatoire."],
-      min: [0, "La quantité en stock ne peut être négative."],
+      min: [0, "La quantité en stock ne peut pas être négative."],
       default: 1,
+      validate: {
+        validator: Number.isInteger,
+        message: "La quantité en stock doit être un nombre entier."
+      }
     },
-    visualConditionScore: { // Nouveau champ pour le score
+    visualConditionScore: {
       type: Number,
       min: 0,
       max: 4,
-      required: false, // L'analyse peut échouer ou ne pas être faite initialement
+      required: false,
     },
-    visualConditionRawResponse: { // Pour stocker la réponse textuelle brute de Gemini
+    visualConditionRawResponse: {
         type: String,
+        trim: true,
         required: false,
     },
     listingStatus: {
@@ -117,71 +125,63 @@ const ProductBaseSchema = new Schema<IProductBase>(
     },
     orderId: { 
         type: Schema.Types.ObjectId, 
-        ref: 'Order', // Assurez-vous que 'Order' est le nom de votre modèle de commande
+        ref: 'Order', 
         required: false 
     },
   },
   {
     timestamps: true,
     versionKey: false,
-    discriminatorKey: 'kind', // Important pour Mongoose Discriminators
+    discriminatorKey: 'kind',
   }
 );
 
+// Hook pre-save pour gérer la logique des statuts
 ProductBaseSchema.pre('save', function(this: IProductBase, next) {
-  // Gérer la transition de transactionStatus lorsque listingStatus devient 'active'
-  if ((this.isModified('listingStatus') || this.isNew) && this.listingStatus === 'active' && this.transactionStatus !== 'sold') {
-    this.transactionStatus = 'available';
+  // Si l'annonce devient active et n'est pas déjà vendue, elle devient disponible
+  if (this.isModified('listingStatus') || this.isNew) {
+    if (this.listingStatus === 'active' && this.transactionStatus !== 'sold') {
+      this.transactionStatus = 'available';
+    }
   }
 
-  // Si l'offre est marquée comme vendue (via l'un ou l'autre statut)
-  if ( (this.isModified('listingStatus') && this.listingStatus === 'sold') ||
-       (this.isModified('transactionStatus') && this.transactionStatus === 'sold') ) {
+  // Si l'offre est marquée comme vendue (par l'un ou l'autre statut)
+  // ou si la quantité en stock atteint 0.
+  const markedAsSold = (this.isModified('listingStatus') && this.listingStatus === 'sold') || 
+                       (this.isModified('transactionStatus') && this.transactionStatus === 'sold');
+  const stockDepleted = this.stockQuantity === 0;
+
+  if (markedAsSold || stockDepleted) {
     this.listingStatus = 'sold'; 
     this.transactionStatus = 'sold'; 
-  }
-  next();
-});
-
-// Hook pré-validation pour s'assurer que la catégorie est une feuille
-ProductBaseSchema.pre('validate', async function (next) {
-  if (this.category) {
-    const CategoryModel = models.Category; // Accéder au modèle de catégorie compilé
-    // Si CategoryModel n'est pas disponible directement (par ex. lors de la première compilation),
-    // vous pourriez avoir besoin de l'importer dynamiquement ou de vous assurer qu'il est chargé.
-    // Pour ce cas, on suppose qu'il est accessible via models.Category.
-    if (!CategoryModel) {
-        // Fallback si models.Category n'est pas encore peuplé
-        // Ceci est un contournement et dépend de la façon dont Mongoose gère les modèles.
-        // Idéalement, CategoryModel devrait être importé directement si possible sans causer de dépendances cycliques.
-        try {
-            const dynamicImport = await import('./CategoryModel'); // Tentative d'importation dynamique
-            const ResolvedCategoryModel = dynamicImport.default;
-             if (ResolvedCategoryModel) {
-                const categoryDoc = await ResolvedCategoryModel.findById(this.category);
-                if (categoryDoc && !categoryDoc.isLeafNode) {
-                    this.invalidate('category', 'La catégorie spécifiée doit être une catégorie feuille (sans sous-catégories).');
-                }
-            } else {
-                 console.warn("CategoryModel n'a pas pu être résolu dynamiquement pour la validation de isLeafNode.");
-            }
-        } catch (e) {
-            console.error("Erreur lors de l'importation dynamique de CategoryModel pour la validation:", e);
-        }
-       
-    } else { // Si models.Category est disponible
-        const categoryDoc = await CategoryModel.findById(this.category);
-        if (categoryDoc && !categoryDoc.isLeafNode) {
-          this.invalidate('category', 'La catégorie spécifiée doit être une catégorie feuille (sans sous-catégories).');
-        }
+    if (stockDepleted && this.stockQuantity < 1 && !markedAsSold) {
+      // Cas où le stock est épuisé mais pas explicitement marqué vendu par une autre logique
+      console.log(`Offre ${this._id} marquée automatiquement comme vendue car stock épuisé.`);
     }
   }
   next();
 });
 
+// Hook pre-validation pour s'assurer que la catégorie est une feuille (isLeafNode: true)
+ProductBaseSchema.pre('validate', async function (this: IProductBase, next) {
+  if (this.category) {
+    try {
+      // Utiliser l'interface ICategory pour le typage du document retourné par lean()
+      const categoryDoc = await CategoryModel.findById(this.category).select('isLeafNode').lean<ICategory | null>();
+      
+      if (!categoryDoc) {
+        this.invalidate('category', 'Catégorie non trouvée.', this.category.toString());
+      } else if (!categoryDoc.isLeafNode) {
+        this.invalidate('category', "La catégorie spécifiée doit être une catégorie feuille (sans sous-catégories). Les offres ne peuvent être associées qu\'aux catégories terminales.", this.category.toString());
+      }
+    } catch (error) {
+      console.error("Erreur lors de la validation de la catégorie (isLeafNode):", error);
+      this.invalidate('category', 'Erreur lors de la vérification de la catégorie.', this.category.toString());
+    }
+  }
+  next();
+});
 
-// Le modèle de base. Les discriminateurs seront ajoutés à celui-ci.
-// Le nom 'ProductOffer' est utilisé ici, adaptez si un autre nom est plus pertinent pour votre contexte global d'offres.
-const ProductOfferModel = models.ProductOffer || model<IProductBase>('ProductOffer', ProductBaseSchema);
+const ProductOfferModel: MongooseModel<IProductBase> = models.ProductOffer || model<IProductBase>('ProductOffer', ProductBaseSchema);
 
 export default ProductOfferModel; 

@@ -9,6 +9,32 @@ import dbConnect from "@/lib/db.Connect";
 // Type pour éviter `any` dans le callback session
 type SessionUserWithId = { id?: string; email?: string | null; name?: string | null; image?: string | null };
 
+const authorizeCredentials = async (credentials: Record<"email" | "password", string> | undefined) => {
+  if (!credentials?.email || !credentials?.password) {
+    throw new Error("Email et mot de passe requis.");
+  }
+
+  try {
+    await dbConnect();
+  } catch (error) {
+    console.error("Erreur de connexion à la base de données lors de l'autorisation:", error);
+    throw new Error("Erreur serveur lors de la connexion à la base de données.");
+  }
+
+  const user: IUser | null = await User.findOne({ email: credentials.email }).select("+password");
+
+  if (!user || !user.password) {
+    throw new Error("Identifiants invalides.");
+  }
+
+  const isValidPassword = await bcrypt.compare(credentials.password, user.password);
+  if (!isValidPassword) {
+    throw new Error("Identifiants invalides.");
+  }
+
+  return { id: user._id.toString(), email: user.email, name: user.name };
+};
+
 export const authOptions: NextAuthOptions = {
   adapter: MongoDBAdapter(clientPromise),
   providers: [
@@ -19,23 +45,8 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Mot de passe", type: "password" }
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error("Veuillez fournir un email et un mot de passe.");
-        }
-        try {
-          await dbConnect();
-        } catch {
-          throw new Error("Erreur de serveur lors de la connexion à la base de données.");
-        }
-        const user: IUser | null = await User.findOne({ email: credentials.email }).select("+password");
-        if (!user || !user.password) {
-          throw new Error("Identifiants invalides.");
-        }
-        const isValid = await bcrypt.compare(credentials.password, user.password);
-        if (!isValid) {
-          throw new Error("Identifiants invalides.");
-        }
-        return { id: user._id.toString(), email: user.email, name: user.name };
+        // Appel de la fonction d'autorisation extraite
+        return await authorizeCredentials(credentials as Record<"email" | "password", string> | undefined);
       }
     })
   ],

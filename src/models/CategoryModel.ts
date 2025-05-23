@@ -1,17 +1,21 @@
 import { Schema, model, models, Document, Types } from 'mongoose';
 import slugify from 'slugify';
 
+// Interface pour le document Category
 export interface ICategory extends Document {
   name: string; // Nom de la catégorie (ex: "Téléphones Mobiles")
-  slug: string; // Slug unique pour l'URL et les IDs (ex: "telephones-mobiles")
-  description?: string;
-  depth: number; // Profondeur de la catégorie dans la hiérarchie
-  parent?: Types.ObjectId; // Catégorie parente, requise si depth > 0
-  isLeafNode: boolean; // True si la catégorie est une feuille et peut avoir des champs de formulaire spécifiques
-  imageAnalysisPrompt?: string; // Nouveau champ pour le prompt d'analyse d'image
+  slug: string; // Slug unique pour l'URL (ex: "telephones-mobiles")
+  description?: string; // Description optionnelle
+  depth: number; // Profondeur dans la hiérarchie (0 pour racine)
+  parent?: Types.ObjectId; // Réf. à la catégorie parente (si depth > 0)
+  isLeafNode: boolean; // Vrai si peut avoir des champs de formulaire spécifiques
+  imageAnalysisPrompt?: string; // Prompt pour l'analyse d'image par IA
   createdAt: Date;
   updatedAt: Date;
 }
+
+// Fonction pour générer un slug standardisé
+const generateSlug = (name: string) => slugify(name, { lower: true, strict: true, remove: /[*+~.()'"!:@]/g });
 
 const CategorySchema = new Schema<ICategory>(
   {
@@ -23,11 +27,10 @@ const CategorySchema = new Schema<ICategory>(
     },
     slug: {
       type: String,
-      required: [true, "Le slug est obligatoire."],
       trim: true,
       unique: true,
       index: true,
-      set: (value: string) => slugify(value, { lower: true, strict: true, remove: /[*+~.()'"!:@]/g }),
+      // Slug généré par le hook pre-save
     },
     description: {
       type: String,
@@ -51,7 +54,8 @@ const CategorySchema = new Schema<ICategory>(
       type: Schema.Types.ObjectId,
       ref: 'Category',
       validate: {
-        validator: function(this: ICategory, value: Types.ObjectId | undefined) {
+        // `this` fait référence au document en cours de validation
+        validator: function(this: ICategory, value: Types.ObjectId | undefined): boolean {
           return this.depth === 0 || (this.depth > 0 && value != null);
         },
         message: "Une catégorie parente est requise si la profondeur est supérieure à 0.",
@@ -64,9 +68,10 @@ const CategorySchema = new Schema<ICategory>(
   }
 );
 
+// Hook pre-save pour générer/mettre à jour le slug
 CategorySchema.pre('save', function (this: ICategory, next) {
-  if (!this.slug || this.isModified('name')) {
-    this.slug = slugify(this.name, { lower: true, strict: true, remove: /[*+~.()'"!:@]/g });
+  if (this.isModified('name') || this.isNew) {
+    this.slug = generateSlug(this.name);
   }
   next();
 });

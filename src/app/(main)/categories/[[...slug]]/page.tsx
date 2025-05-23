@@ -4,7 +4,7 @@ import { use, useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import ProductCard from '@/components/shared/ProductCard';
-import FiltersSidebar from '@/components/shared/FiltersSidebar'; // Import du nouveau composant
+import FiltersSidebar from '@/components/features/product-listing/FiltersSidebar'; // Import du nouveau composant
 import { AlertTriangle, Info, PanelLeftOpen, Search as SearchIcon, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ICategory } from '@/models/CategoryModel';

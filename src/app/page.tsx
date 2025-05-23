@@ -3,8 +3,8 @@ import { Button } from '@/components/ui/button';
 import { ShieldCheck, Repeat, PackageCheck } from 'lucide-react'; // Icônes pour la section explicative
 import { Suspense } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { fetchFeaturedProductData } from "@/lib/product-service"; // Importer la fonction directe
-import FeaturedProductsClientWrapper from '@/components/shared/FeaturedProductsClientWrapper';
+import { fetchFeaturedProductData } from "@/services/core/product-service"; // Importer la fonction directe
+import FeaturedProductsClientWrapper from '@/components/features/product-listing/FeaturedProductsClientWrapper';
 import { ProductCardProps } from '@/components/shared/ProductCard'; // Importé pour le type de getFeaturedProducts
 
 // Fonction pour récupérer les produits vedettes côté serveur
