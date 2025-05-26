@@ -3,7 +3,7 @@
 import { use, useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import ProductCard from '@/components/shared/ProductCard';
+import ProductCard, { ProductCardSkeleton } from '@/components/shared/ProductCard';
 import FiltersSidebar from '@/components/features/product-listing/FiltersSidebar'; // Import du nouveau composant
 import { AlertTriangle, Info, PanelLeftOpen, Search as SearchIcon, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -61,99 +61,126 @@ interface FiltersState {
     searchQuery?: string; // Ajout pour la recherche textuelle
 }
 
-// Simule la structure de l'API pour les catégories et marques
-// Vous devrez les fetcher réellement dans useEffect
+// DIAGNOSTIC: Fonctions avec logs de performance
 async function getAllCategories(): Promise<ICategory[]> {
+    const startTime = Date.now();
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    const res = await fetch(`${apiUrl}/categories`, { cache: 'no-store' });
+    console.log(`[CLIENT-PERF] Starting categories fetch...`);
+
+    const res = await fetch(`${apiUrl}/categories`, {
+        cache: 'force-cache' // Cache navigateur au lieu de Next.js cache
+    });
     if (!res.ok) throw new Error('Failed to fetch categories');
     const data = await res.json();
+    console.log(`[CLIENT-PERF] Categories fetch completed: ${Date.now() - startTime}ms`);
     return data.categories || [];
 }
 
 // Modifié pour accepter categorySlug
 async function fetchFilteredBrands(categorySlug?: string): Promise<IBrand[]> {
+    const startTime = Date.now();
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
     let url = `${apiUrl}/brands`;
     if (categorySlug) {
         url += `?categorySlug=${categorySlug}`;
     }
-    const res = await fetch(url, { next: { revalidate: 300 } });
+    console.log(`[CLIENT-PERF] Starting brands fetch for category: ${categorySlug}`);
+
+    const res = await fetch(url, {
+        cache: 'default' // Cache navigateur par défaut
+    });
     if (!res.ok) throw new Error('Failed to fetch brands');
     const data = await res.json();
+    console.log(`[CLIENT-PERF] Brands fetch completed: ${Date.now() - startTime}ms`);
     return data.brands || [];
 }
 
 async function getFilteredProducts(filters: FiltersState): Promise<DisplayProductCardProps[]> {
+    const startTime = Date.now();
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
     if (!apiUrl) {
-        console.error("CRITICAL: NEXT_PUBLIC_API_URL is not defined.");
         throw new Error("Configuration error: NEXT_PUBLIC_API_URL is not defined.");
     }
 
     let fetchUrl = `${apiUrl}/products`;
     const queryParams = new URLSearchParams();
 
-    const hasCategoryFilter = filters.categorySlug && filters.categorySlug.trim() !== '';
-    const hasBrandFilters = filters.brandSlugs && filters.brandSlugs.length > 0;
-
-    if (hasCategoryFilter) {
-        queryParams.append('categorySlug', filters.categorySlug!);
+    if (filters.categorySlug?.trim()) {
+        queryParams.append('categorySlug', filters.categorySlug);
     }
-    if (hasBrandFilters) {
-        queryParams.append('brandSlugs', filters.brandSlugs!.join(','));
+    if (filters.brandSlugs?.length) {
+        queryParams.append('brandSlugs', filters.brandSlugs.join(','));
     }
-    if (filters.searchQuery && filters.searchQuery.trim() !== '') {
+    if (filters.searchQuery?.trim()) {
         queryParams.append('search', filters.searchQuery.trim());
     }
 
     if (queryParams.toString()) {
         fetchUrl += `?${queryParams.toString()}`;
-    } else {
-        // Aucun filtre actif, l'URL reste /api/products pour tout récupérer
-        console.log("[CategoryPage] Aucun filtre actif, appel de /api/products pour tous les produits.");
     }
 
-    console.log("[CategoryPage] Fetching products from:", fetchUrl);
+    console.log(`[CLIENT-PERF] Starting products fetch: ${fetchUrl}`);
 
     try {
-        const res = await fetch(fetchUrl, { cache: 'no-store' });
+        // DIAGNOSTIC: Pas de cache Next.js côté client
+        const res = await fetch(fetchUrl, {
+            cache: 'default' // Cache navigateur par défaut
+        });
         if (!res.ok) {
-            const errorData = await res.text();
-            console.error(`Failed to fetch products (${fetchUrl}): ${res.status} ${res.statusText}. Body: ${errorData}`);
             throw new Error(`Failed to fetch products. Status: ${res.status}`);
         }
         const data = await res.json();
         if (!data.success || !Array.isArray(data.data)) {
-            console.warn(`API (${fetchUrl}) did not return successful data:`, data.message || 'No data array');
             return [];
         }
 
-        // Assurons-nous que data.data est bien un tableau de IProductModel enrichi avec sellerOffers
         const productsFromApi: (IProductModel & { _id: string; sellerOffers?: IOffer[] })[] = data.data;
+        console.log(`[CLIENT-PERF] Products fetch completed: ${Date.now() - startTime}ms, found ${productsFromApi.length} products`);
 
-        return productsFromApi.map((product) => {
+        const mappedProducts = productsFromApi.map((product) => {
             const offers = product.sellerOffers || [];
             const cheapestOffer = offers.length > 0
                 ? offers.reduce((min, p) => p.price < min.price ? p : min, offers[0])
                 : null;
 
-            // Utiliser product.slug s'il est défini, sinon _id.toString()
-            // Cela suppose que IScrapedProduct a maintenant un champ slug?: string
             const productSlugForLink = product.slug || product._id.toString();
 
             return {
                 id: product._id.toString(),
                 slug: productSlugForLink,
-                name: product.title, // Assumant que product.title existe sur IProductModel
-                imageUrl: product.standardImageUrls && product.standardImageUrls.length > 0 ? product.standardImageUrls[0] : undefined,
-                price: cheapestOffer ? cheapestOffer.price : 0,
+                name: product.title,
+                imageUrl: product.standardImageUrls?.[0],
+                price: cheapestOffer?.price || 0,
                 offerCount: offers.length,
             };
         });
 
+        console.log(`[CLIENT-PERF] Products mapping completed: ${Date.now() - startTime}ms total`);
+        return mappedProducts;
+
     } catch (error) {
-        console.error(`Error in getFilteredProducts with URL ${fetchUrl}:`, error);
+        console.error(`[CLIENT-ERROR] Error in getFilteredProducts after ${Date.now() - startTime}ms:`, error);
+        return [];
+    }
+}
+
+// DIAGNOSTIC: Fonction pour charger les favoris utilisateur
+async function fetchUserFavorites(): Promise<string[]> {
+    const startTime = Date.now();
+    try {
+        console.log(`[CLIENT-PERF] Starting favorites fetch...`);
+        const response = await fetch('/api/favorites', {
+            cache: 'default' // Cache navigateur par défaut
+        });
+        if (response.ok) {
+            const favoriteItems: { id: string }[] = await response.json();
+            console.log(`[CLIENT-PERF] Favorites fetch completed: ${Date.now() - startTime}ms`);
+            return favoriteItems.map(fav => fav.id);
+        }
+        console.log(`[CLIENT-PERF] Favorites fetch failed (non-200): ${Date.now() - startTime}ms`);
+        return [];
+    } catch (error) {
+        console.error(`[CLIENT-ERROR] Error fetching favorites after ${Date.now() - startTime}ms:`, error);
         return [];
     }
 }
@@ -190,153 +217,141 @@ export default function CategoryPage({ params: paramsPromise }: { params: Promis
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
-    const { data: session } = useSession(); // Ajout pour la session utilisateur
+    const { data: session } = useSession();
 
-    // Fonction pour initialiser les filtres depuis l'URL
-    const getInitialFilters = useCallback(() => {
+    // OPTIMISATION: État simplifié
+    const [currentFilters, setCurrentFilters] = useState<FiltersState>(() => {
         const categorySlugFromUrl = params.slug?.[0];
-        const brandSlugsFromUrl = searchParams.get('brands')?.split(',') || [];
+        const brandSlugsFromUrl = searchParams.get('brands')?.split(',').filter(Boolean) || [];
         const searchQueryFromUrl = searchParams.get('search') || '';
         return {
             categorySlug: categorySlugFromUrl,
-            brandSlugs: brandSlugsFromUrl.filter(b => b), // Filtrer les chaînes vides
+            brandSlugs: brandSlugsFromUrl,
             searchQuery: searchQueryFromUrl,
         };
-    }, [params.slug, searchParams]);
+    });
 
-    const [currentFilters, setCurrentFilters] = useState<FiltersState>(getInitialFilters);
     const [products, setProducts] = useState<DisplayProductCardProps[]>([]);
     const [allCategories, setAllCategories] = useState<ICategory[]>([]);
     const [availableBrands, setAvailableBrands] = useState<IBrand[]>([]);
+    const [favoriteProductIds, setFavoriteProductIds] = useState<string[]>([]);
 
-    const [isLoadingProducts, setIsLoadingProducts] = useState(true);
-    const [isLoadingFiltersData, setIsLoadingFiltersData] = useState(true);
+    const [isLoading, setIsLoading] = useState(true);
     const [fetchError, setFetchError] = useState<string | null>(null);
     const [isSidebarOpenOnMobile, setIsSidebarOpenOnMobile] = useState(false);
     const [searchInputValue, setSearchInputValue] = useState(currentFilters.searchQuery || '');
-    const [favoriteProductIds, setFavoriteProductIds] = useState<string[]>([]); // État pour les IDs des favoris
 
+    // OPTIMISATION: Mémorisation des calculs
     const currentCategoryObject = useMemo(() => {
         if (!currentFilters.categorySlug) return null;
         return allCategories.find(cat => cat.slug === currentFilters.categorySlug);
     }, [currentFilters.categorySlug, allCategories]);
 
     const activeCategoryAncestors = useMemo(() => {
-        // Toujours calculer les ancêtres basé sur le currentFilters.categorySlug
         return getCategoryAncestors(currentFilters.categorySlug, allCategories);
     }, [currentFilters.categorySlug, allCategories]);
 
-    // Effet pour mettre à jour currentFilters si l'URL (pathname ou searchParams) change
+    // DIAGNOSTIC: useEffect unique pour charger toutes les données en parallèle
     useEffect(() => {
-        const filtersFromUrl = getInitialFilters();
-        const needsUpdate = (
-            filtersFromUrl.categorySlug !== currentFilters.categorySlug ||
-            JSON.stringify(filtersFromUrl.brandSlugs.sort()) !== JSON.stringify((currentFilters.brandSlugs || []).sort()) ||
-            filtersFromUrl.searchQuery !== (currentFilters.searchQuery || '')
+        let isMounted = true;
+
+        const loadAllData = async () => {
+            const overallStart = Date.now();
+            console.log(`[CLIENT-PERF] Starting loadAllData for filters:`, currentFilters);
+            setIsLoading(true);
+            setFetchError(null);
+
+            try {
+                // DIAGNOSTIC: Chargement en parallèle au lieu de séquentiel
+                console.log(`[CLIENT-PERF] Starting Promise.allSettled...`);
+                const promiseStart = Date.now();
+                const [categoriesData, brandsData, productsData, favoritesData] = await Promise.allSettled([
+                    getAllCategories(),
+                    fetchFilteredBrands(currentFilters.categorySlug),
+                    getFilteredProducts(currentFilters),
+                    session?.user ? fetchUserFavorites() : Promise.resolve([])
+                ]);
+                console.log(`[CLIENT-PERF] Promise.allSettled completed: ${Date.now() - promiseStart}ms`);
+
+                if (!isMounted) return;
+
+                // Traitement des résultats
+                if (categoriesData.status === 'fulfilled') {
+                    setAllCategories(categoriesData.value);
+                }
+
+                if (brandsData.status === 'fulfilled') {
+                    setAvailableBrands(brandsData.value);
+                }
+
+                if (productsData.status === 'fulfilled') {
+                    setProducts(productsData.value);
+                }
+
+                if (favoritesData.status === 'fulfilled') {
+                    setFavoriteProductIds(favoritesData.value);
+                }
+
+                // Vérifier s'il y a eu des erreurs
+                const errors = [categoriesData, brandsData, productsData, favoritesData]
+                    .filter(result => result.status === 'rejected')
+                    .map(result => (result as PromiseRejectedResult).reason.message);
+
+                if (errors.length > 0) {
+                    setFetchError(errors[0]); // Afficher la première erreur
+                }
+
+            } catch (error) {
+                console.error(`[CLIENT-ERROR] loadAllData error after ${Date.now() - overallStart}ms:`, error);
+                if (isMounted) {
+                    setFetchError(error instanceof Error ? error.message : "Erreur de chargement.");
+                }
+            } finally {
+                if (isMounted) {
+                    console.log(`[CLIENT-PERF] loadAllData completed: ${Date.now() - overallStart}ms total`);
+                    setIsLoading(false);
+                }
+            }
+        };
+
+        loadAllData();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [currentFilters, session?.user]);
+
+    // OPTIMISATION: Synchronisation URL simplifiée
+    useEffect(() => {
+        const categorySlugFromUrl = params.slug?.[0];
+        const brandSlugsFromUrl = searchParams.get('brands')?.split(',').filter(Boolean) || [];
+        const searchQueryFromUrl = searchParams.get('search') || '';
+
+        const newFilters = {
+            categorySlug: categorySlugFromUrl,
+            brandSlugs: brandSlugsFromUrl,
+            searchQuery: searchQueryFromUrl,
+        };
+
+        // Vérifier si les filtres ont vraiment changé
+        const filtersChanged = (
+            newFilters.categorySlug !== currentFilters.categorySlug ||
+            JSON.stringify(newFilters.brandSlugs.sort()) !== JSON.stringify((currentFilters.brandSlugs || []).sort()) ||
+            newFilters.searchQuery !== (currentFilters.searchQuery || '')
         );
 
-        if (needsUpdate) {
-            setCurrentFilters(filtersFromUrl);
-            // setSearchInputValue est maintenant géré par son propre useEffect ci-dessous
+        if (filtersChanged) {
+            setCurrentFilters(newFilters);
+            setSearchInputValue(newFilters.searchQuery || '');
         }
-    }, [pathname, searchParams, getInitialFilters, currentFilters.categorySlug, currentFilters.brandSlugs, currentFilters.searchQuery]);
-
-    // Effet pour synchroniser searchInputValue avec currentFilters.searchQuery
-    useEffect(() => {
-        if (searchInputValue !== (currentFilters.searchQuery || '')) {
-            setSearchInputValue(currentFilters.searchQuery || '');
-        }
-    }, [currentFilters.searchQuery, searchInputValue]); // searchInputValue ajouté aux dépendances
-
-    // NOUVEAU: Effet pour charger les favoris de l'utilisateur
-    useEffect(() => {
-        if (session?.user) {
-            const fetchUserFavorites = async () => {
-                try {
-                    const response = await fetch('/api/favorites');
-                    if (response.ok) {
-                        const favoriteItems: { id: string }[] = await response.json();
-                        setFavoriteProductIds(favoriteItems.map(fav => fav.id));
-                    } else {
-                        console.warn("CategoryPage: Impossible de charger les favoris de l'utilisateur.");
-                        setFavoriteProductIds([]);
-                    }
-                } catch (error) {
-                    console.error("CategoryPage: Erreur lors du fetch des favoris:", error);
-                    setFavoriteProductIds([]);
-                }
-            };
-            fetchUserFavorites();
-        } else {
-            // Si l'utilisateur n'est pas connecté, s'assurer que la liste des favoris est vide
-            setFavoriteProductIds([]);
-        }
-    }, [session]);
-
-    useEffect(() => {
-        async function loadInitialCategories() {
-            setIsLoadingFiltersData(true);
-            try {
-                const categoriesData = await getAllCategories();
-                setAllCategories(categoriesData);
-            } catch (error) {
-                console.error("Failed to load initial categories:", error);
-                setFetchError(error instanceof Error ? error.message : "Erreur de chargement des filtres.");
-            } finally {
-                setIsLoadingFiltersData(false);
-            }
-        }
-        loadInitialCategories();
-    }, []);
-
-    useEffect(() => {
-        async function loadBrandsForCategory() {
-            // On attend que les catégories soient chargées pour éviter des appels inutiles si le slug est au chargement
-            if (isLoadingFiltersData && allCategories.length === 0 && currentFilters.categorySlug) {
-                return;
-            }
-            try {
-                // fetchFilteredBrands gère déjà le cas où categorySlug est undefined pour toutes les marques
-                const brandsData = await fetchFilteredBrands(currentFilters.categorySlug);
-                setAvailableBrands(brandsData);
-            } catch (error) {
-                console.error("Failed to load brands for category:", error);
-                setFetchError(error instanceof Error ? error.message : "Erreur de chargement des marques.");
-            }
-        }
-        // Appeler si les catégories sont chargées, ou si on n'attend pas de slug de catégorie (pour charger toutes les marques)
-        if (!isLoadingFiltersData) {
-            loadBrandsForCategory();
-        }
-    }, [currentFilters.categorySlug, allCategories.length, isLoadingFiltersData]); // Dépend de la longueur pour réagir au chargement des catégories
-
-    const loadProducts = useCallback(async (filters: FiltersState) => {
-        setIsLoadingProducts(true);
-        setFetchError(null);
-        try {
-            const fetchedProducts = await getFilteredProducts(filters);
-            setProducts(fetchedProducts);
-        } catch (error) {
-            console.error("Failed to load products:", error);
-            setFetchError(error instanceof Error ? error.message : "Erreur de chargement des produits.");
-            setProducts([]);
-        } finally {
-            setIsLoadingProducts(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        if (!isLoadingFiltersData) {
-            loadProducts(currentFilters);
-        }
-    }, [currentFilters, loadProducts, isLoadingFiltersData]);
+    }, [pathname, searchParams, params.slug, currentFilters]);
 
     const updateUrlWithFilters = useCallback((filters: FiltersState) => {
         const newSearchParams = new URLSearchParams();
-        if (filters.brandSlugs && filters.brandSlugs.length > 0) {
+        if (filters.brandSlugs?.length) {
             newSearchParams.set('brands', filters.brandSlugs.join(','));
         }
-        if (filters.searchQuery && filters.searchQuery.trim() !== '') {
+        if (filters.searchQuery?.trim()) {
             newSearchParams.set('search', filters.searchQuery.trim());
         }
 
@@ -346,76 +361,55 @@ export default function CategoryPage({ params: paramsPromise }: { params: Promis
         }
 
         const queryString = newSearchParams.toString();
-        router.push(`${newPathname}${queryString ? `?${queryString}` : ''}`, { scroll: false });
+        const finalUrl = `${newPathname}${queryString ? `?${queryString}` : ''}`;
+        router.push(finalUrl as any, { scroll: false });
     }, [router]);
-
-    // NOUVEAU: useEffect pour synchroniser currentFilters vers l'URL
-    useEffect(() => {
-        const newGeneratedPathname = currentFilters.categorySlug ? `/categories/${currentFilters.categorySlug}` : '/categories';
-        const newGeneratedSearchParams = new URLSearchParams();
-        if (currentFilters.brandSlugs && currentFilters.brandSlugs.length > 0) {
-            newGeneratedSearchParams.set('brands', currentFilters.brandSlugs.join(','));
-        }
-        if (currentFilters.searchQuery && currentFilters.searchQuery.trim() !== '') {
-            newGeneratedSearchParams.set('search', currentFilters.searchQuery.trim());
-        }
-        const newGeneratedQueryString = newGeneratedSearchParams.toString();
-
-        // Comparer avec l'URL actuelle du navigateur
-        const currentPathname = pathname; // Provient de usePathname()
-        const currentQueryString = searchParams.toString(); // Provient de useSearchParams()
-
-        if (currentPathname !== newGeneratedPathname || currentQueryString !== newGeneratedQueryString) {
-            updateUrlWithFilters(currentFilters);
-        }
-    }, [currentFilters.categorySlug, currentFilters.brandSlugs, currentFilters.searchQuery, router, pathname, searchParams, updateUrlWithFilters, currentFilters]);
 
     const handleFiltersChange = useCallback((newFiltersFromSidebar: Partial<FiltersState>) => {
         setCurrentFilters(prevFilters => {
-            const updatedFiltersResult: FiltersState = { ...prevFilters };
+            const updatedFilters: FiltersState = { ...prevFilters };
 
-            // Appliquer les changements de la sidebar si les clés sont présentes dans newFiltersFromSidebar
             if (Object.prototype.hasOwnProperty.call(newFiltersFromSidebar, 'categorySlug')) {
-                updatedFiltersResult.categorySlug = newFiltersFromSidebar.categorySlug;
+                updatedFilters.categorySlug = newFiltersFromSidebar.categorySlug;
             }
             if (Object.prototype.hasOwnProperty.call(newFiltersFromSidebar, 'brandSlugs')) {
-                updatedFiltersResult.brandSlugs = newFiltersFromSidebar.brandSlugs;
+                updatedFilters.brandSlugs = newFiltersFromSidebar.brandSlugs;
             }
             if (Object.prototype.hasOwnProperty.call(newFiltersFromSidebar, 'searchQuery')) {
-                updatedFiltersResult.searchQuery = newFiltersFromSidebar.searchQuery;
+                updatedFilters.searchQuery = newFiltersFromSidebar.searchQuery;
             }
 
-            // Si la catégorie a changé (y compris si elle a été effacée -> undefined)
-            if (prevFilters.categorySlug !== updatedFiltersResult.categorySlug) {
-                // Réinitialiser brandSlugs seulement si non explicitement fourni dans cette mise à jour
+            // Réinitialiser les autres filtres si la catégorie change
+            if (prevFilters.categorySlug !== updatedFilters.categorySlug) {
                 if (!Object.prototype.hasOwnProperty.call(newFiltersFromSidebar, 'brandSlugs')) {
-                    updatedFiltersResult.brandSlugs = [];
+                    updatedFilters.brandSlugs = [];
                 }
-                // Réinitialiser searchQuery seulement si non explicitement fourni dans cette mise à jour
                 if (!Object.prototype.hasOwnProperty.call(newFiltersFromSidebar, 'searchQuery')) {
-                    updatedFiltersResult.searchQuery = '';
+                    updatedFilters.searchQuery = '';
                 }
             }
-            return updatedFiltersResult;
+
+            // Mettre à jour l'URL
+            updateUrlWithFilters(updatedFilters);
+            return updatedFilters;
         });
+
         if (window.innerWidth < 768) {
             setIsSidebarOpenOnMobile(false);
         }
-    }, [setIsSidebarOpenOnMobile]);
+    }, [updateUrlWithFilters]);
 
     const handleSearchSubmit = useCallback((event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const newSearchQuery = searchInputValue.trim();
-        setCurrentFilters(prevFilters => {
-            const updatedFilters = {
-                ...prevFilters,
-                searchQuery: newSearchQuery
-            };
-            return updatedFilters;
-        });
-    }, [searchInputValue]);
+        const updatedFilters = {
+            ...currentFilters,
+            searchQuery: newSearchQuery
+        };
+        setCurrentFilters(updatedFilters);
+        updateUrlWithFilters(updatedFilters);
+    }, [searchInputValue, currentFilters, updateUrlWithFilters]);
 
-    // NOUVEAU: Handler pour la mise à jour des favoris
     const handleFavoriteToggle = useCallback((productId: string, isFavorite: boolean) => {
         setFavoriteProductIds(prevIds => {
             if (isFavorite) {
@@ -426,7 +420,6 @@ export default function CategoryPage({ params: paramsPromise }: { params: Promis
     }, []);
 
     const pageTitle = currentCategoryObject ? currentCategoryObject.name : (currentFilters.categorySlug ? currentFilters.categorySlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : "Catalogue des produits");
-    const isLoadingGlobal = isLoadingFiltersData || isLoadingProducts;
     const currentSearchTerm = currentFilters.searchQuery;
 
     return (
@@ -454,19 +447,19 @@ export default function CategoryPage({ params: paramsPromise }: { params: Promis
                     <FiltersSidebar
                         allCategories={allCategories as unknown as LeanCategory[]}
                         allBrands={availableBrands as unknown as LeanBrand[]}
-                        activeCategorySlug={currentFilters.categorySlug} // Passe le slug de l'état de la page
-                        activeBrandSlugs={currentFilters.brandSlugs || []} // NOUVEAU: Passer les slugs de marque actifs
+                        activeCategorySlug={currentFilters.categorySlug}
+                        activeBrandSlugs={currentFilters.brandSlugs || []}
                         onFiltersChange={handleFiltersChange}
                         basePath="/categories"
-                        currentCategoryAncestors={activeCategoryAncestors} // Passe les ancêtres de la catégorie active
+                        currentCategoryAncestors={activeCategoryAncestors}
                     />
                 </div>
-                {/* Invisible div pour pousser le contenu quand la sidebar est sticky sur desktop */}
                 <div className="hidden md:block md:w-64 lg:w-72 flex-shrink-0"></div>
 
                 <main className="flex-1 pt-4 md:pt-0">
                     <div className="mb-6 md:mb-8 p-4 border rounded-lg shadow-sm">
                         <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">{pageTitle}</h1>
+
                         {/* Barre de recherche */}
                         <form onSubmit={handleSearchSubmit} className="mt-4 mb-6 flex w-full max-w-lg items-center space-x-2">
                             <Input
@@ -477,17 +470,17 @@ export default function CategoryPage({ params: paramsPromise }: { params: Promis
                                 className="flex-1"
                                 aria-label="Rechercher des produits"
                             />
-                            <Button type="submit" disabled={isLoadingProducts}>
-                                {isLoadingProducts && currentFilters.searchQuery ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SearchIcon className="mr-2 h-4 w-4" />}
+                            <Button type="submit" disabled={isLoading}>
+                                {isLoading && currentFilters.searchQuery ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SearchIcon className="mr-2 h-4 w-4" />}
                                 Rechercher
                             </Button>
                         </form>
 
-                        {!isLoadingGlobal && products.length > 0 && !currentSearchTerm && <p className="text-muted-foreground mt-1 text-sm sm:text-base">{products.length} produits trouvés dans cette catégorie.</p>}
-                        {!isLoadingGlobal && products.length > 0 && currentSearchTerm && <p className="text-muted-foreground mt-1 text-sm sm:text-base">{products.length} produits trouvés pour &quot;{currentSearchTerm}&quot; {currentCategoryObject ? `dans ${currentCategoryObject.name}` : ''}.</p>}
-                        {!isLoadingGlobal && products.length === 0 && currentSearchTerm && <p className="text-muted-foreground mt-1 text-sm sm:text-base">Aucun produit trouvé pour &quot;{currentSearchTerm}&quot; {currentCategoryObject ? `dans ${currentCategoryObject.name}` : ''}.</p>}
-                        {isLoadingGlobal && currentFilters.searchQuery && <p className="text-muted-foreground mt-1 text-sm sm:text-base">Recherche de &quot;{currentFilters.searchQuery}&quot; en cours...</p>}
-                        {isLoadingGlobal && !currentFilters.searchQuery && <Skeleton className="h-6 w-1/3 sm:w-1/4 mt-2" />}
+                        {!isLoading && products.length > 0 && !currentSearchTerm && <p className="text-muted-foreground mt-1 text-sm sm:text-base">{products.length} produits trouvés dans cette catégorie.</p>}
+                        {!isLoading && products.length > 0 && currentSearchTerm && <p className="text-muted-foreground mt-1 text-sm sm:text-base">{products.length} produits trouvés pour &quot;{currentSearchTerm}&quot; {currentCategoryObject ? `dans ${currentCategoryObject.name}` : ''}.</p>}
+                        {!isLoading && products.length === 0 && currentSearchTerm && <p className="text-muted-foreground mt-1 text-sm sm:text-base">Aucun produit trouvé pour &quot;{currentSearchTerm}&quot; {currentCategoryObject ? `dans ${currentCategoryObject.name}` : ''}.</p>}
+                        {isLoading && currentFilters.searchQuery && <p className="text-muted-foreground mt-1 text-sm sm:text-base">Recherche de &quot;{currentFilters.searchQuery}&quot; en cours...</p>}
+                        {isLoading && !currentFilters.searchQuery && <Skeleton className="h-6 w-1/3 sm:w-1/4 mt-2" />}
                     </div>
 
                     {fetchError && (
@@ -500,7 +493,7 @@ export default function CategoryPage({ params: paramsPromise }: { params: Promis
                         </div>
                     )}
 
-                    {!isLoadingGlobal && !fetchError && products.length === 0 && (
+                    {!isLoading && !fetchError && products.length === 0 && (
                         <div className="text-center py-8 sm:py-10">
                             <Info className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mb-3 sm:mb-4" />
                             <h2 className="text-lg sm:text-xl font-semibold mb-1.5 sm:mb-2">
@@ -517,19 +510,15 @@ export default function CategoryPage({ params: paramsPromise }: { params: Promis
                         </div>
                     )}
 
-                    {isLoadingGlobal && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                    {isLoading && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                             {Array.from({ length: 6 }).map((_, index) => (
-                                <div key={index} className="space-y-2">
-                                    <Skeleton className="h-40 sm:h-48 w-full" />
-                                    <Skeleton className="h-4 w-3/4" />
-                                    <Skeleton className="h-4 w-1/2" />
-                                </div>
+                                <ProductCardSkeleton key={index} />
                             ))}
                         </div>
                     )}
 
-                    {!isLoadingGlobal && !fetchError && products.length > 0 && (
+                    {!isLoading && !fetchError && products.length > 0 && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                             {products.map((product) => (
                                 <ProductCard

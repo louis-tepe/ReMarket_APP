@@ -33,10 +33,10 @@ interface IProductModelPopulated extends Omit<IProductModel, 'brand' | 'category
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: { productslug: string } } // Paramètre renommé pour correspondre au dossier
+    { params }: { params: Promise<{ productslug: string }> } // Paramètre renommé pour correspondre au dossier
 ) {
     await dbConnect();
-    const { productslug } = params; // Utilisation de productslug
+    const { productslug } = await params; // Utilisation de productslug avec await
 
     try {
         let query: FilterQuery<IProductModel>;

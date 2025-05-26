@@ -92,7 +92,7 @@ export async function GET(
         return NextResponse.json(formattedOffers, { status: 200 });
 
     } catch (error) {
-        console.error('Failed to fetch seller offers:', error);
+        // console.error('Failed to fetch seller offers:', error);
         // Gestion plus détaillée des erreurs ici si nécessaire
         const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
         return NextResponse.json({ message: 'Failed to fetch offers', error: errorMessage }, { status: 500 });
@@ -122,13 +122,65 @@ export async function GET(
  *           application/json:
  *             schema:
  *               type: array
- *               items: // TODO: Définir le schéma de l'offre
- *                 type: object 
+ *               items:
+ *                 $ref: '#/components/schemas/SellerOffer'
  *       401:
  *         description: Non autorisé (si l'accès est restreint au propriétaire ou admin).
  *       404:
  *         description: Utilisateur non trouvé.
  *       500:
  *         description: Erreur serveur.
- *
+ * components: # Ajout de la section components pour définir les schémas réutilisables
+ *   schemas:
+ *     ProductModelInfo:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           description: L'ID du modèle de produit.
+ *         name:
+ *           type: string
+ *           description: Le nom du modèle de produit.
+ *         imageUrl:
+ *           type: string
+ *           description: L'URL de l'image du modèle de produit (optionnel).
+ *           nullable: true
+ *     SellerOffer:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           description: L'ID de l'offre.
+ *         productModel:
+ *           $ref: '#/components/schemas/ProductModelInfo'
+ *         price:
+ *           type: number
+ *           format: float
+ *           description: Le prix de l'offre.
+ *         currency:
+ *           type: string
+ *           description: La devise du prix (ex: EUR).
+ *         condition:
+ *           type: string
+ *           enum: [new, used_likenew, used_good, used_fair]
+ *           description: L'état de l'article dans l'offre.
+ *         status:
+ *           type: string
+ *           enum: [available, reserved, sold, pending_shipment, shipped, delivered, cancelled, archived]
+ *           description: Le statut actuel de l'offre.
+ *         sellerDescription:
+ *           type: string
+ *           description: Description fournie par le vendeur pour cette offre spécifique (optionnel).
+ *           nullable: true
+ *         sellerPhotos:
+ *           type: array
+ *           items:
+ *             type: string
+ *             format: url
+ *           description: URLs des photos fournies par le vendeur pour cette offre (optionnel).
+ *           nullable: true
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: La date de création de l'offre.
  */ 

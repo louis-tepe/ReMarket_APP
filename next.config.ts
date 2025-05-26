@@ -24,12 +24,42 @@ const nextConfig: NextConfig = {
         pathname: "/**",
       },
     ],
+    formats: ['image/webp', 'image/avif'],
+    minimumCacheTTL: 3600,
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
-  /* config options here */
+  experimental: {
+    optimizePackageImports: ['@radix-ui/react-icons', 'lucide-react'],
+    serverComponentsExternalPackages: ['crawlee'],
+    typedRoutes: true,
+  },
+  compress: true,
+  async headers() {
+    return [
+      {
+        source: '/api/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=300, s-maxage=300, stale-while-revalidate=600',
+          },
+        ],
+      },
+      {
+        source: '/:all*(svg|jpg|jpeg|png|gif|ico|webp|avif)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+    ];
+  },
   serverExternalPackages: ["crawlee"],
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, dev }) => {
     if (isServer) {
-      // Résoudre le chemin vers le répertoire data_files de header-generator
       const headerGeneratorEntryPoint = require.resolve("header-generator");
       const headerGeneratorRootDir = path.dirname(headerGeneratorEntryPoint);
       const headerGeneratorDataFilesPath = path.join(
@@ -42,20 +72,47 @@ const nextConfig: NextConfig = {
           patterns: [
             {
               from: headerGeneratorDataFilesPath,
-              to: path.join("vendor-chunks", "data_files"), // Relatif à config.output.path (.next/server)
+              to: path.join("vendor-chunks", "data_files"),
             },
           ],
         })
       );
 
-      // Marquer 'canvas' comme externe pour éviter les erreurs de module non trouvé côté serveur
       if (!config.externals) {
         config.externals = [];
       }
       config.externals.push("canvas");
     }
 
+    if (!dev) {
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+          chunks: 'all',
+          cacheGroups: {
+            vendor: {
+              test: /[\\/]node_modules[\\/]/,
+              name: 'vendors',
+              chunks: 'all',
+              priority: 10,
+            },
+            common: {
+              name: 'common',
+              minChunks: 2,
+              priority: 5,
+              reuseExistingChunk: true,
+            },
+          },
+        },
+      };
+    }
+
     return config;
+  },
+  productionBrowserSourceMaps: false,
+  poweredByHeader: false,
+  async redirects() {
+    return [];
   },
 };
 

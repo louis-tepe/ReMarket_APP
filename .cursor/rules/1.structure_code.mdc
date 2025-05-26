@@ -1,0 +1,31 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+**Structure du Code & Interaction IA**
+
+**Principes de Conception du Code**
+    1.  Simplicité et Clarté :
+        -   Privilégier des solutions et des processus directs, évitant la complexité inutile.
+        -   Viser un code facile à comprendre et à maintenir.
+    2.  Efficacité et Performance :
+        -   Écrire du code concis et performant, éliminant toute redondance.
+    3.  Minimalisme Structurel :
+        -   Limiter la création excessive de fichiers. Regrouper logiquement les fonctionnalités pour conserver une arborescence de projet claire et concise.
+        -   Éviter la fragmentation excessive du code qui pourrait nuire à la compréhension globale.
+
+**Conception des Fonctions**
+    1.  Modularité : Créer des fonctions courtes, autonomes et réutilisables.
+    2.  Objectif Unique : Concevoir des fonctions avec une responsabilité clairement définie pour une compréhension aisée.
+
+**Standards de Développement Code**
+    1.  Nommage : Utiliser des noms clairs et cohérents en anglais
+    2.  Gestion des Erreurs : Implémenter une gestion des erreurs simple et efficace.
+    3.  Documentation : Commentaires explicatifs concis
+
+**Principes d'Interaction avec l'IA**
+    1.  Langue : Communiquer exclusivement en français.
+    2.  Style de Communication : Être direct, concis et aller droit au but.
+    3.  Clarification : En cas d'ambiguïté dans la demande, poser des questions ciblées pour éviter les erreurs d'interprétation.    
+    4. Questions & Réponses : N'hésite pas à poser des questions afin d'obtenir des informations importantes non fournis.

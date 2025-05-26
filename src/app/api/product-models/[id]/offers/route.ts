@@ -7,7 +7,7 @@ import { Types } from 'mongoose';
 
 /**
  * @swagger
- * /api/product-models/{productModelId}/offers:
+ * /api/product-models/{id}/offers:
  *   get:
  *     summary: Récupère toutes les offres actives pour un ProductModel spécifique.
  *     description: Retourne une liste d'offres associées à un ProductModel ReMarket, utile pour voir toutes les options de vente pour un produit standardisé.
@@ -16,7 +16,7 @@ import { Types } from 'mongoose';
  *       - Offers
  *     parameters:
  *       - in: path
- *         name: productModelId
+ *         name: id
  *         required: true
  *         schema:
  *           type: string
@@ -63,24 +63,24 @@ interface IPopulatedOffer extends Omit<IProductBase, 'seller' | 'productModel' |
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { productModelId: string } }
+  { params }: { params: { id: string } }
 ) {
-  const { productModelId } = params;
+  const { id } = params;
 
-  if (!productModelId || !Types.ObjectId.isValid(productModelId)) {
+  if (!id || !Types.ObjectId.isValid(id)) {
     return NextResponse.json({ message: 'ID du ProductModel invalide ou manquant.' }, { status: 400 });
   }
 
   try {
     await dbConnect();
 
-    const productModelExists = await ProductModel.findById(productModelId).lean();
+    const productModelExists = await ProductModel.findById(id).lean();
     if (!productModelExists) {
       return NextResponse.json({ message: 'ProductModel non trouvé.' }, { status: 404 });
     }
 
     const offersFromDB = await ProductOfferModel.find({
-      productModel: new Types.ObjectId(productModelId),
+      productModel: new Types.ObjectId(id),
       listingStatus: 'active', // Ne prendre que les offres actives
       transactionStatus: 'available' // Et disponibles
     })
@@ -127,7 +127,7 @@ export async function GET(
     return NextResponse.json({ offers: formattedOffers }, { status: 200 });
 
   } catch (error) {
-    // console.error(`[GET /api/product-models/${productModelId}/offers]`, error);
+    // console.error(`[GET /api/product-models/${id}/offers]`, error);
     const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue.';
     return NextResponse.json({ message: 'Erreur lors de la récupération des offres pour le ProductModel.', error: errorMessage }, { status: 500 });
   }

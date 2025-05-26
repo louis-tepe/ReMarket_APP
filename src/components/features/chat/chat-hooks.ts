@@ -214,7 +214,7 @@ export const useChatLogic = ({ initialMessages = [], onMessagesChange, scrollAre
                 parts: msg.text ? [{ text: msg.text }] : [],
             }));
 
-            const response = await fetch("/api/generate", {
+            const response = await fetch("/api/services/ai/generate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

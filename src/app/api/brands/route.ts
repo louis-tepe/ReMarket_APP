@@ -63,27 +63,44 @@ interface SelectedCategory {
  *           format: date-time
  */
 
-// Helper function to get all descendant category IDs (including self)
+// Helper function OPTIMISÉE to get all descendant category IDs (including self) avec $graphLookup
 async function findAllDescendantIds(initialCategoryId: Types.ObjectId): Promise<Types.ObjectId[]> {
-    const allDescendantIds = new Set<string>();
-    const queue: Types.ObjectId[] = [initialCategoryId];
-    const visited = new Set<string>();
-
-    visited.add(initialCategoryId.toString());
-    allDescendantIds.add(initialCategoryId.toString());
-
-    while (queue.length > 0) {
-        const currentId = queue.shift()!;
-        const children = await CategoryModel.find({ parent: currentId }).select('_id').lean();
-        for (const child of children as { _id: Types.ObjectId }[]) {
-            if (!visited.has(child._id.toString())) {
-                visited.add(child._id.toString());
-                allDescendantIds.add(child._id.toString());
-                queue.push(child._id);
+    try {
+        // SOLUTION OPTIMISÉE: Une seule requête MongoDB avec $graphLookup
+        const pipeline = [
+            { $match: { _id: initialCategoryId } },
+            {
+                $graphLookup: {
+                    from: 'categories',
+                    startWith: '$_id',
+                    connectFromField: '_id',
+                    connectToField: 'parent',
+                    as: 'descendants'
+                }
+            },
+            {
+                $project: {
+                    allIds: {
+                        $concatArrays: [
+                            ['$_id'],
+                            '$descendants._id'
+                        ]
+                    }
+                }
             }
-        }
+        ];
+
+        const result = await CategoryModel.aggregate(pipeline).exec();
+        const descendantIds = result[0]?.allIds || [initialCategoryId];
+        
+        console.log(`[PERF] findAllDescendantIds optimized: found ${descendantIds.length} categories`);
+        return descendantIds;
+        
+    } catch (error) {
+        console.error(`[ERROR] Error in findAllDescendantIds:`, error);
+        // Fallback: retourner seulement la catégorie courante
+        return [initialCategoryId];
     }
-    return Array.from(allDescendantIds).map(idStr => new Types.ObjectId(idStr));
 }
 
 export async function GET(request: NextRequest) {

@@ -98,11 +98,11 @@ export const ChatHistoryPanel: React.FC<ChatHistoryPanelProps> = ({
                 </div>
                 <ScrollArea className="flex-grow px-4">
                     {isLoadingHistory && <p className="text-sm text-muted-foreground p-2">Chargement...</p>}
-                    {!isLoadingHistory && chatSessions.length === 0 && (
+                    {!isLoadingHistory && (!chatSessions || chatSessions.length === 0) && (
                         <p className="text-sm text-muted-foreground p-2 text-center">Aucun chat sauvegardé.</p>
                     )}
                     <div className="space-y-2">
-                        {chatSessions.map((chat) => (
+                        {chatSessions?.map((chat) => (
                             <ChatHistoryItem
                                 key={chat._id}
                                 chat={chat}

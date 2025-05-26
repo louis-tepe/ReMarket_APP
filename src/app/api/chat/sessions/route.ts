@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import dbConnect from "@/lib/db.Connect";
-import ChatSession, { ChatMessage } from "@/models/ChatSession";
+import ChatSession, { IChatMessage } from "@/models/ChatSession";
 import User from "@/models/User"; // Assurez-vous que le chemin est correct
 
 interface SaveChatRequestBody {
   clientSessionId: string;
-  messages: ChatMessage[]; // L'historique complet des messages de la session en cours
+  messages: IChatMessage[]; // L'historique complet des messages de la session en cours
   title?: string;
 }
 

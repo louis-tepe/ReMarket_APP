@@ -1,0 +1,37 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+**ReMarket : Informations Projet**
+
+**Concept Principal**
+    1.  Plateforme : Marketplace web de produits d'occasion.
+    2.  Mission : Standardiser les annonces et processus pour une expérience d'achat "produit neuf".
+    3.  Distinction : Pas de contact direct acheteur/vendeur. ReMarket centralise les interactions.
+
+**Structure des Annonces**
+    1.  Standardisation : Annonces uniformes (image, titre, description, prix fixe) au style professionnel.
+    2.  Annonce Unique : Un seul modèle de produit correspond à une annonce unique sur la plateforme.
+    3.  Offres Groupées : Les articles identiques de vendeurs multiples sont listés sous cette annonce unique.
+
+**Processus Utilisateurs**
+    1.  Vendeur :
+        -   Soumet les informations du produit.
+        -   L'IA analyse et liste le produit.
+        -   Notification en cas de vente.
+        -   Envoi du produit vers un point relais désigné par ReMarket.
+    2.  Acheteur :
+        -   Recherche un produit.
+        -   Sélectionne une offre parmi celles regroupées (variations de prix, état, etc.).
+        -   Achète le produit.
+        -   Récupère le produit au point relais.
+
+**Stack Technique & Conventions**
+    1.  Environnement : Node.js
+    2.  Framework : Next.js (avec App Router)
+    3.  Langage : TypeScript
+    4.  Base de Données : MongoDB (hébergée sur Atlas, via Mongoose ODM)
+    5.  Styling : Tailwind CSS et composants shadcn/ui.
+        -   Style : Minimaliste, sobre, épuré (inspiration : backmarket.com).
+    6.  Authentification : NextAuth.js

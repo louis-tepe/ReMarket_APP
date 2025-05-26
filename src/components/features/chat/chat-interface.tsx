@@ -46,7 +46,7 @@ const ChatInterface: React.FC = () => {
     useEffect(() => {
         if (authStatus !== "loading" && !activeDatabaseSessionId && !isLoadingHistory) {
             const isUserAuthenticated = authStatus === "authenticated";
-            if ((isUserAuthenticated && chatSessions.length === 0) || !isUserAuthenticated) {
+            if ((isUserAuthenticated && (!chatSessions || chatSessions.length === 0)) || !isUserAuthenticated) {
                 initializeNewSession();
             }
         }
