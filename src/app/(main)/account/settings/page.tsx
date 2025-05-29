@@ -10,8 +10,12 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 
+/**
+ * SettingsPage: Allows users to manage their profile information and notification preferences.
+ * Handles user session and displays appropriate messages for loading or unauthenticated states.
+ */
 export default function SettingsPage() {
-    const { data: session, status } = useSession();
+    const { data: session, status: sessionStatus } = useSession();
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -23,14 +27,19 @@ export default function SettingsPage() {
         }
     }, [session]);
 
-    if (status === "loading") {
-        return <p>Chargement...</p>;
+    // Handle loading state for the session
+    if (sessionStatus === "loading") {
+        return <div className="container mx-auto py-8"><p>Chargement des paramètres...</p></div>;
     }
 
-    if (!session?.user) {
-        return <p>Veuillez vous connecter pour accéder aux paramètres.</p>;
+    // Handle unauthenticated state
+    if (sessionStatus === "unauthenticated" || !session?.user) {
+        return <div className="container mx-auto py-8"><p>Veuillez vous connecter pour accéder aux paramètres.</p></div>;
     }
 
+    /**
+     * Submits updated user profile information (name, email) to the backend.
+     */
     const handleProfileSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);

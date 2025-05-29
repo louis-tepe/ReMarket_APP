@@ -65,42 +65,32 @@ interface SelectedCategory {
 
 // Helper function OPTIMISÉE to get all descendant category IDs (including self) avec $graphLookup
 async function findAllDescendantIds(initialCategoryId: Types.ObjectId): Promise<Types.ObjectId[]> {
-    try {
-        // SOLUTION OPTIMISÉE: Une seule requête MongoDB avec $graphLookup
-        const pipeline = [
-            { $match: { _id: initialCategoryId } },
-            {
-                $graphLookup: {
-                    from: 'categories',
-                    startWith: '$_id',
-                    connectFromField: '_id',
-                    connectToField: 'parent',
-                    as: 'descendants'
-                }
-            },
-            {
-                $project: {
-                    allIds: {
-                        $concatArrays: [
-                            ['$_id'],
-                            '$descendants._id'
-                        ]
-                    }
+    const pipeline = [
+        { $match: { _id: initialCategoryId } },
+        {
+            $graphLookup: {
+                from: 'categories',
+                startWith: '$_id',
+                connectFromField: '_id',
+                connectToField: 'parent',
+                as: 'descendants'
+            }
+        },
+        {
+            $project: {
+                allIds: {
+                    $concatArrays: [
+                        ['$_id'],
+                        '$descendants._id'
+                    ]
                 }
             }
-        ];
+        }
+    ];
 
-        const result = await CategoryModel.aggregate(pipeline).exec();
-        const descendantIds = result[0]?.allIds || [initialCategoryId];
-        
-        console.log(`[PERF] findAllDescendantIds optimized: found ${descendantIds.length} categories`);
-        return descendantIds;
-        
-    } catch (error) {
-        console.error(`[ERROR] Error in findAllDescendantIds:`, error);
-        // Fallback: retourner seulement la catégorie courante
-        return [initialCategoryId];
-    }
+    const result = await CategoryModel.aggregate(pipeline).exec();
+    // Retourne les IDs trouvés, ou un tableau avec l'ID initial si rien n'est trouvé (par sécurité)
+    return result[0]?.allIds || [initialCategoryId]; 
 }
 
 export async function GET(request: NextRequest) {
@@ -115,52 +105,39 @@ export async function GET(request: NextRequest) {
     await dbConnect();
 
     if (categorySlug) {
-      const category = await CategoryModel.findOne({ slug: categorySlug.toLowerCase() }).select('_id name').lean() as SelectedCategory | null;
+      const category = await CategoryModel.findOne({ slug: categorySlug.toLowerCase() })
+        .select('_id name').lean<SelectedCategory | null>();
+
       if (category) {
-        console.log(`[API_BRANDS_GET] Catégorie sélectionnée: ${category.name} (Slug: ${categorySlug}) (ID: ${category._id.toString()})`);
-        
-        console.time("[API_BRANDS_GET] findAllDescendantIds duration");
-        const allDescendantIds = await findAllDescendantIds(category._id as Types.ObjectId);
-        console.timeEnd("[API_BRANDS_GET] findAllDescendantIds duration");
+        const allDescendantIds = await findAllDescendantIds(category._id);
 
         if (allDescendantIds.length > 0) {
-          console.time("[API_BRANDS_GET] findLeafCategories duration");
           const leafCategoriesInSubtree = await CategoryModel.find({
             _id: { $in: allDescendantIds },
             isLeafNode: true
           }).select('_id').lean();
-          console.timeEnd("[API_BRANDS_GET] findLeafCategories duration");
           
           const leafCategoryIdsToFilterBy = leafCategoriesInSubtree.map(cat => cat._id as Types.ObjectId);
 
           if (leafCategoryIdsToFilterBy.length > 0) {
-            console.log(`[API_BRANDS_GET] Filtrage des marques par ${leafCategoryIdsToFilterBy.length} catégories feuilles.`);
             brandsQuery = BrandModel.find({ categories: { $in: leafCategoryIdsToFilterBy } });
           } else {
-            console.log(`[API_BRANDS_GET] Aucune catégorie FEUILLE trouvée dans la sous-arborescence de ${category.name}, retour de 0 marques.`);
             return NextResponse.json({ success: true, brands: [] }, { status: 200 });
           }
         } else {
-           console.log(`[API_BRANDS_GET] Aucun descendant trouvé pour ${category.name}, retour de 0 marques.`);
            return NextResponse.json({ success: true, brands: [] }, { status: 200 });
         }
       } else {
-        console.log(`[API_BRANDS_GET] Catégorie avec slug '${categorySlug}' non trouvée.`);
         return NextResponse.json({ success: true, brands: [] }, { status: 200 }); 
       }
     } else {
-      console.log("[API_BRANDS_GET] Aucun categorySlug fourni, récupération de toutes les marques.");
       brandsQuery = BrandModel.find({});
     }
 
-    console.time("[API_BRANDS_GET] BrandModel.find query duration");
-    const partialBrands = await brandsQuery
+    const brands = await brandsQuery
       .select('_id name slug logoUrl') 
       .sort({ name: 1 })
       .lean<Pick<IBrand, '_id' | 'name' | 'slug' | 'logoUrl'>[]>();
-    console.timeEnd("[API_BRANDS_GET] BrandModel.find query duration");
-    
-    const brands: Pick<IBrand, '_id' | 'name' | 'slug' | 'logoUrl'>[] = partialBrands;
     
     return NextResponse.json({ success: true, brands }, { status: 200 });
   } catch (error) {

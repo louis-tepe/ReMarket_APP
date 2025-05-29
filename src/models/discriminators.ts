@@ -1,4 +1,4 @@
-import mongoose, { Model } from 'mongoose';
+import { Model } from 'mongoose';
 import ProductOfferModel, { IProductBase } from './ProductBaseModel';
 
 // Importe tous les modèles de discriminateurs spécifiques

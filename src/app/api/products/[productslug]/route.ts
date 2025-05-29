@@ -27,16 +27,17 @@ interface IOfferWithPopulatedSeller extends Omit<IProductBase, 'seller' | '_id'>
 
 // Interface pour ProductModel avec brand et category peuplés
 interface IProductModelPopulated extends Omit<IProductModel, 'brand' | 'category'> {
+  _id: Types.ObjectId; // S'assurer que _id est un ObjectId ici
   brand: { _id?: Types.ObjectId; name: string; slug: string; };
   category: { _id?: Types.ObjectId; name: string; slug: string; };
 }
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: Promise<{ productslug: string }> } // Paramètre renommé pour correspondre au dossier
+    { params }: { params: Promise<{ productslug: string }> } 
 ) {
     await dbConnect();
-    const { productslug } = await params; // Utilisation de productslug avec await
+    const { productslug } = await params; 
 
     try {
         let query: FilterQuery<IProductModel>;
@@ -49,7 +50,7 @@ export async function GET(
         const productModel = await ProductModel.findOne(query)
             .populate('brand', 'name slug')
             .populate('category', 'name slug')
-            .lean() as IProductModelPopulated | null; // Utilisation du type populé
+            .lean<IProductModelPopulated | null>(); 
 
         if (!productModel) {
             return NextResponse.json({ message: "Produit modèle non trouvé" }, { status: 404 });
@@ -58,19 +59,19 @@ export async function GET(
         const offersFromDB = await ProductOfferModel.find({ 
             productModel: productModel._id, 
             transactionStatus: 'available',
-            listingStatus: 'active' // Ajout du filtre listingStatus
+            listingStatus: 'active' 
         })
-        .populate({
+        .populate<{ seller: PopulatedSellerType }>({
             path: 'seller',
-            select: 'name username _id', // Assurer que _id est inclus pour l'ID du vendeur
+            select: 'name username _id', 
             model: UserModel
         })
         .sort({ price: 1 })
-        .lean() as IOfferWithPopulatedSeller[]; // Utilisation du type populé pour les offres
+        .lean<IOfferWithPopulatedSeller[]>(); 
 
         const productData = {
             id: productModel._id.toString(),
-            slug: productModel.slug || productModel._id.toString(), // Fallback au cas où le slug est vide
+            slug: productModel.slug || productModel._id.toString(), 
             title: productModel.title,
             brand: {
                 name: productModel.brand?.name || 'Marque inconnue',
@@ -85,7 +86,6 @@ export async function GET(
             keyFeatures: productModel.keyFeatures || [],
             specifications: productModel.specifications || [],
             offers: offersFromDB.map(offer => {
-                // Le cast n'est plus nécessaire grâce à IOfferWithPopulatedSeller
                 return {
                     id: offer._id.toString(),
                     seller: {
@@ -105,7 +105,7 @@ export async function GET(
         return NextResponse.json(productData);
 
     } catch (error) {
-        // console.error(`[API /api/products/${productslug}] Error fetching product:`, error);
+        console.error(`[API /api/products/${productslug}] Error fetching product:`, error);
         return NextResponse.json({ message: "Erreur serveur lors de la récupération du produit." }, { status: 500 });
     }
 } 

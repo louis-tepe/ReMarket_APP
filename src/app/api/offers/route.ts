@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
+import type { Session } from "next-auth";
 import { authOptions } from '@/lib/authOptions';
 import dbConnect from '@/lib/db.Connect';
 import ProductOfferModel, { IProductBase } from '@/models/ProductBaseModel';
 import CategoryModel, { ICategory } from '@/models/CategoryModel';
 import ProductModel from '@/models/ProductModel';
-import type { Session } from 'next-auth';
 import User from '@/models/User';
 import { analyzeImageCondition, ImagePart } from '@/services/ai/geminiService';
-import { ProductCategorySpecificModel } from '@/models/discriminators';
+import { getProductOfferDiscriminator } from '@/models/discriminators';
 import { Types } from 'mongoose';
 
 // Importer les modèles discriminateurs pour s'assurer qu'ils sont enregistrés auprès de Mongoose
@@ -124,16 +124,17 @@ import { Types } from 'mongoose';
  *           format: date-time
  */
 
-interface OfferCreationBody extends Omit<Partial<IProductBase>, 'seller' | 'category' | 'productModel' | 'images' | 'visualConditionScore' | 'visualConditionRawResponse'> {
+interface OfferCreationBody {
   productModelId: string;
-  categoryId: string; // ID de la catégorie feuille
-  images: string[]; // URLs des images déjà téléversées
+  categoryId: string; // ID de la catégorie feuille (slug technique)
+  images: string[];
   price: number;
   condition: 'new' | 'like-new' | 'good' | 'fair' | 'poor';
   description: string;
+  kind: string; // Slug de la catégorie, utilisé comme discriminateur 'kind'
+  currency?: string;
   stockQuantity?: number;
-  // Plus les champs spécifiques à la catégorie (kind) qui sont dynamiques
-  [key: string]: any; // Pour les champs dynamiques
+  [key: string]: unknown; // Pour les champs dynamiques spécifiques à la catégorie
 }
 
 export async function POST(request: NextRequest) {
@@ -141,136 +142,84 @@ export async function POST(request: NextRequest) {
     await dbConnect();
     const session: Session | null = await getServerSession(authOptions);
 
-    if (!session || !session.user) {
+    if (!session?.user?.id) {
       return NextResponse.json({ success: false, message: "Authentification requise." }, { status: 401 });
     }
     const userId = session.user.id;
-    // console.log(`[POST /api/offers] Attempting to find seller with userId: ${userId}`);
-    const seller = await User.findById(userId);
+    const seller = await User.findById(userId).lean(); // .lean() pour performance
     if (!seller) {
-      // console.error(`[POST /api/offers] Seller not found for userId: ${userId}. Returning 404.`);
       return NextResponse.json({ success: false, message: "Vendeur non trouvé." }, { status: 404 });
     }
-    // console.log(`[POST /api/offers] Seller found: ${seller.name || seller.email}`);
 
     const body: OfferCreationBody = await request.json();
-    // console.log("[POST /api/offers] Body reçu:", JSON.stringify(body, null, 2));
+    const { productModelId, categoryId, images, price, condition, description, kind, stockQuantity = 1, ...specificFields } = body;
 
-    const {
-      productModelId,
-      category: categoryId,
-      images,
-      price,
-      condition,
-      description,
-      stockQuantity = 1,
-      kind,
-      ...specificFields
-    } = body;
+    const requiredFields: (keyof Omit<OfferCreationBody, 'currency' | 'stockQuantity' | 'specificFields'>)[] = 
+        ['productModelId', 'categoryId', 'images', 'price', 'condition', 'description', 'kind'];
+    const missingFields = requiredFields.filter(field => 
+        field === 'images' ? (!body[field] || body[field].length === 0) : !body[field]
+    );
 
-    if (!productModelId || !categoryId || !images || images.length === 0 || !price || !condition || !description || !kind) {
-      let missingFields = [];
-      if (!productModelId) missingFields.push("productModelId");
-      if (!categoryId) missingFields.push("categoryId");
-      if (!images || images.length === 0) missingFields.push("images");
-      if (price === undefined || price === null) missingFields.push("price");
-      if (!condition) missingFields.push("condition");
-      if (!description) missingFields.push("description");
-      if (!kind) missingFields.push("kind");
-
-      if (missingFields.length > 0) {
-        return NextResponse.json({ success: false, message: `Champs requis manquants pour créer l'offre: ${missingFields.join(', ')}.` }, { status: 400 });
-      }
+    if (missingFields.length > 0) {
+      return NextResponse.json({ success: false, message: `Champs requis manquants: ${missingFields.join(', ')}.` }, { status: 400 });
     }
 
-    const categoryDoc = await CategoryModel.findById(categoryId).lean() as ICategory | null;
-    if (!categoryDoc || !categoryDoc.isLeafNode) {
-      return NextResponse.json({ success: false, message: "Catégorie feuille valide non trouvée ou non spécifiée." }, { status: 400 });
+    const categoryDoc = await CategoryModel.findById(categoryId).lean<ICategory | null>();
+    if (!categoryDoc || !categoryDoc.isLeafNode || categoryDoc.slug !== kind) {
+      return NextResponse.json({ success: false, message: "Catégorie feuille invalide, non correspondante ou non spécifiée." }, { status: 400 });
     }
 
-    if (categoryDoc.slug !== kind) {
-      return NextResponse.json({ success: false, message: `Incohérence entre le type de produit (kind: ${kind}) et le slug de la catégorie (${categoryDoc.slug}).` }, { status: 400 });
-    }
-
-    const productModelDoc = await ProductModel.findById(productModelId);
+    const productModelDoc = await ProductModel.findById(productModelId).lean(); // .lean() pour performance
     if (!productModelDoc) {
-      // console.error(`[POST /api/offers] ProductModel not found for productModelId: ${productModelId}. Returning 404.`);
       return NextResponse.json({ success: false, message: "Modèle de produit ReMarket non trouvé." }, { status: 404 });
     }
-    // console.log(`[POST /api/offers] ProductModel found: ${productModelDoc.title}`);
 
     let visualConditionScore: number | null = null;
     let visualConditionRawResponse: string | undefined = undefined;
 
-    // Analyse de l'image principale si le prompt est défini pour la catégorie
     if (categoryDoc.imageAnalysisPrompt && images.length > 0) {
-      const mainImageRelativeUrl = images[0]; // Analyser la première image
-      // console.log(`[POST /api/offers] Analyse de l'image: ${mainImageRelativeUrl} avec le prompt: "${categoryDoc.imageAnalysisPrompt}"`);
-      
-      // Pour utiliser analyzeImageCondition, nous avons besoin de l'image en base64.
-      // Ici, nous avons une URL. Il faudrait soit :
-      // 1. Modifier analyzeImageCondition pour accepter une URL (et faire le fetch + conversion base64 dedans)
-      // 2. Faire le fetch de l'image ici et la convertir en base64 avant d'appeler analyzeImageCondition.
-      // Option 2 est plus simple à intégrer pour l'instant si analyzeImageCondition attend une ImagePart.
-      // Ou, si les images sont accessibles publiquement, le prompt peut inclure l'URL directement
-      // et Gemini peut potentiellement la charger. Pour l'instant, supposons que analyzeImageCondition
-      // s'attend à une ImagePart (base64).
-      // Pour cette implémentation, je vais simuler que l'analyse retourne un score pour ne pas bloquer
-      // car la conversion URL -> Base64 côté serveur ajoute de la complexité ici.
-      // Dans une vraie implémentation, il faudrait faire le fetch de `mainImageRelativeUrl`.
-      
-      // SIMULATION (remplacer par un vrai appel avec conversion URL -> base64 si nécessaire)
-      // visualConditionScore = Math.floor(Math.random() * 5); // Nombre aléatoire 0-4
-      // visualConditionRawResponse = `Simulation: Score ${visualConditionScore} pour ${mainImageRelativeUrl}`;
-      // console.log(`[POST /api/offers] Résultat SIMULÉ de l'analyse:`, { visualConditionScore, visualConditionRawResponse });
-
-      // Pour un vrai appel, il faudrait quelque chose comme ça (après avoir récupéré l'image en base64):
       try {
-        // Étape 1: Construire l'URL absolue et récupérer l'image depuis l'URL
-        const host = request.headers.get('host');
-        const protocol = request.headers.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https');
-        const mainImageUrl = `${protocol}://${host}${mainImageRelativeUrl}`;
+        const host = request.headers.get('host') || 'localhost:3000';
+        const protocol = request.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
+        const mainImageUrl = `${protocol}://${host}${images[0]}`;
         
-        // console.log(`[POST /api/offers] Fetching image from absolute URL: ${mainImageUrl}`);
         const imageResponse = await fetch(mainImageUrl);
-        if (!imageResponse.ok) {
-            console.warn(`Impossible de récupérer l'image ${mainImageUrl} pour l'analyse.`);
-        } else {
+        if (imageResponse.ok) {
             const imageBuffer = await imageResponse.arrayBuffer();
             const imageBase64 = Buffer.from(imageBuffer).toString('base64');
-            const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg'; // default ou essayer de déduire
+            const mimeType = imageResponse.headers.get('content-type');
             
-            const imagePartForAnalysis: ImagePart = { 
-                data: imageBase64, 
-                // Assurer que le mimeType est l'un de ceux attendus par ImagePart
-                mimeType: mimeType.startsWith('image/') ? mimeType as ImagePart['mimeType'] : 'image/jpeg' 
-            }; 
-
-            const analysisResult = await analyzeImageCondition(imagePartForAnalysis, categoryDoc.imageAnalysisPrompt);
-            if (analysisResult) {
-              visualConditionScore = analysisResult.score;
-              visualConditionRawResponse = analysisResult.rawResponse;
-              // console.log(`[POST /api/offers] Résultat de l'analyse Gemini:`, { visualConditionScore, visualConditionRawResponse });
+            if (mimeType && mimeType.startsWith('image/')){
+                const imagePartForAnalysis: ImagePart = { 
+                    data: imageBase64, 
+                    mimeType: mimeType as ImagePart['mimeType'] 
+                }; 
+                const analysisResult = await analyzeImageCondition(imagePartForAnalysis, categoryDoc.imageAnalysisPrompt);
+                visualConditionScore = analysisResult?.score ?? null;
+                visualConditionRawResponse = analysisResult?.rawResponse;
+            } else {
+                visualConditionRawResponse = "Type MIME de l'image invalide pour l'analyse.";
             }
+        } else {
+            visualConditionRawResponse = `Impossible de récupérer l'image ${mainImageUrl} (statut: ${imageResponse.status}).`;
         }
       } catch (analysisError) {
-        console.error("[POST /api/offers] Erreur lors de l'analyse de l'image par Gemini:", analysisError);
-        // Ne pas bloquer la création de l'offre si l'analyse échoue, mais logguer.
-        visualConditionRawResponse = `Erreur analyse Gemini: ${analysisError instanceof Error ? analysisError.message : 'Inconnue'}`;
+        console.warn("[API_OFFERS_POST] Erreur analyse Gemini (non bloquant):", analysisError); // Log non critique
+        visualConditionRawResponse = `Erreur analyse Gemini: ${analysisError instanceof Error ? analysisError.message : 'Erreur inconnue'}`;
       }
     }
 
     const newOfferData: Partial<IProductBase> & { category: Types.ObjectId, productModel: Types.ObjectId, seller: Types.ObjectId, kind: string } = {
-      productModel: productModelDoc._id,
-      seller: seller._id,
-      category: productModelDoc.category,
-      kind: categoryDoc.slug,
-      price: price,
+      productModel: productModelDoc._id as Types.ObjectId,
+      seller: seller._id as Types.ObjectId,
+      category: productModelDoc.category as Types.ObjectId, // Utiliser la catégorie du ProductModel
+      kind: categoryDoc.slug, // kind est le slug de la catégorie feuille
+      price,
       currency: body.currency || 'EUR',
-      condition: condition,
-      description: description,
-      images: images,
-      stockQuantity: stockQuantity,
+      condition,
+      description,
+      images,
+      stockQuantity,
       listingStatus: 'active',
       transactionStatus: 'available',
       ...specificFields,
@@ -278,25 +227,24 @@ export async function POST(request: NextRequest) {
       ...(visualConditionRawResponse && { visualConditionRawResponse }),
     };
 
-    // Utiliser le modèle discriminateur spécifique basé sur `kind`
-    const DiscriminatorModel = ProductCategorySpecificModel(newOfferData.kind);
+    const DiscriminatorModel = getProductOfferDiscriminator(newOfferData.kind);
     const newOffer = new DiscriminatorModel(newOfferData);
-    
     await newOffer.save();
 
-    return NextResponse.json({ success: true, message: "Offre créée avec succès.", data: newOffer }, { status: 201 });
+    return NextResponse.json({ success: true, message: "Offre créée avec succès.", data: newOffer.toObject() }, { status: 201 });
 
-  } catch (error: any) {
-    console.error("Erreur lors de la création de l'offre:", error);
-    let errorMessage = "Erreur serveur inconnue lors de la création de l'offre.";
-    if (error.name === 'ValidationError') {
-        errorMessage = Object.values(error.errors).map((val: any) => val.message).join(', ');
-        return NextResponse.json({ success: false, message: errorMessage, errors: error.errors }, { status: 400 });
+  } catch (error: unknown) {
+    // console.error("[API_OFFERS_POST] Erreur création offre:", error); // Log serveur optionnel
+    if (error instanceof Error && error.name === 'ValidationError') {
+        interface ValidationError {
+            errors: Record<string, { message: string }>;
+        }
+        const validationError = error as unknown as ValidationError;
+        const messages = Object.values(validationError.errors).map((val) => val.message).join(', ');
+        return NextResponse.json({ success: false, message: `Erreur de validation: ${messages}`, errors: validationError.errors }, { status: 400 });
     }
-    if (error instanceof Error) {
-        errorMessage = error.message;
-    }
-    return NextResponse.json({ success: false, message: errorMessage }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : "Erreur serveur inconnue.";
+    return NextResponse.json({ success: false, message: "Erreur lors de la création de l'offre.", errorDetails: errorMessage }, { status: 500 });
   }
 }
 
@@ -306,48 +254,30 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     await dbConnect();
-    const session = await getServerSession(authOptions);
-    // Optionnel: Vérifier la session si certaines offres sont protégées ou si le listage dépend de l'utilisateur
-    // if (!session || !session.user) {
-    //   return NextResponse.json({ success: false, message: "Authentification requise pour certaines opérations." }, { status: 401 });
-    // }
+    // const session = await getServerSession(authOptions); // Décommenter si authentification nécessaire pour lister
 
     const { searchParams } = new URL(request.url);
-    // TODO: Implémenter la logique de filtres (par exemple, sellerId, categoryId, productModelId, status, etc.)
-    // Exemple: const sellerId = searchParams.get('sellerId');
-    // const categorySlug = searchParams.get('categorySlug');
+    const queryParams: Record<string, unknown> = {}; // Construire les filtres dynamiquement
+    // Exemple: if (searchParams.get('sellerId')) queryParams.seller = searchParams.get('sellerId');
+    // queryParams.listingStatus = 'active'; // Filtrer par défaut ?
 
-    const query: any = {};
-    // if (sellerId) query.seller = sellerId;
-    // if (categorySlug) { ... find category by slug then query.category = category._id ... }
-    // query.listingStatus = 'active'; // Par défaut, ne montrer que les offres actives ?
+    // Utiliser les paramètres de recherche
+    if (searchParams.get('sellerId')) {
+        queryParams.seller = searchParams.get('sellerId');
+    }
 
-    // TODO: Implémenter la pagination
-    // const page = parseInt(searchParams.get('page') || '1', 10);
-    // const limit = parseInt(searchParams.get('limit') || '10', 10);
-    // const skip = (page - 1) * limit;
-
-    const offers = await ProductOfferModel.find(query)
-      // .populate('productModel', 'title slug standardImageUrls brand category') // TODO: Ajuster le populate selon les besoins
+    const offers = await ProductOfferModel.find(queryParams)
+      // .populate('productModel', 'title slug') // Ajuster populate au besoin
       // .populate('seller', 'name username')
       .sort({ createdAt: -1 })
-      // .skip(skip)
-      // .limit(limit)
+      // .limit(10) // Ajouter pagination si nécessaire
       .lean();
 
-    // TODO: Calculer le nombre total d'offres pour la pagination
-    // const totalOffers = await ProductOfferModel.countDocuments(query);
+    return NextResponse.json({ success: true, data: offers }, { status: 200 });
 
-    return NextResponse.json({ 
-      success: true, 
-      data: offers, 
-      // currentPage: page, 
-      // totalPages: Math.ceil(totalOffers / limit),
-      // totalOffers 
-    }, { status: 200 });
-
-  } catch (error: any) {
-    console.error("[API_OFFERS_GET]", error);
-    return NextResponse.json({ success: false, message: "Erreur serveur lors de la récupération des offres.", error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    // console.error("[API_OFFERS_GET] Erreur listage offres:", error); // Log serveur optionnel
+    const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
+    return NextResponse.json({ success: false, message: "Erreur serveur lors de la récupération des offres.", errorDetails: errorMessage }, { status: 500 });
   }
 } 

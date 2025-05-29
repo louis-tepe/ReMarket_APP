@@ -3,6 +3,8 @@ import bcrypt from 'bcryptjs';
 import dbConnect from '@/lib/db.Connect'; // Utilitaire de connexion Mongoose
 import User from '@/models/User'; // Modèle User Mongoose
 
+const MIN_PASSWORD_LENGTH = 6;
+
 export async function POST(req: NextRequest) {
   try {
     await dbConnect(); // Assurer la connexion à la base de données
@@ -11,27 +13,29 @@ export async function POST(req: NextRequest) {
 
     if (!email || !password) {
       return NextResponse.json(
-        { message: 'Email et mot de passe sont requis.' },
+        { message: 'L\'email et le mot de passe sont requis.' },
         { status: 400 }
       );
+    }
+
+    if (password.length < MIN_PASSWORD_LENGTH) {
+        return NextResponse.json(
+            { message: `Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caractères.` },
+            { status: 400 }
+        );
     }
 
     // Vérifier si l'utilisateur existe déjà
     const existingUser = await User.findOne({ email });
     if (existingUser) {
+      // Message générique pour ne pas révéler l'existence d'un email
       return NextResponse.json(
-        { message: 'Un utilisateur avec cet email existe déjà.' },
-        { status: 409 } // 409 Conflict
+        { message: 'Impossible de créer le compte avec ces informations.' }, 
+        { status: 409 } 
       );
     }
 
     // Hacher le mot de passe
-    if (password.length < 6) { // Exemple de validation simple de la longueur du mot de passe
-        return NextResponse.json(
-            { message: 'Le mot de passe doit contenir au moins 6 caractères.' },
-            { status: 400 }
-        );
-    }
     const hashedPassword = await bcrypt.hash(password, 10); // 10 est le nombre de tours de salage
 
     // Créer le nouvel utilisateur
@@ -57,9 +61,14 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     console.error("Erreur lors de la création de l'utilisateur:", error);
-    // Gestion plus fine des erreurs de Mongoose (ex: validation)
     if (error instanceof Error && error.name === 'ValidationError') {
-        return NextResponse.json({ message: error.message }, { status: 400 });
+        // Extrait les messages d'erreur de validation spécifiques
+        interface ValidationError {
+            errors: Record<string, { message: string }>;
+        }
+        const validationError = error as unknown as ValidationError;
+        const messages = Object.values(validationError.errors).map((e) => e.message).join(', ');
+        return NextResponse.json({ message: `Erreur de validation: ${messages}` }, { status: 400 });
     }
     return NextResponse.json(
       { message: "Erreur serveur lors de la création de l'utilisateur." },

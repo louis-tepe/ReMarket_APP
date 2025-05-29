@@ -31,7 +31,6 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     optimizePackageImports: ['@radix-ui/react-icons', 'lucide-react'],
-    serverComponentsExternalPackages: ['crawlee'],
     typedRoutes: true,
   },
   compress: true,

@@ -7,6 +7,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import Link from 'next/link';
 
+/**
+ * Fetches the user's favorite products from the API.
+ * @returns A promise that resolves to an array of ProductCardProps.
+ */
 async function fetchFavoriteProducts(): Promise<ProductCardProps[]> {
     // console.log("Appel à fetchFavoriteProducts pour récupérer les favoris via API"); // Commenté pour moins de verbosité
     try {
@@ -24,6 +28,9 @@ async function fetchFavoriteProducts(): Promise<ProductCardProps[]> {
     }
 }
 
+/**
+ * Displays a skeleton loader for the favorites page.
+ */
 function FavoritesPageSkeleton() {
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -44,6 +51,10 @@ function FavoritesPageSkeleton() {
     );
 }
 
+/**
+ * FavoritesPage component: Displays a list of the user's favorite products.
+ * Allows users to see their saved items and potentially remove them (handled by ProductCard).
+ */
 export default function FavoritesPage() {
     const [favorites, setFavorites] = useState<ProductCardProps[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -56,21 +67,37 @@ export default function FavoritesPage() {
             .then(data => setFavorites(data))
             .catch(err => {
                 console.error("Erreur chargement favoris:", err);
-                setError("Impossible de charger vos favoris pour le moment.");
+                setError(err instanceof Error ? err.message : "Impossible de charger vos favoris pour le moment.");
             })
             .finally(() => setIsLoading(false));
     }, []);
 
+    /**
+     * Callback function passed to ProductCard to handle favorite toggling.
+     * If a product is unfavorited, it's removed from the local state.
+     * @param productId - The ID of the product toggled.
+     * @param isFavorite - The new favorite status (expected to be false here).
+     */
     const handleFavoriteToggled = useCallback((productId: string, isFavorite: boolean) => {
-        // Sur la page des favoris, si un produit n'est plus un favori (isFavorite == false),
-        // nous le retirons de la liste.
         if (!isFavorite) {
             setFavorites(prevFavorites => prevFavorites.filter(fav => fav.id !== productId));
         }
-        // Si isFavorite est true, cela ne devrait pas arriver depuis un clic sur ProductCard
-        // car il serait déjà favori. On pourrait re-fetch pour être sûr, mais pour l'UI
-        // c'est surtout la suppression qui importe ici.
+        // No action needed if isFavorite is true from this page, as it should already be a favorite.
     }, []);
+
+    if (isLoading) return <FavoritesPageSkeleton />;
+
+    if (error) {
+        return (
+            <div className="container mx-auto py-8 text-center">
+                <div className="text-center py-10 bg-destructive/10 border border-destructive text-destructive p-4 rounded-md">
+                    <Info className="mx-auto h-12 w-12 mb-4" />
+                    <h2 className="text-xl font-semibold mb-2">Erreur de chargement</h2>
+                    <p>{error}</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="container mx-auto py-8">
@@ -82,16 +109,6 @@ export default function FavoritesPage() {
                 {/* Option: Bouton pour vider les favoris ou autre action */}
             </div>
 
-            {isLoading && <FavoritesPageSkeleton />}
-
-            {!isLoading && error && (
-                <div className="text-center py-10 bg-destructive/10 border border-destructive text-destructive p-4 rounded-md">
-                    <Info className="mx-auto h-12 w-12 mb-4" />
-                    <h2 className="text-xl font-semibold mb-2">Erreur de chargement</h2>
-                    <p>{error}</p>
-                </div>
-            )}
-
             {!isLoading && !error && favorites.length === 0 && (
                 <div className="text-center py-10 border-2 border-dashed border-muted rounded-lg">
                     <HeartIcon className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
@@ -100,7 +117,7 @@ export default function FavoritesPage() {
                         Parcourez nos produits et cliquez sur le petit cœur pour les ajouter ici.
                     </p>
                     <Button asChild>
-                        <Link href="/search">Découvrir les produits</Link>
+                        <Link href="/categories">Découvrir les produits</Link>
                     </Button>
                 </div>
             )}

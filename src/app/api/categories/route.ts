@@ -78,24 +78,24 @@ export async function GET(request: NextRequest) {
         query.depth = depth;
       } else {
         return NextResponse.json(
-          { success: false, message: "Le paramètre 'depth' doit être un nombre valide." }, 
+          { success: false, message: "Le paramètre 'depth' doit être un nombre." }, 
           { status: 400 }
         );
       }
     }
 
-    // Inclure explicitement tous les champs nécessaires, y compris isLeafNode et depth
+    // Sélectionner tous les champs pertinents utilisés par le client ou d'autres parties du système.
     const categories = await CategoryModel.find(query)
-      .select('_id name slug depth isLeafNode parent description createdAt updatedAt') // Soyez explicite sur les champs
+      .select('_id name slug depth isLeafNode parent description iconKey createdAt updatedAt') 
       .sort({ name: 1 })
-      .lean(); // Cast après lean
+      .lean<ICategory[]>(); 
 
     return NextResponse.json({ success: true, categories }, { status: 200 });
   } catch (error) {
-    console.error("[API_CATEGORIES_GET]", error);
-    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+    // console.error("[API_CATEGORIES_GET] Erreur serveur:", error); // Log optionnel pour débogage serveur
+    const errorMessage = error instanceof Error ? error.message : "Erreur inconnue.";
     return NextResponse.json(
-      { success: false, message: "Erreur serveur lors de la récupération des catégories", error: errorMessage }, 
+      { success: false, message: "Erreur serveur lors de la récupération des catégories.", error: errorMessage }, 
       { status: 500 }
     );
   }

@@ -2,8 +2,8 @@ import { NextResponse, NextRequest } from 'next/server';
 import type { FormFieldDefinition } from '@/types/form.types.ts';
 import ProductOfferModel from '@/models/ProductBaseModel';
 
-// Importez TOUS vos modèles discriminateurs ici pour vous assurer qu'ils sont enregistrés par Mongoose
-// avant que cette route ne soit utilisée.
+// Les imports des discriminateurs sont nécessaires pour que Mongoose les enregistre
+// et qu'ils soient disponibles via ProductOfferModel.discriminators.
 import '@/models/discriminators/SmartphoneModel';
 import '@/models/discriminators/LaptopModel';
 import '@/models/discriminators/MonitorModel';
@@ -24,35 +24,25 @@ import '@/models/discriminators/ScreenProtectorsModel';
 import '@/models/discriminators/SmartwatchModel';
 import '@/models/discriminators/StorageModel';
 import '@/models/discriminators/TabletModel';
-// ... ajoutez d'autres imports de discriminateurs au besoin
 
 function generateLabel(name: string): string {
-    // Convertit camelCase ou snake_case en libellé plus lisible
-    // Exemple: screenSizeIn -> Screen Size In, storage_capacity -> Storage Capacity
     const result = name.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ');
     return result.charAt(0).toUpperCase() + result.slice(1).toLowerCase();
 }
 
 function mapMongooseTypeToFormType(instance: string, enumValues?: string[] | number[]): FormFieldDefinition['type'] {
-    if (enumValues && enumValues.length > 0) {
-        return 'select';
-    }
+    if (enumValues && enumValues.length > 0) return 'select';
     switch (instance) {
-        case 'String':
-            return 'text';
-        case 'Number':
-            return 'number';
-        case 'Boolean':
-            return 'select'; // On pourrait aussi utiliser 'checkbox', mais 'select' (Oui/Non) est plus simple ici
-        case 'Date':
-            return 'text'; // HTML5 a 'date', mais 'text' est plus simple pour une gestion basique
-        default:
-            return 'text'; // Type par défaut
+        case 'String': return 'text';
+        case 'Number': return 'number';
+        case 'Boolean': return 'select'; // Ou 'checkbox', 'select' (Oui/Non) est simple
+        case 'Date': return 'text'; // HTML5 'date' existe, mais 'text' est plus simple ici
+        default: return 'text';
     }
 }
 
 export async function GET(
-    request: NextRequest,
+    request: NextRequest, // request n'est pas utilisé, mais conservé pour la signature
     { params }: { params: Promise<{ categorySlug: string }> }
 ) {
     const actualParams = await params;
@@ -65,12 +55,9 @@ export async function GET(
     const DiscriminatorModel = ProductOfferModel.discriminators?.[categorySlug];
 
     if (!DiscriminatorModel) {
-        // Pas un slug de catégorie feuille avec un discriminateur enregistré, ou slug invalide
-        // Renvoyer un tableau vide ou un message approprié
-        console.warn(`Aucun discriminateur trouvé pour le slug de catégorie: ${categorySlug}`);
         return NextResponse.json({
             success: true, 
-            message: "Aucun champ de formulaire dynamique spécifique défini pour cette catégorie (pas de discriminateur ou slug invalide).", 
+            message: "Aucun attribut spécifique défini pour cette catégorie.", 
             formFields: [] 
         });
     }
@@ -80,7 +67,6 @@ export async function GET(
     const baseSchemaPaths = ProductOfferModel.schema.paths;
 
     for (const pathName in discriminatorSchemaPaths) {
-        // Exclure les champs du schéma de base et les champs internes Mongoose
         if (baseSchemaPaths[pathName] || pathName === '_id' || pathName === '__v' || pathName === 'kind') {
             continue;
         }
@@ -88,15 +74,20 @@ export async function GET(
         const schemaPath = discriminatorSchemaPaths[pathName];
         const instance = schemaPath.instance;
         const enumValues = schemaPath.options.enum;
-
         const fieldType = mapMongooseTypeToFormType(instance, enumValues);
+        
         const fieldDefinition: FormFieldDefinition = {
             name: pathName,
-            label: generateLabel(pathName), // Générer un libellé basique
+            label: generateLabel(pathName),
             type: fieldType,
             required: schemaPath.isRequired || false,
             placeholder: `Entrez ${generateLabel(pathName).toLowerCase()}`,
-            defaultValue: schemaPath.options.default !== undefined ? schemaPath.options.default : '',
+            // Assurer que defaultValue est une chaîne pour les types 'select' si défini
+            defaultValue: schemaPath.options.default !== undefined 
+                ? (fieldType === 'select' && typeof schemaPath.options.default === 'boolean' 
+                    ? String(schemaPath.options.default) 
+                    : schemaPath.options.default)
+                : '',
         };
 
         if (fieldType === 'select') {
@@ -105,20 +96,17 @@ export async function GET(
                     { value: 'true', label: 'Oui' },
                     { value: 'false', label: 'Non' },
                 ];
-                // Si defaultValue n'est pas explicitement false, et est undefined, on pourrait vouloir le forcer à string 'false' ou 'true'
-                if (typeof fieldDefinition.defaultValue !== 'string' && fieldDefinition.defaultValue !== undefined) {
-                    fieldDefinition.defaultValue = String(fieldDefinition.defaultValue);
-                }
             } else if (enumValues && enumValues.length > 0) {
-                fieldDefinition.options = enumValues.map((val: string | number) => ({ value: String(val), label: generateLabel(String(val)) }));
+                fieldDefinition.options = enumValues.map((val: string | number) => ({ 
+                    value: String(val), 
+                    label: generateLabel(String(val)) 
+                }));
             }
         }
         
         if (schemaPath.options) {
             if (schemaPath.options.min !== undefined) fieldDefinition.min = schemaPath.options.min as number;
             if (schemaPath.options.max !== undefined) fieldDefinition.max = schemaPath.options.max as number;
-            // Mongoose stocke minlength/maxlength dans les validateurs, plus complexe à extraire directement.
-            // Pour une implémentation simple, on pourrait ajouter des options personnalisées au schéma.
         }
 
         formFields.push(fieldDefinition);

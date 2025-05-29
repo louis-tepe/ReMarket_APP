@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import Image from 'next/image';
 import { Edit3, Trash2, PlusCircle, AlertTriangle, Info, Package } from 'lucide-react';
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from 'sonner';
+import type { SellerOffer } from './types';
 
 export interface ProductModelInfo {
     id: string;
@@ -18,44 +19,41 @@ export interface ProductModelInfo {
     imageUrl?: string;
 }
 
-export interface SellerOffer {
-    id: string;
-    productModel: ProductModelInfo;
-    price: number;
-    currency: string;
-    condition: 'new' | 'used_likenew' | 'used_good' | 'used_fair';
-    status: 'available' | 'reserved' | 'sold' | 'pending_shipment' | 'shipped' | 'delivered' | 'cancelled' | 'archived';
-    sellerDescription?: string;
-    sellerPhotos?: string[];
-    createdAt: string;
-}
-
-// Fonction pour traduire les conditions en français
-const translateCondition = (condition: string): string => {
-    const conditionsMap: { [key: string]: string } = {
-        'new': 'Neuf',
-        'used_likenew': 'Comme neuf',
-        'used_good': 'Bon état',
-        'used_fair': 'État correct',
-    };
-    return conditionsMap[condition] || condition;
+// Constants for translations to avoid magic strings and improve maintainability
+const CONDITIONS_MAP: Record<SellerOffer['condition'], string> = {
+    'new': 'Neuf',
+    'used_likenew': 'Comme neuf',
+    'used_good': 'Bon état',
+    'used_fair': 'État correct',
 };
 
-// Fonction pour traduire les statuts en français
-const translateStatus = (status: SellerOffer['status']): string => {
-    const statusMap: { [key: string]: string } = {
-        'available': 'Disponible',
-        'reserved': 'Réservée',
-        'sold': 'Vendu',
-        'pending_shipment': 'Envoi en attente',
-        'shipped': 'Expédiée',
-        'delivered': 'Livrée',
-        'cancelled': 'Annulée',
-        'archived': 'Archivée',
-    };
-    return statusMap[status] || status;
+const STATUS_MAP: Record<SellerOffer['status'], string> = {
+    'available': 'Disponible',
+    'reserved': 'Réservée',
+    'sold': 'Vendu',
+    'pending_shipment': 'Envoi en attente',
+    'shipped': 'Expédiée',
+    'delivered': 'Livrée',
+    'cancelled': 'Annulée',
+    'archived': 'Archivée',
 };
 
+// Helper function to get badge variant based on status
+const getStatusBadgeVariant = (status: SellerOffer['status']): 'default' | 'destructive' | 'outline' | 'secondary' => {
+    switch (status) {
+        case 'available': return 'default';
+        case 'sold': return 'destructive';
+        case 'pending_shipment': return 'outline';
+        case 'archived': return 'secondary';
+        default: return 'default';
+    }
+};
+
+/**
+ * Fetches all offers for a given seller ID.
+ * @param userId - The ID of the seller.
+ * @returns A promise that resolves to an array of SellerOffer.
+ */
 async function fetchSellerOffers(userId: string): Promise<SellerOffer[]> {
     if (!userId) return [];
 
@@ -75,6 +73,9 @@ async function fetchSellerOffers(userId: string): Promise<SellerOffer[]> {
     }
 }
 
+/**
+ * Displays a skeleton loader for the seller dashboard page.
+ */
 function SellerDashboardSkeleton() {
     return (
         <Card>
@@ -114,42 +115,58 @@ function SellerDashboardSkeleton() {
     );
 }
 
+/**
+ * SellerDashboardPage: Displays the seller's offers, allowing them to manage their listings.
+ * Handles loading, error states, and fetches offers based on the authenticated user.
+ */
 export default function SellerDashboardPage() {
     const { data: session, status: sessionStatus } = useSession();
     const [offers, setOffers] = useState<SellerOffer[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // Memoized fetch function to avoid re-creation on every render
+    const loadOffers = useCallback(async (userId: string) => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const fetchedOffers = await fetchSellerOffers(userId);
+            setOffers(fetchedOffers);
+        } catch (err) {
+            console.error('Erreur lors du chargement des offres:', err);
+            const errorMessage = err instanceof Error ? err.message : 'Impossible de charger vos offres pour le moment.';
+            setError(errorMessage);
+            toast.error("Erreur de chargement", { description: errorMessage });
+        } finally {
+            setIsLoading(false);
+        }
+    }, []); // Empty dependency array as it doesn't depend on component state directly
+
     useEffect(() => {
         const userId = (session?.user as { id?: string })?.id;
-
         if (sessionStatus === 'authenticated' && userId) {
-            setIsLoading(true);
-            setError(null);
-            fetchSellerOffers(userId)
-                .then(fetchedOffers => setOffers(fetchedOffers))
-                .catch(err => {
-                    console.error('Erreur lors du chargement des offres:', err);
-                    const errorMessage = 'Impossible de charger vos offres pour le moment.';
-                    setError(errorMessage);
-                    toast.error("Erreur de chargement", { description: errorMessage });
-                })
-                .finally(() => setIsLoading(false));
+            loadOffers(userId);
         } else if (sessionStatus === 'unauthenticated') {
             setError("Veuillez vous connecter pour voir vos offres.");
             setIsLoading(false);
-            // Optionnel: rediriger vers la page de connexion
-            // router.push('/signin');
         } else if (sessionStatus === 'loading') {
-            setIsLoading(true);
+            setIsLoading(true); // Explicitly set loading true while session is resolving
         }
-    }, [sessionStatus, session]);
+    }, [sessionStatus, session, loadOffers]);
 
+    /**
+     * Placeholder for editing an offer.
+     * @param offerId - The ID of the offer to edit.
+     */
     const handleEditOffer = (offerId: string) => {
         console.log(`Modifier l'offre: ${offerId}`);
         toast.info("Fonctionnalité à venir", { description: `La modification de l'offre ${offerId} sera bientôt disponible.` });
     };
 
+    /**
+     * Placeholder for deleting an offer. Shows a confirmation toast.
+     * @param offerId - The ID of the offer to delete.
+     */
     const handleDeleteOffer = async (offerId: string) => {
         toast("Confirmation requise", {
             description: "Êtes-vous sûr de vouloir supprimer cette offre ? Cette action est irréversible.",
@@ -157,27 +174,16 @@ export default function SellerDashboardPage() {
                 label: "Supprimer",
                 onClick: async () => {
                     console.log(`Suppression de l'offre: ${offerId}`);
-                    // TODO: Implémenter l'appel API DELETE /api/offers/${offerId}
-                    // Puis rafraîchir la liste ou filtrer l'offre supprimée
-                    // Exemple: setOffers(prevOffers => prevOffers.filter(offer => offer.id !== offerId));
+                    // TODO: Implement API call: await fetch(`/api/offers/${offerId}`, { method: 'DELETE' });
+                    // On success, update state: setOffers(prev => prev.filter(o => o.id !== offerId));
                     toast.success("Offre supprimée (simulation)", { description: `L'offre ${offerId} a été marquée pour suppression.` });
                 },
             },
             cancel: {
                 label: "Annuler",
-                onClick: () => console.log("Suppression annulée")
+                onClick: () => toast.info("Suppression annulée")
             }
         });
-    };
-
-    const getStatusBadgeVariant = (status: SellerOffer['status']) => {
-        switch (status) {
-            case 'available': return 'default';
-            case 'sold': return 'destructive';
-            case 'pending_shipment': return 'outline';
-            case 'archived': return 'secondary';
-            default: return 'default';
-        }
     };
 
     if (sessionStatus === 'loading' || (isLoading && sessionStatus !== 'unauthenticated')) {
@@ -210,7 +216,7 @@ export default function SellerDashboardPage() {
             <div className="flex justify-between items-center mb-8">
                 <h1 className="text-3xl font-bold">Mes Offres</h1>
                 <Button asChild>
-                    <Link href="/sell"><PlusCircle className="mr-2 h-4 w-4" />Ajouter une nouvelle offre</Link>
+                    <Link href="/account/sell"><PlusCircle className="mr-2 h-4 w-4" />Ajouter une nouvelle offre</Link>
                 </Button>
             </div>
 
@@ -227,7 +233,7 @@ export default function SellerDashboardPage() {
                     </CardContent>
                     <CardFooter className="justify-center">
                         <Button asChild size="lg">
-                            <Link href="/sell"><PlusCircle className="mr-2 h-5 w-5" />Mettre un article en vente</Link>
+                            <Link href="/account/sell"><PlusCircle className="mr-2 h-5 w-5" />Mettre un article en vente</Link>
                         </Button>
                     </CardFooter>
                 </Card>
@@ -264,17 +270,17 @@ export default function SellerDashboardPage() {
                                         </TableCell>
                                         <TableCell>
                                             <div className="font-medium group-hover:text-primary transition-colors">
-                                                <Link href={`/sell/edit/${offer.id}`} className="hover:underline" title={`Modifier ${offer.productModel.name}`}>{offer.productModel.name}</Link>
+                                                <Link href={`/account/sell/edit/${offer.id}`} className="hover:underline" title={`Modifier ${offer.productModel.name}`}>{offer.productModel.name}</Link>
                                             </div>
                                             <div className="text-xs text-muted-foreground md:hidden">
-                                                {offer.price.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} - {translateCondition(offer.condition)}
+                                                {offer.price.toLocaleString('fr-FR', { style: 'currency', currency: offer.currency })} - {CONDITIONS_MAP[offer.condition] || offer.condition}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-right hidden md:table-cell">{offer.price.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</TableCell>
-                                        <TableCell className="hidden md:table-cell">{translateCondition(offer.condition)}</TableCell>
+                                        <TableCell className="text-right hidden md:table-cell">{offer.price.toLocaleString('fr-FR', { style: 'currency', currency: offer.currency })}</TableCell>
+                                        <TableCell className="hidden md:table-cell">{CONDITIONS_MAP[offer.condition] || offer.condition}</TableCell>
                                         <TableCell>
                                             <Badge variant={getStatusBadgeVariant(offer.status)} className="capitalize text-xs whitespace-nowrap">
-                                                {translateStatus(offer.status)}
+                                                {STATUS_MAP[offer.status] || offer.status}
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">{new Date(offer.createdAt).toLocaleDateString('fr-FR')}</TableCell>

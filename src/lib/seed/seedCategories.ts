@@ -156,7 +156,7 @@ function generateCategoryAnalysisPrompt(categoryName: string): string {
 // Fonction pour ajouter/mettre à jour les prompts d'analyse d'image pour les catégories feuilles
 function addAnalysisPromptsToSeedData(categories: SeedCategoryDefinition[]): SeedCategoryDefinition[] {
   return categories.map(category => {
-    let updatedCategory = { ...category };
+    const updatedCategory = { ...category };
     if (!category.children || category.children.length === 0) {
       // C'est une catégorie feuille
       if (!updatedCategory.imageAnalysisPrompt) { // N'écrase pas un prompt déjà défini manuellement

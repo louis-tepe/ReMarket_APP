@@ -3,7 +3,7 @@
   "retiredSessionsCount": 0,
   "sessions": [
     {
-      "id": "session_TtVSpFK5fa",
+      "id": "session_xfl6rXzudp",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -16,14 +16,14 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-05-23T12:23:12.535Z",
-      "createdAt": "2025-05-23T11:33:12.535Z",
+      "expiresAt": "2025-05-29T12:24:07.799Z",
+      "createdAt": "2025-05-29T11:34:07.799Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_MffcD51ZbN",
+      "id": "session_GO8bn4ohtw",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -34,89 +34,89 @@
         "cookies": [
           {
             "key": "JSESSIONID",
-            "value": "F442B56ED9E1BDF960268469B3A1798B",
-            "expires": "2025-05-23T12:23:17.875Z",
+            "value": "6D5585E19269436820DAF6D6764D246F",
+            "expires": "2025-05-29T12:24:12.445Z",
             "domain": "www.idealo.fr",
             "path": "/",
             "httpOnly": true,
             "hostOnly": true,
-            "creation": "2025-05-23T11:33:17.877Z",
-            "lastAccessed": "2025-05-23T11:33:17.877Z"
+            "creation": "2025-05-29T11:34:12.446Z",
+            "lastAccessed": "2025-05-29T11:34:12.446Z"
           },
           {
             "key": "sessionid",
-            "value": "1747999994742_e1031140-20d3-c14e-75c3-0b188a1291c0",
-            "expires": "2025-05-23T13:08:17.193Z",
+            "value": "1748518449737_b8fbadfa-c6b4-de49-f1af-2b44858f0171",
+            "expires": "2025-05-29T13:09:11.996Z",
             "domain": "idealo.fr",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-05-23T11:33:17.878Z",
-            "lastAccessed": "2025-05-23T11:33:17.878Z"
+            "creation": "2025-05-29T11:34:12.447Z",
+            "lastAccessed": "2025-05-29T11:34:12.447Z"
           },
           {
             "key": "ttrjm",
-            "value": "22ee7d5f-313c-15f9-a446-c4a16d51f8a3",
-            "expires": "2025-05-23T13:03:15.764Z",
+            "value": "1585d81d-4c94-e84c-5a0d-6222c8273376",
+            "expires": "2025-05-29T13:04:10.862Z",
             "domain": "idealo.fr",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-05-23T11:33:17.878Z",
-            "lastAccessed": "2025-05-23T11:33:17.878Z"
+            "creation": "2025-05-29T11:34:12.447Z",
+            "lastAccessed": "2025-05-29T11:34:12.447Z"
           },
           {
             "key": "xp_seed_s",
-            "value": "9495d",
-            "expires": "2025-05-23T15:33:15.764Z",
+            "value": "9a52c",
+            "expires": "2025-05-29T15:34:10.862Z",
             "domain": "idealo.fr",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-05-23T11:33:17.879Z",
-            "lastAccessed": "2025-05-23T11:33:17.879Z"
+            "creation": "2025-05-29T11:34:12.448Z",
+            "lastAccessed": "2025-05-29T11:34:12.448Z"
           },
           {
             "key": "bm_sv",
-            "value": "8C2173DAF760F81CD55AA8027B5DBFE3~YAAQH/Q9FySordOWAQAAfjrr/BtGA+GZsLRPHV+95VZnizZMN5+fkYWHnMimjioaFTPlcYsPIQuyXbJGkjImEZu1NZx/A3S0/Mc436+GKfMO5zb6Ce+09Ud3Ax8XUiJhXXDNqUkMnLZc1iKN7gVWb8Ox7YVAXPUzCWrYXsDzK8vlM1Im4Pugrush65dQrLyab+M4yuePIeNzybAA1XIwUnyA8PBCz6ODZjhz7rA4UNg9uhJmOotrlwE8XhQ4iEo=~1",
-            "expires": "2025-05-23T13:33:16.538Z",
+            "value": "089BD2FB55755374478C67DB7519D06F~YAAQHOUuF+prdtmWAQAARTnSGxs9/xvfazIUA6bOIVuQn+kFMCY+5SP9PHLFQA4hpWszwPu1qxBrLPnzV5N7qF/aepTLAl0FL3QQ04YW0XmknDcmWTqnwESjyDBka4E7WMI7oyKdrGmGeC28GeNGl70UNsSe8gb+75uO7ziJEDLk8Do0eHDnz4SMtE6gtFEJFKcDsw7rwXzq5+5HfVHOqMrpIyUM2o9oZt4EDEd8ZlSGGSgW4xMvrozZQY87TPU=~1",
+            "expires": "2025-05-29T13:34:11.445Z",
             "domain": "idealo.fr",
             "path": "/",
             "secure": true,
             "hostOnly": false,
-            "creation": "2025-05-23T11:33:17.879Z",
-            "lastAccessed": "2025-05-23T11:33:17.879Z"
-          },
-          {
-            "key": "ak_bmsc",
-            "value": "891802A11E2332FEEC0E33F5F93095E5~000000000000000000000000000000~YAAQH/Q9FyWordOWAQAAyjvr/Bs7pymVM5cDaX4ooR4JZD9C548o1XptTvXaLJd5RXRVOOKZ3h2Ir83zBdkV/Oyo1xAmekd0k7jxCfLpdShkQwM1xFSp6kKOQQbMsm9PgHEKwLrByFnRVas2f0WPZpe0oQVeEKLeXSKriM/HP3g1shXn1XMVFVSpFYjdprtyOpaeAT30pfnMloDwgEZjDLOVWDJ9ZBzzCqaB+jR/dchy/Ybm6ZVjysZHb6sK8OcStuKpfwN4iOihhyVuN1uG+cC2f6Ajc8NyRYQAzzFKWnI440rC1O3GJ0sDW13ogj5lJMi/9FbiguafEdAoHAWunlWo/cYvPcApCWGKdQqipKM28ayHvgY6MOqwyDB6n6ZKKkpXqVqRG4HnRffiEeet4reTV6goyuzQ6mPEZShiA9Uti7OYCcd8U8OBcTTcG4mM0nQvDUPCDqRZx3HbXtKPowf7uHQleqeMgxdpI8hGWMQ+FEI=",
-            "expires": "2025-05-23T13:33:14.874Z",
-            "domain": "idealo.fr",
-            "path": "/",
-            "hostOnly": false,
-            "creation": "2025-05-23T11:33:17.879Z",
-            "lastAccessed": "2025-05-23T11:33:17.879Z"
+            "creation": "2025-05-29T11:34:12.448Z",
+            "lastAccessed": "2025-05-29T11:34:12.448Z"
           },
           {
             "key": "_cmp_controllerid",
-            "value": "d0585733e85b8b7c6ede52cea5851ac4662e17274b38475cfded3d4f626720dc",
-            "expires": "2026-05-23T11:33:17.000Z",
+            "value": "1df0d35483e4f1f703ae571fa4bf0721c40872a798adae31a94ee6f4e307e91f",
+            "expires": "2026-05-29T11:34:11.000Z",
             "domain": "idealo.fr",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-05-23T11:33:17.879Z",
-            "lastAccessed": "2025-05-23T11:33:17.879Z"
+            "creation": "2025-05-29T11:34:12.448Z",
+            "lastAccessed": "2025-05-29T11:34:12.448Z"
+          },
+          {
+            "key": "ak_bmsc",
+            "value": "BC1F09E4C10B277DC3D4F8181D243B0E~000000000000000000000000000000~YAAQduUuF5a5Q96WAQAAazvSGxtwHCQ0n2r/ScvKuzNcGUi1uRWoVgwwG1c4wvg4+LwbAsvR+FihAhW07TOy42Zm7w74C+lEHTy9z8vzgYjg76l1wFLpagxc7f5C3iJ8g5a0dmCtWNwYt9gJIiRA2Ji5DU8xTY25BniJp3XwfIH0jYmRGAkhT5kvp17UeIY9LBzQz3D3R2j+0ciWs9Tznn23xREGVwV3i9px6zZQ01EafM7CmmqJc3CUqPOtYosNJd7V/2LOGUGWZh1uwnMRFcsB8PJh9+KvxF3aspKACJJmmG6t1eEe31TL0c7L1yQ095+cBCD1clE14gq5lTbrhYVyXtgFqJ4EirjMxD3PWQBTAFLqgBgBfL8A7fC+M6KjasGjepm2lfcb7VYaJpPKwkcMmZMwvDSEDHoW36S4bY+ryWyF3kZOG9Hoh9DcG3b0q7/Czfc=",
+            "expires": "2025-05-29T13:34:08.996Z",
+            "domain": "idealo.fr",
+            "path": "/",
+            "hostOnly": false,
+            "creation": "2025-05-29T11:34:12.448Z",
+            "lastAccessed": "2025-05-29T11:34:12.448Z"
           }
         ]
       },
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-05-23T12:23:12.537Z",
-      "createdAt": "2025-05-23T11:33:12.537Z",
+      "expiresAt": "2025-05-29T12:24:07.801Z",
+      "createdAt": "2025-05-29T11:34:07.801Z",
       "usageCount": 1,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_4d7LbpzGPT",
+      "id": "session_JyT85eWru1",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -129,14 +129,14 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-05-23T12:23:32.182Z",
-      "createdAt": "2025-05-23T11:33:32.182Z",
+      "expiresAt": "2025-05-29T12:24:26.676Z",
+      "createdAt": "2025-05-29T11:34:26.676Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_PPOfMU0YQf",
+      "id": "session_UcCiMxiCqg",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -147,83 +147,83 @@
         "cookies": [
           {
             "key": "sessionid",
-            "value": "1748000013401_3e8dab58-d839-7ffa-b6f5-abc2197fdf82",
-            "expires": "2025-05-23T13:08:35.782Z",
+            "value": "1748518468215_60059033-febd-dab5-f741-b7b2e6fac265",
+            "expires": "2025-05-29T13:09:30.448Z",
             "domain": "idealo.fr",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-05-23T11:33:35.913Z",
-            "lastAccessed": "2025-05-23T11:33:35.913Z"
+            "creation": "2025-05-29T11:34:30.491Z",
+            "lastAccessed": "2025-05-29T11:34:30.491Z"
           },
           {
             "key": "ttrjm",
-            "value": "e5794604-24a6-40c2-d9b0-47c674aefc66",
-            "expires": "2025-05-23T13:03:33.855Z",
+            "value": "c1d37d71-4a24-5b17-b9f5-8ad6de1e1457",
+            "expires": "2025-05-29T13:04:28.755Z",
             "domain": "idealo.fr",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-05-23T11:33:35.913Z",
-            "lastAccessed": "2025-05-23T11:33:35.913Z"
+            "creation": "2025-05-29T11:34:30.491Z",
+            "lastAccessed": "2025-05-29T11:34:30.491Z"
           },
           {
             "key": "xp_seed_s",
-            "value": "0bedf",
-            "expires": "2025-05-23T15:33:33.855Z",
+            "value": "28768",
+            "expires": "2025-05-29T15:34:28.755Z",
             "domain": "idealo.fr",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-05-23T11:33:35.913Z",
-            "lastAccessed": "2025-05-23T11:33:35.913Z"
+            "creation": "2025-05-29T11:34:30.491Z",
+            "lastAccessed": "2025-05-29T11:34:30.491Z"
+          },
+          {
+            "key": "_cmp_controllerid",
+            "value": "eb5680d64b0e746f9f8e538478595bf2972571559b0d1b210527d61ee5e189d5",
+            "expires": "2026-05-29T11:34:29.000Z",
+            "domain": "idealo.fr",
+            "path": "/",
+            "hostOnly": false,
+            "creation": "2025-05-29T11:34:30.491Z",
+            "lastAccessed": "2025-05-29T11:34:30.491Z"
           },
           {
             "key": "JSESSIONID",
-            "value": "7869E373A5E82A679CBD3803AAF9E5D5",
-            "expires": "2025-05-23T12:23:35.913Z",
+            "value": "CA590C4D093B1DB98CF25AF9DA30C2EC",
+            "expires": "2025-05-29T12:24:30.491Z",
             "domain": "www.idealo.fr",
             "path": "/",
             "httpOnly": true,
             "hostOnly": true,
-            "creation": "2025-05-23T11:33:35.913Z",
-            "lastAccessed": "2025-05-23T11:33:35.913Z"
-          },
-          {
-            "key": "_cmp_controllerid",
-            "value": "1e957b2cca90e55f7a13be60c360e7ca7f6b1f1161bf62b1bc7e2613efd438a3",
-            "expires": "2026-05-23T11:33:35.000Z",
-            "domain": "idealo.fr",
-            "path": "/",
-            "hostOnly": false,
-            "creation": "2025-05-23T11:33:35.914Z",
-            "lastAccessed": "2025-05-23T11:33:35.914Z"
+            "creation": "2025-05-29T11:34:30.491Z",
+            "lastAccessed": "2025-05-29T11:34:30.491Z"
           },
           {
             "key": "ak_bmsc",
-            "value": "F7347FF625DF03F383E8AE7749DC20C5~000000000000000000000000000000~YAAQPfQ9F5IIpNKWAQAA5IPr/BtsnnktKMZCRKi/k3iNDuRc0Nar7QVDtKUxGjfwdW3i0R2mTHqdwf+IbG4Lqiq9GWEvZttf/d7N1LVFazldDmof1HuD6ouJt+WrLyT4hLoxhOjIZ8rUv/5DVITH+oUYuf1CUoPQfb9fvxSv33FcKejJBa099gA1wM6uHUByxj4yeNYwc41NK6h2kCUHkQnVA+f9x5YkZlzYWawR4YlSKApYX8nlLg3Z3Twt/x7cWZeTCnLd8eDCusQPf2mxoYYSYmZqEo7PCv7g2JzXIRlxjNCkHE83+1XbvLuFq8qDa43BBgHwmTz7VEIi8DCnxeMicI/CpXikKx5SA28QytQHrdiMloQI4XrwjUeeWZKCXhvl6+RfkdT4hhPXEhzmK99ifuYtxthgEyOTUYWjHGUefUKTVcjDnEgbU4lvujDryZZRauqIA9ut3omoWsmGLLiANkNozjakKoIARw==",
-            "expires": "2025-05-23T13:33:33.328Z",
+            "value": "051D6596D9B40E11507ADBE79DF55449~000000000000000000000000000000~YAAQZOUuF1VzLNqWAQAAfoPSGxsETXiziTJBt+EWxYK2APtJOxiU4RgnWuamSD4AqAykqW07+sEqWGIb69DcBR64eiDX9M1BYPWk46hjhvj7XvAp3ky7vPcTP219CmLwXObz96DFByfUpkyb9QuXtPq0BllR/olHBrOF0MhYV0OdOkaD5ffvWKegmP5dDYpucgGgtjum7dhrOpUPU9iusURavGVlULPPAVppsTLptxqfGmQvV8nsGU/LwScH1oQ7VkaVeyd4Hv08qzd6QyaZ+W2QNyi4fbLBKRCgkPBttEg/QzhGYmH7K0WOLTrI/K8105LJqCYvYP8HNbIyWiVwNrdIIojm4Q0pu+DAvREtpkI36iqF+53Wr6JVzAiZA3WFkvUjwSmQfGV2hzdnxd16yYtW529JbmANotJEp3lfNa8t4ba0uroTBdNVTqAhudRdP938BGU=",
+            "expires": "2025-05-29T13:34:28.448Z",
             "domain": "idealo.fr",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-05-23T11:33:35.914Z",
-            "lastAccessed": "2025-05-23T11:33:35.914Z"
+            "creation": "2025-05-29T11:34:30.491Z",
+            "lastAccessed": "2025-05-29T11:34:30.491Z"
           },
           {
             "key": "bm_sv",
-            "value": "275E713C8F9E19416A284ECD5A75304A~YAAQPfQ9F5MIpNKWAQAA5IPr/BvFb77gN35i5Ly2RF1lUa7rggH6y7CzFp9wg6S4gm9pT3WGkuulcg/qNyrT3j+mv2YakiTL93XrLel58HQAMOp2xjWMzBZJn+5MBbNHodwMetgqT0KbqEQj4XN2srMgHWkURbZ+hIt7tsVTEozMxGGZG6evDcCl54KR5vGqCijBkhYReAmq14FuAuU3Hj+e4u+CY2nRibMq8hgXLH6r5TewUdQDqDBxFiInNcM=~1",
-            "expires": "2025-05-23T13:33:35.328Z",
+            "value": "D8B9189DE9C2BC20DC19F79531882D16~YAAQZOUuF1ZzLNqWAQAAfoPSGxszRegm9Ro4uTUShXwroqM660LPkrQcvihQD8kiNmBEYXD1es7w5BUyTgMKGmWW5TWX8e7dXyVJYvazdDHzB8pIe9rb4nFbXg34rX8QwJ3q7uoJOTCMDQEddgn52vBLIc0zNHOva7Rb5r+QqNAfsMsGe/wHyfWjvJl+8V+Bm09BRXN4emT5Q+KtP3XNqSQ2PsYrba/ZNz1aIcbrWWQXKAClWjfxjOlAQ4UhtZ0=~1",
+            "expires": "2025-05-29T13:34:30.448Z",
             "domain": "idealo.fr",
             "path": "/",
             "secure": true,
             "hostOnly": false,
-            "creation": "2025-05-23T11:33:35.914Z",
-            "lastAccessed": "2025-05-23T11:33:35.914Z"
+            "creation": "2025-05-29T11:34:30.491Z",
+            "lastAccessed": "2025-05-29T11:34:30.491Z"
           }
         ]
       },
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-05-23T12:23:32.183Z",
-      "createdAt": "2025-05-23T11:33:32.183Z",
+      "expiresAt": "2025-05-29T12:24:26.679Z",
+      "createdAt": "2025-05-29T11:34:26.679Z",
       "usageCount": 1,
       "maxUsageCount": 50,
       "errorScore": 0

@@ -77,13 +77,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ response: result });
 
   } catch (error) {
-    // console.error("[API_GENERATE_ERROR]", error);
+    // Le console.error a été supprimé pour la concision.
     const errorMessage =
       error instanceof Error ? error.message : "Une erreur inconnue est survenue";
     // Évitez de propager des messages d'erreur trop techniques au client en production
     if (errorMessage.includes("API key") || errorMessage.includes("billing") || errorMessage.includes("quota") || errorMessage.includes("Access denied")) {
         return NextResponse.json({ error: "Erreur de configuration ou de service. Veuillez contacter l'administrateur." }, { status: 500 });
     }
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    // Message d'erreur générique pour les autres cas
+    return NextResponse.json({ error: "Erreur lors de la génération du contenu." }, { status: 500 });
   }
 } 

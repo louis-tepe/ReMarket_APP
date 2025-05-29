@@ -1,9 +1,28 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db.Connect';
 import ProductOfferModel, { IProductBase } from '@/models/ProductBaseModel';
-import ProductModel, { IProductModel } from '@/models/ProductModel'; // Assurez-vous que ProductModel est importé
-import { SellerOffer, ProductModelInfo } from '@/app/(main)/dashboard/sales/page'; // Importez les types nécessaires
-import { Types } from 'mongoose'; // Importer Types
+import ProductModel, { IProductModel } from '@/models/ProductModel';
+import { Types } from 'mongoose';
+
+// Interface pour les informations de modèle de produit
+interface ProductModelInfo {
+    id: string;
+    name: string;
+    imageUrl?: string;
+}
+
+// Interface pour les offres du vendeur
+interface SellerOffer {
+    id: string;
+    productModel: ProductModelInfo;
+    price: number;
+    currency: string;
+    condition: 'new' | 'used_likenew' | 'used_good' | 'used_fair';
+    status: 'available' | 'reserved' | 'sold' | 'pending_shipment' | 'shipped' | 'delivered' | 'cancelled' | 'archived';
+    sellerDescription?: string;
+    sellerPhotos?: string[];
+    createdAt: string;
+}
 
 // Helper function pour mapper les données du modèle aux types de l'interface SellerOffer
 function mapToSellerOffer(offerDoc: IProductBase): SellerOffer {
@@ -92,7 +111,6 @@ export async function GET(
         return NextResponse.json(formattedOffers, { status: 200 });
 
     } catch (error) {
-        // console.error('Failed to fetch seller offers:', error);
         // Gestion plus détaillée des erreurs ici si nécessaire
         const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
         return NextResponse.json({ message: 'Failed to fetch offers', error: errorMessage }, { status: 500 });

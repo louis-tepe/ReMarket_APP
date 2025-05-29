@@ -97,19 +97,19 @@ export default function Header() {
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem asChild>
-                            <Link href="/dashboard/sales">
+                            <Link href="/account/sales">
                                 <LayoutDashboard className="mr-2 h-4 w-4" />
                                 Tableau de bord
                             </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
-                            <Link href="/favorites">
+                            <Link href="/account/favorites">
                                 <Heart className="mr-2 h-4 w-4" />
-                                Mes Favoris
+                                Mes favoris
                             </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
-                            <Link href="/settings">
+                            <Link href="/account/settings">
                                 <Settings className="mr-2 h-4 w-4" />
                                 Paramètres
                             </Link>
@@ -144,7 +144,7 @@ export default function Header() {
                         </Link>
                     </Button>
                     <Button variant="ghost" size="icon" asChild>
-                        <Link href="/cart" aria-label="Panier">
+                        <Link href="/account/cart" aria-label="Panier">
                             <ShoppingCart className="h-5 w-5" />
                         </Link>
                     </Button>

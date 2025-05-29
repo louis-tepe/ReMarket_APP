@@ -24,10 +24,9 @@ export async function POST(request: NextRequest) {
     // Créer le dossier de destination s'il n'existe pas
     try {
       await fs.mkdir(uploadDir, { recursive: true });
-      // console.log(`[API UPLOAD] Dossier d'upload assuré: ${uploadDir}`);
-    } catch (mkdirError) {
-      // console.error("[API UPLOAD] Erreur lors de la création du dossier d'upload:", mkdirError);
-      return NextResponse.json({ success: false, message: "Erreur serveur lors de la création du dossier d'upload." }, { status: 500 });
+    } catch {
+      // Message d'erreur simplifié
+      return NextResponse.json({ success: false, message: "Erreur serveur lors de la préparation de l'upload." }, { status: 500 });
     }
 
     const uploadedImageUrls: string[] = [];
@@ -41,9 +40,9 @@ export async function POST(request: NextRequest) {
         const fileBuffer = Buffer.from(await file.arrayBuffer());
         await fs.writeFile(filePath, fileBuffer);
         uploadedImageUrls.push(publicUrl);
-        // console.log(`[API UPLOAD] Fichier '${file.name}' sauvegardé localement: ${filePath} (URL: ${publicUrl})`);
-      } catch (writeError) {
-        // console.error(`[API UPLOAD] Erreur lors de l'écriture du fichier ${file.name}:`, writeError);
+      } catch {
+        // Le log de l'erreur d'écriture individuelle est supprimé pour éviter la verbosité.
+        // L'échec sera capturé par la vérification `uploadedImageUrls.length` plus bas.
       }
     }
     
@@ -54,7 +53,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, urls: uploadedImageUrls }, { status: 200 });
 
   } catch (error) {
-    // console.error('[API UPLOAD] Erreur lors du traitement des fichiers:', error);
+    // Le console.error général est supprimé.
     const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue lors de l\'upload.';
     return NextResponse.json({ success: false, message: 'Erreur serveur lors de l\'upload des images.', error: errorMessage }, { status: 500 });
   }

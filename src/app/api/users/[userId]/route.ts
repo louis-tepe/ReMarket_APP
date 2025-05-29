@@ -45,7 +45,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ userId
         return NextResponse.json(updatedUser, { status: 200 });
 
     } catch (error) {
-        // console.error('Erreur lors de la mise à jour du profil utilisateur:', error);
         if (error instanceof Error && error.name === 'ValidationError') {
             interface MongooseValidationError {
                 errors: { [path: string]: { message: string; name?: string; kind?: string; path?: string; value?: unknown } };

@@ -1,10 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from '@/lib/authOptions';
 import dbConnect from '@/lib/db.Connect';
 import ProductOfferModel, { IProductBase } from '@/models/ProductBaseModel';
-import ProductModel from '@/models/ProductModel'; // Pour populer productModel
-import UserModel from '@/models/User'; // Pour populer seller
+import ProductModel from '@/models/ProductModel';
+import UserModel from '@/models/User';
 import { Types } from 'mongoose';
 
 /**
@@ -59,14 +59,22 @@ import { Types } from 'mongoose';
  *       500:
  *         description: Erreur serveur.
  */
+
+// Champs autorisés pour la mise à jour d'une offre
+const ALLOWED_OFFER_UPDATE_FIELDS = ['price', 'condition', 'description', 'images', 'stockQuantity', 'specificFields']; // 'specificFields' pour les champs dynamiques
+
 export async function PUT(
-  request: Request,
-  { params }: { params: { offerid: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ offerid: string }> }
 ) {
-  const { offerid } = params;
+  const { offerid } = await params;
+  if (!offerid || !Types.ObjectId.isValid(offerid)) {
+    return NextResponse.json({ message: "ID d'offre invalide ou manquant." }, { status: 400 });
+  }
+
   const session = await getServerSession(authOptions);
-  if (!session || !session.user?.id) {
-    return NextResponse.json({ message: 'Non autorisé' }, { status: 401 });
+  if (!session?.user?.id) {
+    return NextResponse.json({ message: 'Authentification requise.' }, { status: 401 });
   }
   const userId = session.user.id;
 
@@ -78,25 +86,47 @@ export async function PUT(
     if (!offer) {
       return NextResponse.json({ message: 'Offre non trouvée.' }, { status: 404 });
     }
-
     if (offer.seller.toString() !== userId) { 
-      return NextResponse.json({ message: 'Interdit de modifier cette offre.' }, { status: 403 });
+      return NextResponse.json({ message: 'Action non autorisée sur cette offre.' }, { status: 403 });
     }
-    if (offer.transactionStatus === 'sold' || offer.transactionStatus === 'shipped') { 
-      return NextResponse.json({ message: 'Cette offre ne peut plus être modifiée car elle est vendue ou expédiée.' }, { status: 403 });
+    if (offer.transactionStatus === 'sold' || offer.transactionStatus === 'shipped' || offer.listingStatus === 'rejected') { 
+      return NextResponse.json({ message: 'Cette offre ne peut plus être modifiée.' }, { status: 403 });
     }
 
-    const { productModel, seller, listingStatus, transactionStatus, kind, ...updateData } = body;
+    // Filtrer le corps de la requête pour ne garder que les champs modifiables
+    const updateData: Partial<IProductBase> & Record<string, unknown> = {};
+    for (const key in body) {
+        if (ALLOWED_OFFER_UPDATE_FIELDS.includes(key) || offer.schema.pathType(key) === 'real') { // Accepter aussi les champs du discriminateur
+            // Attention: specificFields doit être traité correctement si c'est un objet imbriqué
+            if (key === 'specificFields' && typeof body[key] === 'object') {
+                 Object.assign(updateData, body[key]); // Écraser les champs spécifiques directement à la racine
+            } else {
+                updateData[key] = body[key];
+            }
+        }
+    }
+    // S'assurer que les champs non modifiables ne sont pas passés
+    delete updateData.productModel;
+    delete updateData.seller;
+    delete updateData.listingStatus;
+    delete updateData.transactionStatus;
+    delete updateData.kind;
+    delete updateData.category;
+
+    if (Object.keys(updateData).length === 0) {
+        return NextResponse.json({ message: "Aucune donnée valide à mettre à jour." }, { status: 400 });
+    }
+
     const updatedOffer = await ProductOfferModel.findByIdAndUpdate(offerid, { $set: updateData }, { new: true, runValidators: true });
 
     return NextResponse.json(updatedOffer, { status: 200 });
   } catch (error) {
-    console.error(`[PUT /api/offers/${offerid}]`, error);
-    const errorMessage = error instanceof Error ? error.message : (typeof error === 'string' ? error : "Erreur inconnue lors de la mise à jour de l'offre.");
+    // console.error(`[PUT /api/offers/${offerid}]`, error); // Log serveur optionnel
+    const errorMessage = error instanceof Error ? error.message : "Erreur inconnue.";
     if (error instanceof Error && (error.name === 'ValidationError' || error.name === 'CastError')) {
-        return NextResponse.json({ message: 'Erreur de validation des données ou ID invalide.', error: error.message }, { status: 400 });
+        return NextResponse.json({ message: 'Données invalides.', errorDetails: errorMessage }, { status: 400 });
     }
-    return NextResponse.json({ message: "Erreur lors de la mise à jour de l'offre.", error: errorMessage }, { status: 500 });
+    return NextResponse.json({ message: "Erreur serveur lors de la mise à jour.", errorDetails: errorMessage }, { status: 500 });
   }
 }
 
@@ -128,45 +158,34 @@ export async function PUT(
  *         description: Erreur serveur.
  */
 export async function GET(
-  request: Request,
-  { params }: { params: { offerid: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ offerid: string }> }
 ) {
-  const { offerid } = params;
-
+  const { offerid } = await params;
   if (!offerid || !Types.ObjectId.isValid(offerid)) {
-    return NextResponse.json({ message: "ID de l'offre invalide ou manquant." }, { status: 400 });
+    return NextResponse.json({ message: "ID d'offre invalide ou manquant." }, { status: 400 });
   }
 
   try {
     await dbConnect();
-
     const offer = await ProductOfferModel.findById(offerid)
-      .populate({
-        path: 'productModel',
-        model: ProductModel,
-        select: 'title slug standardImageUrls brand category',
-        populate: [
-            { path: 'brand', select: 'name slug' },
-            { path: 'category', select: 'name slug' }
-        ]
-      })
-      .populate({
-        path: 'seller',
-        model: UserModel,
-        select: 'name username _id'
-      })
-      .lean() as IProductBase | null;
+      .populate([
+          { 
+            path: 'productModel', model: ProductModel, select: 'title slug standardImageUrls brand category',
+            populate: [{ path: 'brand', select: 'name slug' }, { path: 'category', select: 'name slug'}]
+          },
+          { path: 'seller', model: UserModel, select: 'name username _id' }
+      ])
+      .lean<IProductBase | null>();
 
     if (!offer) {
       return NextResponse.json({ message: 'Offre non trouvée.' }, { status: 404 });
     }
-
     return NextResponse.json(offer, { status: 200 });
-
   } catch (error) {
-    console.error(`[GET /api/offers/${offerid}]`, error);
+    // console.error(`[GET /api/offers/${offerid}]`, error); // Log serveur optionnel
     const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue.';
-    return NextResponse.json({ message: "Erreur lors de la récupération de l'offre.", error: errorMessage }, { status: 500 });
+    return NextResponse.json({ message: "Erreur serveur lors de la récupération.", errorDetails: errorMessage }, { status: 500 });
   }
 }
 
@@ -198,20 +217,19 @@ export async function GET(
  *         description: Erreur serveur.
  */
 export async function DELETE(
-  request: Request,
-  { params }: { params: { offerid: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ offerid: string }> }
 ) {
-  const { offerid } = params;
-  const session = await getServerSession(authOptions);
+  const { offerid } = await params;
+  if (!offerid || !Types.ObjectId.isValid(offerid)) {
+    return NextResponse.json({ message: "ID d'offre invalide ou manquant." }, { status: 400 });
+  }
 
-  if (!session || !session.user?.id) {
-    return NextResponse.json({ message: 'Non autorisé' }, { status: 401 });
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ message: 'Authentification requise.' }, { status: 401 });
   }
   const userId = session.user.id;
-
-  if (!offerid || !Types.ObjectId.isValid(offerid)) {
-    return NextResponse.json({ message: "ID de l'offre invalide ou manquant." }, { status: 400 });
-  }
 
   try {
     await dbConnect();
@@ -220,30 +238,32 @@ export async function DELETE(
     if (!offer) {
       return NextResponse.json({ message: 'Offre non trouvée.' }, { status: 404 });
     }
-
     if (offer.seller.toString() !== userId) {
-      return NextResponse.json({ message: "Action non autorisée. Vous n'êtes pas le propriétaire de cette offre." }, { status: 403 });
+      return NextResponse.json({ message: "Action non autorisée sur cette offre." }, { status: 403 });
     }
-
+    if (offer.listingStatus === 'inactive') {
+      return NextResponse.json({ message: 'L\'offre est déjà désactivée.' }, { status: 400 });
+    }
     if (offer.transactionStatus === 'sold' || offer.transactionStatus === 'shipped') {
-      return NextResponse.json({ message: 'Impossible de supprimer une offre vendue ou expédiée.' }, { status: 403 });
+      return NextResponse.json({ message: 'Impossible de désactiver une offre vendue ou expédiée.' }, { status: 403 });
     }
 
-    const archivedOffer = await ProductOfferModel.findByIdAndUpdate(
+    const deactivatedOffer = await ProductOfferModel.findByIdAndUpdate(
         offerid,
-        { $set: { listingStatus: 'archived', transactionStatus: 'archived' } }, 
+        { $set: { listingStatus: 'inactive', transactionStatus: 'cancelled' } }, 
         { new: true }
     );
 
-    if (!archivedOffer) {
-        return NextResponse.json({ message: "Offre non trouvée lors de la tentative d'archivage." }, { status: 404 });
+    if (!deactivatedOffer) {
+        // Ce cas ne devrait pas arriver si l'offre a été trouvée initialement
+        return NextResponse.json({ message: "Erreur lors de la désactivation de l'offre." }, { status: 500 });
     }
 
-    return NextResponse.json({ message: 'Offre archivée avec succès.', offerId: offerid }, { status: 200 });
+    return NextResponse.json({ message: 'Offre désactivée avec succès.', offerId: offerid }, { status: 200 });
 
   } catch (error) {
-    console.error(`[DELETE /api/offers/${offerid}]`, error);
+    // console.error(`[DELETE /api/offers/${offerid}]`, error); // Log serveur optionnel
     const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue.';
-    return NextResponse.json({ message: "Erreur lors de la suppression/archivage de l'offre.", error: errorMessage }, { status: 500 });
+    return NextResponse.json({ message: "Erreur serveur lors de la désactivation.", errorDetails: errorMessage }, { status: 500 });
   }
 }

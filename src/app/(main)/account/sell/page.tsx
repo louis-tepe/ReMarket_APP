@@ -1,7 +1,6 @@
 'use client';
 
-import React from 'react';
-import { useState, ChangeEvent, FormEvent, useEffect } from 'react';
+import React, { useState, ChangeEvent, FormEvent, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,49 +9,30 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from "sonner";
-import type { IProductModel as IProductModelReMarketType } from '@/models/ProductModel';
 import { useSession } from "next-auth/react";
-import type {
+import {
+    FrontendCategory,
+    CategoryDropdownLevel,
+    OfferDetails,
     ProductModelReMarketSelectItem,
     DisplayableProductModel,
+    FormFieldDefinition,
     AttributeItem,
-    Specifications
+    Specifications,
+    IBrand
 } from './types';
-import type { FormFieldDefinition } from '@/types/form.types.ts';
-import type { ICategory as BackendCategory } from '@/models/CategoryModel';
-import { IBrand } from '@/models/BrandModel';
+import { NOT_LISTED_ID } from './types';
 import { Loader2, CheckCircle, ArrowRight, RefreshCcw, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-const NOT_LISTED_ID = "---PRODUCT_NOT_LISTED---";
-
-interface FrontendCategory extends Omit<BackendCategory, '_id' | 'parent' | 'createdAt' | 'updatedAt'> {
-    _id: string;
-    name: string;
-    slug: string;
-    depth: number;
-    isLeafNode: boolean;
-    parent?: string;
-    createdAt?: string;
-    updatedAt?: string;
-}
-
-interface CategoryDropdownLevel {
-    level: number;
-    parentId: string | null;
-    options: FrontendCategory[];
-    selectedId: string | null;
-    placeholder: string;
-}
-
-export interface OfferDetails {
-    price: string;
-    currency: 'EUR';
-    condition: 'new' | 'like-new' | 'good' | 'fair' | 'poor';
-    sellerDescription: string;
-    photos: File[];
-    stockQuantity: string;
-}
+const INITIAL_OFFER_DETAILS: OfferDetails = {
+    price: '',
+    currency: 'EUR',
+    condition: 'good',
+    sellerDescription: '',
+    photos: [],
+    stockQuantity: '1',
+};
 
 export default function SellPage() {
     const [step, setStep] = useState(1);
@@ -71,15 +51,7 @@ export default function SellPage() {
     const [showCreateByName, setShowCreateByName] = useState(false);
     const [newProductModelName, setNewProductModelName] = useState('');
     const [selectedProductModel, setSelectedProductModel] = useState<DisplayableProductModel | null>(null);
-    const initialOfferDetails: OfferDetails = {
-        price: '',
-        currency: 'EUR',
-        condition: 'good',
-        sellerDescription: '',
-        photos: [],
-        stockQuantity: '1',
-    };
-    const [offerDetails, setOfferDetails] = useState<OfferDetails>(initialOfferDetails);
+    const [offerDetails, setOfferDetails] = useState<OfferDetails>(INITIAL_OFFER_DETAILS);
     const [categorySpecificFormFields, setCategorySpecificFormFields] = useState<FormFieldDefinition[]>([]);
     const [offerSpecificFieldValues, setOfferSpecificFieldValues] = useState<Record<string, string | number | boolean | File | File[]>>({});
 
@@ -90,7 +62,7 @@ export default function SellPage() {
     const [isLoadingFullProduct, setIsLoadingFullProduct] = useState(false);
     const [isLoadingSubmitOffer, setIsLoadingSubmitOffer] = useState(false);
 
-    const resetSellProcess = () => {
+    const resetSellProcess = useCallback(() => {
         setStep(1);
         setCategoryDropdowns([]);
         setFinalSelectedLeafCategory(null);
@@ -101,7 +73,9 @@ export default function SellPage() {
         setSelectedProductModel(null);
         setShowCreateByName(false);
         setNewProductModelName('');
-        setOfferDetails(initialOfferDetails);
+        setOfferDetails(INITIAL_OFFER_DETAILS);
+        setOfferSpecificFieldValues({});
+        setCategorySpecificFormFields([]);
         if (allCategories.length > 0) {
             setCategoryDropdowns([
                 {
@@ -113,7 +87,7 @@ export default function SellPage() {
                 }
             ]);
         }
-    };
+    }, [allCategories]);
 
     useEffect(() => {
         setIsLoadingCategories(true);
@@ -197,7 +171,7 @@ export default function SellPage() {
     const fetchCategorySpecificFormFields = async (categorySlug: string) => {
         if (!categorySlug) return;
         try {
-            const response = await fetch(`/api/categories/${categorySlug}/form`);
+            const response = await fetch(`/api/categories/${categorySlug}/attributes`);
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 throw new Error(errorData.message || `Erreur ${response.status} lors du chargement du formulaire.`);
@@ -327,7 +301,7 @@ export default function SellPage() {
         setShowCreateByName(false);
     };
 
-    const handleSelectProductModelReMarket = async (productModelId: string) => {
+    const handleSelectProductModelReMarket = useCallback(async (productModelId: string) => {
         setSelectedProductModelReMarketId(productModelId);
         if (productModelId === NOT_LISTED_ID) {
             setShowCreateByName(true);
@@ -341,24 +315,21 @@ export default function SellPage() {
         setIsLoadingFullProduct(true);
         try {
             const response = await fetch(`/api/product-models/${productModelId}`);
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: `Erreur HTTP: ${response.status} - ${response.statusText}` }));
-                throw new Error(errorData.message);
-            }
-            const fullProductModel = (await response.json()) as IProductModelReMarketType & { _id: string };
+            const fullProductModelData = await response.json();
+            if (!response.ok) throw new Error(fullProductModelData.message || "Erreur chargement détail produit.");
+            const fullProductModel = fullProductModelData as DisplayableProductModel;
             setSelectedProductModel(fullProductModel);
             setStep(2);
-            toast.success("Produit ReMarket sélectionné", { description: `Prêt à décrire votre offre pour : ${fullProductModel.title}` });
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : "Impossible de charger les détails du produit.";
-            toast.error("Erreur Chargement Produit", { description: errorMessage });
+            toast.success("Produit ReMarket sélectionné", { description: `Prêt à décrire: ${fullProductModel.title}` });
+        } catch (error) {
+            toast.error("Erreur Chargement Produit", { description: (error as Error).message });
             setSelectedProductModelReMarketId(null);
         } finally {
             setIsLoadingFullProduct(false);
         }
-    };
+    }, [brands, selectedBrandId]);
 
-    const handleScrapeNewProductModel = async (e: FormEvent) => {
+    const handleScrapeNewProductModel = useCallback(async (e: FormEvent) => {
         e.preventDefault();
         const trimmedNewProductModelName = newProductModelName.trim();
         if (!trimmedNewProductModelName) {
@@ -389,26 +360,19 @@ export default function SellPage() {
                 }),
             });
             const data = await response.json();
-            if (!response.ok) {
-                throw new Error(data.message || `Erreur ${response.status} lors de la création/scraping du produit.`);
-            }
+            if (!response.ok) throw new Error(data.message || "Erreur création/scraping produit.");
 
-            if (data.productModel) {
+            if (data.productModel?._id) {
                 setIsLoadingFullProduct(true);
                 const pmResponse = await fetch(`/api/product-models/${data.productModel._id}`);
-                if (!pmResponse.ok) {
-                    const errorData = await pmResponse.json().catch(() => ({ message: "Erreur interne en rechargeant le produit standardisé." }));
-                    throw new Error(errorData.message);
-                }
-                const fullProductModelForDisplay = await pmResponse.json() as DisplayableProductModel;
+                const fullProductModelForDisplayData = await pmResponse.json();
+                if (!pmResponse.ok) throw new Error(fullProductModelForDisplayData.message || "Erreur recharge produit standardisé.");
+                const fullProductModelForDisplay = fullProductModelForDisplayData as DisplayableProductModel;
                 setSelectedProductModel(fullProductModelForDisplay);
                 setStep(2);
                 toast.success("Produit Prêt !", { description: `Les informations pour "${fullProductModelForDisplay.title}" sont prêtes pour votre offre.` });
-            } else if (data.error) {
-                toast.error("Erreur Standardisation Produit", { description: `Le produit "${data.productModel?.rawTitle || nameForScraping}" n'a pas pu être correctement traité: ${data.error}. Essayez de modifier le nom.` });
-                if (data.productModel) setSelectedProductModel(data.productModel as DisplayableProductModel);
             } else {
-                toast.error("Produit Non Trouvé/Standardisé", { description: `Aucune information pour "${nameForScraping}" n'a pu être trouvée ou standardisée. Veuillez réessayer.` });
+                throw new Error(data.error || data.message || `Produit "${nameForScraping}" non trouvé/standardisé.`);
             }
 
         } catch (error: unknown) {
@@ -418,7 +382,7 @@ export default function SellPage() {
             setIsLoadingCreate(false);
             setIsLoadingFullProduct(false);
         }
-    };
+    }, [newProductModelName, brands, selectedBrandId, finalSelectedLeafCategory]);
 
     const handleOfferDetailsChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         setOfferDetails(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -441,7 +405,7 @@ export default function SellPage() {
         }
     };
 
-    const handleSubmitOffer = async (e: FormEvent) => {
+    const handleSubmitOffer = useCallback(async (e: FormEvent) => {
         e.preventDefault();
         const userId = (session?.user as { id?: string })?.id;
         if (sessionStatus !== 'authenticated' || !userId) {
@@ -468,7 +432,7 @@ export default function SellPage() {
 
             try {
                 toast.info("Téléversement des images...", { id: "upload-toast" });
-                const uploadResponse = await fetch('/api/upload/images', {
+                const uploadResponse = await fetch('/api/services/media/upload/images', {
                     method: 'POST',
                     body: photoFormData,
                 });
@@ -487,9 +451,8 @@ export default function SellPage() {
             }
         }
 
-        // Récupérer les valeurs spécifiques à la catégorie
-        // et s'assurer de leur bon typage avant de construire le payload final.
-        const typedOfferSpecificFieldValues: Record<string, any> = {};
+        const typedOfferSpecificFieldValues: Record<string, string | number | boolean> = {};
+
         if (finalSelectedLeafCategory?.slug === 'laptops') {
             typedOfferSpecificFieldValues.screenSize_in = parseFloat(String(offerSpecificFieldValues.screenSize_in || '0'));
             typedOfferSpecificFieldValues.processor = String(offerSpecificFieldValues.processor || '');
@@ -498,54 +461,86 @@ export default function SellPage() {
             typedOfferSpecificFieldValues.storageCapacity_gb = parseInt(String(offerSpecificFieldValues.storageCapacity_gb || '0'), 10);
             typedOfferSpecificFieldValues.graphicsCard = String(offerSpecificFieldValues.graphicsCard || '');
             typedOfferSpecificFieldValues.operatingSystem = String(offerSpecificFieldValues.operatingSystem || '');
-            let webcamValue = offerSpecificFieldValues.hasWebcam;
-            if (typeof webcamValue === 'string') {
-                typedOfferSpecificFieldValues.hasWebcam = webcamValue.toLowerCase() === 'true';
-            } else {
-                typedOfferSpecificFieldValues.hasWebcam = Boolean(webcamValue);
-            }
+            const webcamValue = offerSpecificFieldValues.hasWebcam;
+            typedOfferSpecificFieldValues.hasWebcam = typeof webcamValue === 'string' ? webcamValue.toLowerCase() === 'true' : Boolean(webcamValue);
             typedOfferSpecificFieldValues.color = String(offerSpecificFieldValues.color || '');
         } else if (finalSelectedLeafCategory?.slug === 'smartphones') {
-            typedOfferSpecificFieldValues.screenSize_in = parseFloat(String(offerSpecificFieldValues.screenSize_in || '0'));
-            typedOfferSpecificFieldValues.storageCapacity_gb = parseInt(String(offerSpecificFieldValues.storageCapacity_gb || '0'), 10);
-            typedOfferSpecificFieldValues.ram_gb = parseInt(String(offerSpecificFieldValues.ram_gb || '0'), 10);
-            typedOfferSpecificFieldValues.cameraResolution_mp = parseFloat(String(offerSpecificFieldValues.cameraResolution_mp || '0')) || undefined;
-            typedOfferSpecificFieldValues.batteryCapacity_mah = parseInt(String(offerSpecificFieldValues.batteryCapacity_mah || '0'), 10) || undefined;
+            const parseNumericOrUndefined = (val: string | number | boolean | File | File[] | undefined): number | undefined => {
+                const strVal = String(val || '');
+                if (!strVal) return undefined;
+                const num = parseFloat(strVal);
+                return isNaN(num) || num === 0 ? undefined : num;
+            };
+            const parseIntOrUndefined = (val: string | number | boolean | File | File[] | undefined): number | undefined => {
+                const strVal = String(val || '');
+                if (!strVal) return undefined;
+                const num = parseInt(strVal, 10);
+                return isNaN(num) || num === 0 ? undefined : num;
+            };
+            const parseStringOrUndefined = (val: string | number | boolean | File | File[] | undefined): string | undefined => {
+                const str = String(val || '');
+                return str === '' ? undefined : str;
+            };
+
+            const screenSize = parseNumericOrUndefined(offerSpecificFieldValues.screenSize_in);
+            if (screenSize !== undefined) typedOfferSpecificFieldValues.screenSize_in = screenSize;
+            else delete typedOfferSpecificFieldValues.screenSize_in;
+
+            const storageCapacity = parseIntOrUndefined(offerSpecificFieldValues.storageCapacity_gb);
+            if (storageCapacity !== undefined) typedOfferSpecificFieldValues.storageCapacity_gb = storageCapacity;
+            else delete typedOfferSpecificFieldValues.storageCapacity_gb;
+
+            const ram = parseIntOrUndefined(offerSpecificFieldValues.ram_gb);
+            if (ram !== undefined) typedOfferSpecificFieldValues.ram_gb = ram;
+            else delete typedOfferSpecificFieldValues.ram_gb;
+
+            const cameraResolution = parseNumericOrUndefined(offerSpecificFieldValues.cameraResolution_mp);
+            if (cameraResolution !== undefined) typedOfferSpecificFieldValues.cameraResolution_mp = cameraResolution;
+            else delete typedOfferSpecificFieldValues.cameraResolution_mp;
+
+            const batteryCapacity = parseIntOrUndefined(offerSpecificFieldValues.batteryCapacity_mah);
+            if (batteryCapacity !== undefined) typedOfferSpecificFieldValues.batteryCapacity_mah = batteryCapacity;
+            else delete typedOfferSpecificFieldValues.batteryCapacity_mah;
+
             typedOfferSpecificFieldValues.operatingSystem = String(offerSpecificFieldValues.operatingSystem || '');
             typedOfferSpecificFieldValues.color = String(offerSpecificFieldValues.color || '');
-            typedOfferSpecificFieldValues.imei = String(offerSpecificFieldValues.imei || '') || undefined;
-            if (typedOfferSpecificFieldValues.cameraResolution_mp === 0) delete typedOfferSpecificFieldValues.cameraResolution_mp;
-            if (typedOfferSpecificFieldValues.batteryCapacity_mah === 0) delete typedOfferSpecificFieldValues.batteryCapacity_mah;
-            if (typedOfferSpecificFieldValues.imei === '') delete typedOfferSpecificFieldValues.imei;
+
+            const imei = parseStringOrUndefined(offerSpecificFieldValues.imei);
+            if (imei !== undefined) typedOfferSpecificFieldValues.imei = imei;
+            else delete typedOfferSpecificFieldValues.imei;
+
         } else {
-            Object.assign(typedOfferSpecificFieldValues, offerSpecificFieldValues);
+            Object.keys(offerSpecificFieldValues).forEach(key => {
+                const value = offerSpecificFieldValues[key];
+                if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+                    typedOfferSpecificFieldValues[key] = value;
+                }
+            });
         }
 
-        const payload = {
-            productModelId: selectedProductModel._id.toString(),
-            price: parseFloat(offerDetails.price), // Assuré d'être un nombre
+        const payload: Record<string, string | number | boolean | string[]> = { // More specific than any
+            productModelId: selectedProductModel!._id.toString(),
+            price: parseFloat(offerDetails.price),
             currency: offerDetails.currency || 'EUR',
             condition: offerDetails.condition,
             description: offerDetails.sellerDescription,
-            images: uploadedPhotoUrls,
-            stockQuantity: parseInt(offerDetails.stockQuantity, 10) || 1, // Assuré d'être un nombre
-
-            ...typedOfferSpecificFieldValues, // Valeurs spécifiques à la catégorie, maintenant typées
-
+            images: uploadedPhotoUrls, // string[]
+            stockQuantity: parseInt(offerDetails.stockQuantity, 10) || 1,
+            ...typedOfferSpecificFieldValues, // string | number | boolean
             kind: finalSelectedLeafCategory?.slug || '',
-            category: finalSelectedLeafCategory?._id || '',
+            categoryId: finalSelectedLeafCategory?._id || '',
         };
 
-        // Supprimer les clés où la valeur est undefined ou une chaîne vide si le backend ne les gère pas bien
-        // Cela dépend de la rigueur de vos modèles Mongoose pour les champs optionnels.
-        // Par exemple, si processor est une chaîne vide, vous pourriez vouloir l'omettre.
-        for (const key in payload) {
-            const currentKey = key as string;
-            if (payload[currentKey as keyof typeof payload] === undefined) {
-                delete payload[currentKey as keyof typeof payload];
-            } else if (payload[currentKey as keyof typeof payload] === '') {
-                if (currentKey !== 'description' && currentKey !== 'graphicsCard') {
-                    delete payload[currentKey as keyof typeof payload];
+        // Refined logic for deleting keys from payload
+        const keysInPayload = Object.keys(payload) as Array<keyof typeof payload>;
+        for (const key of keysInPayload) {
+            if (payload[key] === undefined) {
+                delete payload[key];
+            } else if (payload[key] === '') {
+                // Define fields that are allowed to be empty strings if necessary
+                const allowedEmptyStrings = ['description', 'graphicsCard', 'processor', 'operatingSystem', 'color', 'imei'];
+                if (!allowedEmptyStrings.includes(key as string)) {
+                    delete payload[key];
                 }
             }
         }
@@ -555,7 +550,7 @@ export default function SellPage() {
             setIsLoadingSubmitOffer(false);
             return;
         }
-        if (!payload.category) {
+        if (!payload.categoryId) {
             toast.error("Erreur Catégorie", { description: "L'ID de catégorie est manquant." });
             setIsLoadingSubmitOffer(false);
             return;
@@ -575,18 +570,18 @@ export default function SellPage() {
                 throw new Error(createdOfferData.message || `Erreur HTTP: ${response.status}`);
             }
             toast.success("Offre Publiée !", {
-                description: `Votre offre pour "${selectedProductModel.title}" à ${createdOfferData.data?.price || payload.price}€ est en ligne.`,
-                action: { label: "Vendre un autre article", onClick: () => resetSellProcess() },
-                cancel: { label: "Voir mes offres", onClick: () => router.push('/dashboard/sales') }
+                description: `Votre offre pour "${selectedProductModel!.title}" à ${createdOfferData.data?.price || payload.price}€ est en ligne.`,
+                action: { label: "Vendre un autre article", onClick: resetSellProcess },
+                cancel: { label: "Voir mes offres", onClick: () => router.push('/account/sales') }
             });
             resetSellProcess();
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : "Erreur inconnue.";
-            toast.error("Erreur Soumission Offre", { description: errorMessage });
+            toast.error("Erreur Soumission Offre", { description: errorMessage, id: "offer-toast" });
         } finally {
             setIsLoadingSubmitOffer(false);
         }
-    };
+    }, [session, sessionStatus, offerDetails, selectedProductModel, offerSpecificFieldValues, finalSelectedLeafCategory, resetSellProcess, router]);
 
     const displayTitle = selectedProductModel?.title || 'N/A';
 
@@ -599,8 +594,6 @@ export default function SellPage() {
             if (value.title && typeof value.title === 'string') return value.title;
         }
         if (typeof value.toString === 'function') {
-            // Éviter d'appeler .toString() sur des objets simples comme {} qui donnerait "[object Object]"
-            // On le fait seulement si ce n'est pas un objet simple ou si les autres conditions n'ont pas marché
             const strValue = value.toString();
             if (strValue !== '[object Object]') return strValue;
         }
@@ -608,7 +601,26 @@ export default function SellPage() {
     };
 
     const displayBrand = selectedProductModel?.brand ? getDisplayString(selectedProductModel.brand) : 'N/A';
-    const displayCategory = finalSelectedLeafCategory?.name || (selectedProductModel?.category ? getDisplayString((selectedProductModel.category as any).name || selectedProductModel.rawCategoryName) : 'N/A');
+
+    let displayCategoryName: string | undefined = finalSelectedLeafCategory?.name;
+    if (!displayCategoryName && selectedProductModel?.category) {
+        const categoryData = selectedProductModel.category;
+        if (typeof categoryData === 'object' && categoryData !== null && 'name' in categoryData && typeof categoryData.name === 'string') {
+            displayCategoryName = categoryData.name;
+        } else if (typeof categoryData === 'string' && categoryData) {
+            displayCategoryName = categoryData;
+        } else if (selectedProductModel.rawCategoryName) {
+            displayCategoryName = selectedProductModel.rawCategoryName;
+        } else if (categoryData && typeof categoryData.toString === 'function' && categoryData.constructor.name !== 'Object') {
+            // Attempt toString() only if it's likely a Mongoose ObjectId or similar, not a plain object
+            const categoryString = categoryData.toString();
+            if (categoryString !== '[object Object]' && categoryString) {
+                displayCategoryName = categoryString;
+            }
+        }
+    }
+    const displayCategory = displayCategoryName || 'N/A';
+
     const displayAsin = selectedProductModel?.rawAsin;
 
     let displayStandardDescription: string | undefined = 'N/A';
@@ -643,7 +655,6 @@ export default function SellPage() {
                 displayAttributes = selectedProductModel.rawAttributes.map(attr => ({
                     label: attr.label,
                     value: attr.value,
-                    // unit: undefined // rawAttributes n'ont pas d'unité définie dans IProductModel pour l'instant
                 }));
             }
         }

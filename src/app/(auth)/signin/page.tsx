@@ -1,48 +1,20 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
-import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "sonner"; // Pour les notifications
+import { SignInForm } from './components/SignInForm'; // Importation du nouveau composant
+import { useRouter } from 'next/navigation';
 
+/**
+ * Page de Connexion
+ * Affiche le formulaire de connexion et gère la navigation post-connexion.
+ */
 export default function ConnexionPage() {
     const router = useRouter();
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
 
-    const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        setIsLoading(true);
-
-        try {
-            const result = await signIn('credentials', {
-                redirect: false,
-                email,
-                password,
-            });
-
-            if (result?.error) {
-                const errorMessage = result.error === "CredentialsSignin" ? "Email ou mot de passe incorrect." : "Une erreur est survenue. Veuillez réessayer.";
-                toast.error("Erreur de connexion", { description: errorMessage });
-                setIsLoading(false);
-            } else if (result?.ok) {
-                toast.success("Connexion réussie!", { description: "Vous allez être redirigé." });
-                router.push('/');
-            } else {
-                toast.error("Erreur inattendue", { description: "Une erreur de connexion inattendue est survenue." });
-                setIsLoading(false);
-            }
-        } catch (err) {
-            console.error("Erreur lors de la tentative de connexion:", err);
-            toast.error("Erreur Serveur", { description: "Une erreur serveur est survenue." });
-            setIsLoading(false);
-        }
+    // Callback pour gérer la redirection après une connexion réussie
+    const handleSignInSuccess = () => {
+        router.push('/');
     };
 
     return (
@@ -55,41 +27,8 @@ export default function ConnexionPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="space-y-2">
-                            <Label htmlFor="email">Adresse email</Label>
-                            <Input
-                                id="email"
-                                name="email"
-                                type="email"
-                                autoComplete="email"
-                                placeholder="votre@email.com"
-                                required
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                disabled={isLoading}
-                                className="bg-input"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="password">Mot de passe</Label>
-                            <Input
-                                id="password"
-                                name="password"
-                                type="password"
-                                autoComplete="current-password"
-                                placeholder="Votre mot de passe"
-                                required
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                disabled={isLoading}
-                                className="bg-input"
-                            />
-                        </div>
-                        <Button type="submit" className="w-full" disabled={isLoading}>
-                            {isLoading ? 'Connexion en cours...' : 'Se connecter'}
-                        </Button>
-                    </form>
+                    {/* Utilisation du composant SignInForm */}
+                    <SignInForm onSuccess={handleSignInSuccess} />
                 </CardContent>
                 <CardFooter className="flex flex-col items-center space-y-2">
                     <div className="text-sm text-muted-foreground">

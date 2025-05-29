@@ -137,7 +137,8 @@ export default function FiltersSidebar({
                         BASE_CATEGORY_ITEM_PADDING_X
                     )}>
                         <Link
-                            href={`${basePath}/${category.slug}`}
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            href={`${basePath}/${category.slug}` as any}
                             passHref
                             className="flex-grow min-w-0"
                             onClick={() => handleCategoryClick(category.slug)}

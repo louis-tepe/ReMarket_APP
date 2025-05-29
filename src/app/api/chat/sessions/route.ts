@@ -2,95 +2,145 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import dbConnect from "@/lib/db.Connect";
-import ChatSession, { IChatMessage } from "@/models/ChatSession";
-import User from "@/models/User"; // Assurez-vous que le chemin est correct
+import ChatSession, { IChatMessage, IChatSession } from "@/models/ChatSession";
+import { Types } from 'mongoose';
 
-interface SaveChatRequestBody {
+interface ChatSessionRequestBody {
   clientSessionId: string;
-  messages: IChatMessage[]; // L'historique complet des messages de la session en cours
-  title?: string;
+  messages?: IChatMessage[]; 
+  firstMessageContent?: string; 
+  title?: string; 
+  existingSessionId?: string; 
 }
 
-// POST /api/chat/history - Sauvegarde ou met à jour une session de chat
+// POST /api/chat/sessions - Crée, met à jour ou ajoute un message à une session de chat.
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user?.id) {
-      return NextResponse.json({ success: false, error: "Non autorisé. Utilisateur non connecté." }, { status: 401 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ success: false, message: "Authentification requise." }, { status: 401 });
     }
+    const userId = session.user.id;
 
-    const body: SaveChatRequestBody = await request.json();
-    const { clientSessionId, messages, title } = body;
+    const body: ChatSessionRequestBody = await request.json();
+    const { clientSessionId, messages, firstMessageContent, title, existingSessionId } = body;
 
-    if (!clientSessionId || !messages) {
-      return NextResponse.json(
-        { success: false, error: "clientSessionId et messages sont requis." },
-        { status: 400 }
-      );
+    if (!clientSessionId || typeof clientSessionId !== 'string') {
+      return NextResponse.json({ success: false, message: "clientSessionId est requis." }, { status: 400 });
+    }
+    if (!messages && !firstMessageContent) {
+        return NextResponse.json({ success: false, message: "Contenu du message ou messages requis." }, { status: 400 });
     }
 
     await dbConnect();
 
-    // Vérifier si l'utilisateur existe (juste au cas où)
-    const user = await User.findById(session.user.id);
-    if (!user) {
-      return NextResponse.json({ success: false, error: "Utilisateur non trouvé." }, { status: 404 });
+    // Optionnel : Vérifier si l'utilisateur existe réellement. Peut être omis si l'ID de session est suffisant.
+    // const user = await User.findById(userId);
+    // if (!user) {
+    //   return NextResponse.json({ success: false, message: "Utilisateur non trouvé." }, { status: 404 });
+    // }
+
+    let chatSessionToUpdateOrSave: IChatSession | null = null;
+    let isNewSession = false;
+
+    if (existingSessionId && Types.ObjectId.isValid(existingSessionId)) {
+      chatSessionToUpdateOrSave = await ChatSession.findOne({ _id: existingSessionId, userId: userId });
+      if (!chatSessionToUpdateOrSave) {
+        return NextResponse.json({ success: false, message: `Session ${existingSessionId} non trouvée ou accès non autorisé.` }, { status: 404 });
+      }
+    } else {
+      chatSessionToUpdateOrSave = await ChatSession.findOne({ clientSessionId: clientSessionId, userId: userId });
     }
 
-    // Créer ou mettre à jour la session de chat
-    // Upsert basé sur clientSessionId et userId pour garantir que la session est unique par utilisateur et clientSessionId
-    // Si une session avec ce clientSessionId existe déjà pour cet utilisateur, elle sera mise à jour.
-    // Sinon, une nouvelle session sera créée.
-    const chatSession = await ChatSession.findOneAndUpdate(
-      {
-        clientSessionId: clientSessionId,
-        userId: user._id, 
-      },
-      {
-        $set: {
-          messages: messages,
-          userId: user._id,
-          clientSessionId: clientSessionId,
-          ...(title && { title: title }), // Ajoute le titre seulement s'il est fourni
-        },
-      },
-      {
-        upsert: true, // Crée le document s'il n'existe pas
-        new: true, // Retourne le document modifié/nouveau
-        setDefaultsOnInsert: true, // Applique les valeurs par défaut du schéma lors de l'insertion
+    if (chatSessionToUpdateOrSave) { // Session existante
+      isNewSession = false;
+      if (messages) chatSessionToUpdateOrSave.messages = messages as IChatMessage[];
+      if (firstMessageContent) {
+        chatSessionToUpdateOrSave.messages.push({
+          role: "user",
+          parts: [{ text: firstMessageContent }],
+          timestamp: new Date(),
+        });
       }
-    );
+      if (title) chatSessionToUpdateOrSave.title = title;
+      chatSessionToUpdateOrSave.updatedAt = new Date();
+    } else { // Nouvelle session
+      isNewSession = true;
+      const newMessages: IChatMessage[] = [];
+      if (messages) newMessages.push(...messages as IChatMessage[]);
+      if (firstMessageContent) {
+        newMessages.push({ role: "user", parts: [{ text: firstMessageContent }], timestamp: new Date() });
+      }
+      if (newMessages.length === 0) {
+        return NextResponse.json({ success: false, message: "Impossible de créer une session vide." }, { status: 400 });
+      }
+      chatSessionToUpdateOrSave = new ChatSession({
+        userId: userId,
+        clientSessionId: clientSessionId,
+        title: title || newMessages[0]?.parts[0]?.text?.substring(0, 75) || "Nouveau Chat",
+        messages: newMessages,
+      });
+    }
 
-    return NextResponse.json({ success: true, data: chatSession }, { status: 200 });
+    const savedChatSession: IChatSession = await chatSessionToUpdateOrSave.save();
+    
+    const responseData = {
+        _id: (savedChatSession._id as Types.ObjectId).toString(), 
+        title: savedChatSession.title,
+        clientSessionId: savedChatSession.clientSessionId,
+        updatedAt: savedChatSession.updatedAt,
+        isNewSession: isNewSession,
+        lastMessage: firstMessageContent ? savedChatSession.messages[savedChatSession.messages.length -1] : undefined
+    };
+
+    return NextResponse.json({ 
+        success: true, 
+        message: isNewSession ? "Session de chat créée." : "Session de chat mise à jour.", 
+        data: responseData
+    }, { status: isNewSession ? 201 : 200 });
 
   } catch (error) {
-    console.error("Erreur lors de la sauvegarde de l'historique du chat:", error);
-    const errorMessage = error instanceof Error ? error.message : "Erreur serveur inconnue";
-    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
+    // console.error("Erreur POST /api/chat/sessions:", error); // Log serveur optionnel
+    const errorMessage = error instanceof Error ? error.message : "Erreur serveur inconnue.";
+    return NextResponse.json({ success: false, message: "Erreur lors du traitement de la session de chat.", errorDetails: errorMessage }, { status: 500 });
   }
 }
 
-// GET /api/chat/history - Récupérer la liste des sessions pour l'utilisateur
+// GET /api/chat/sessions - Récupère la liste des sessions pour l'utilisateur.
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user?.id) {
-      return NextResponse.json({ success: false, error: "Non autorisé." }, { status: 401 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ success: false, message: "Authentification requise." }, { status: 401 });
     }
+    const userId = session.user.id;
 
     await dbConnect();
 
-    const userChatSessions = await ChatSession.find({ userId: session.user.id })
-      .sort({ updatedAt: -1 }) // Les plus récents en premier
-      .select("_id clientSessionId title updatedAt createdAt") // Sélectionner les champs nécessaires
-      .lean(); // .lean() pour des objets JS simples, plus rapide
+    // Spécifier le type de _id dans IChatSession comme Types.ObjectId si possible dans la définition du modèle
+    // ou caster ici pour s'assurer que le linter comprend.
+    const userChatSessions = await ChatSession.find({ userId: userId })
+      .sort({ updatedAt: -1 })
+      .select("_id clientSessionId title updatedAt messages") 
+      .lean<IChatSession[]>(); 
 
-    return NextResponse.json({ success: true, data: userChatSessions });
+    const formattedSessions = userChatSessions.map(cs => ({
+        _id: (cs._id as Types.ObjectId).toString(), // Assurer le cast vers Types.ObjectId avant toString()
+        clientSessionId: cs.clientSessionId,
+        title: cs.title,
+        updatedAt: cs.updatedAt,
+        messageCount: cs.messages?.length || 0,
+        lastMessagePreview: cs.messages?.length > 0 
+            ? cs.messages[cs.messages.length - 1].parts[0]?.text?.substring(0, 100) || "(Message sans texte)"
+            : "Aucun message",
+    }));
+
+    return NextResponse.json({ success: true, data: formattedSessions });
 
   } catch (error) {
-    console.error("Erreur lors de la récupération des sessions de chat:", error);
-    const errorMessage = error instanceof Error ? error.message : "Erreur serveur inconnue";
-    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
+    // console.error("Erreur GET /api/chat/sessions:", error); // Log serveur optionnel
+    const errorMessage = error instanceof Error ? error.message : "Erreur serveur inconnue.";
+    return NextResponse.json({ success: false, message: "Erreur lors de la récupération des sessions.", errorDetails: errorMessage }, { status: 500 });
   }
 }
 

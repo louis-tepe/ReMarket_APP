@@ -1,37 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
+import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
 import dbConnect from '@/lib/db.Connect';
-import CartModel from '@/models/CartModel';
+import CartModel, { ICart } from '@/models/CartModel';
 import ProductOfferModel from '@/models/ProductBaseModel';
 import { Types } from 'mongoose';
-
-// Définition locale de ICartItem si non exporté par CartModel
-// Cela suppose la structure d'un élément de panier dans un document Mongoose complet.
-interface ICartItem {
-    _id: Types.ObjectId;
-    offer: Types.ObjectId | PopulatedOfferForCartItem; // Peut être ObjectId ou populé
-    productModel: Types.ObjectId | PopulatedProductModelForCartItem; // Peut être ObjectId ou populé
-    quantity: number;
-    // autres champs spécifiques à ICartItem si nécessaire
-}
 
 // INTERFACES POUR LE PANIER LEAN ET LES OFFRES LEAN
 interface PopulatedSellerForCart {
     _id: Types.ObjectId | string;
     name?: string;
     username?: string;
-}
-
-// Interface pour une offre "lean" individuelle, utilisée dans POST
-// Définie de manière autonome pour éviter les conflits d'héritage
-interface LeanProductOffer {
-    _id: Types.ObjectId | string;
-    transactionStatus?: string; 
-    productModel: Types.ObjectId | string; 
-    price: number; 
-    // Ajoutez d'autres champs de ProductOfferModel que vous sélectionnez et utilisez effectivement.
-    // Par exemple: name, description, seller (si vous le sélectionnez pour cet usage spécifique)
 }
 
 interface PopulatedOfferForCartItem {
@@ -72,53 +51,51 @@ interface CartActionPayload {
     quantity?: number; // Requis pour action: 'add' ou 'update' (pour 'add', 1 par défaut)
 }
 
+// Helper pour calculer le total et le nombre d'articles
+function calculateCartTotals(items: LeanCartItem[] | ICart['items']) {
+    let total = 0;
+    let count = 0;
+    if (items && Array.isArray(items)) { 
+        for (const item of items) {
+            // S'assurer que item.offer est bien populé et a un prix
+            const offerPrice = (item.offer as PopulatedOfferForCartItem)?.price; 
+            if (offerPrice && typeof item.quantity === 'number') {
+                total += offerPrice * item.quantity;
+                count += item.quantity;
+            }
+        }
+    }
+    return { total, count };
+}
+
 // GET: Récupérer le panier de l'utilisateur
 export async function GET() {
     const session = await getServerSession(authOptions);
-    if (session && session.user && (session.user as { id?: string }).id) {
-        console.log(`GET /api/cart - Session récupérée pour l'utilisateur ID: ${(session.user as { id: string }).id}`);
-    } else {
-        console.log("GET /api/cart - Session non récupérée ou ID utilisateur manquant.");
-    }
-
-    if (!session || !session.user || !(session.user as { id?: string }).id) {
-        console.error("GET /api/cart - Échec auth ou ID utilisateur manquant. Session:", session ? JSON.stringify({ userId: (session.user as {id?: string})?.id }) : 'null');
+    if (!session?.user?.id) {
         return NextResponse.json({ success: false, message: 'Authentification requise.' }, { status: 401 });
     }
-    const userId = (session.user as { id: string }).id;
+    const userId = session.user.id;
 
     try {
         await dbConnect();
         const cart = await CartModel.findOne({ user: userId })
-            .populate({
-                path: 'items.offer',
-                model: ProductOfferModel,
-                select: '_id price seller', // Assurez-vous que cela correspond à PopulatedOfferForCartItem
-                populate: {
-                    path: 'seller',
-                    select: '_id name username' // Assurez-vous que cela correspond à PopulatedSellerForCart
-                }
-            })
-            .populate('items.productModel', '_id title standardImageUrls slug') // Assurez-vous que cela correspond à PopulatedProductModelForCartItem
-            .lean<LeanCart | null>(); // Utilisation de LeanCart ici
+            .populate<{ items: { offer: PopulatedOfferForCartItem, productModel: PopulatedProductModelForCartItem }[] }>([
+                {
+                    path: 'items.offer',
+                    model: ProductOfferModel,
+                    select: '_id price seller',
+                    populate: { path: 'seller', select: '_id name username' }
+                },
+                { path: 'items.productModel', select: '_id title standardImageUrls slug' }
+            ])
+            .lean<LeanCart | null>();
 
-        if (!cart) {
+        if (!cart || !cart.items) {
             return NextResponse.json({ success: true, data: { items: [], count: 0, total: 0 } });
         }
 
-        // Calculer le total et le nombre d'articles directement
-        let calculatedTotal = 0;
-        let calculatedCount = 0;
-        if (cart.items && Array.isArray(cart.items)) { 
-            for (const item of cart.items) { 
-                if (item.offer && typeof item.offer.price === 'number' && typeof item.quantity === 'number') {
-                    calculatedTotal += item.offer.price * item.quantity;
-                    calculatedCount += item.quantity;
-                }
-            }
-        }
-
-        return NextResponse.json({ success: true, data: { ...cart, count: calculatedCount, total: calculatedTotal } });
+        const { total, count } = calculateCartTotals(cart.items);
+        return NextResponse.json({ success: true, data: { ...cart, count, total } });
 
     } catch (error) {
         console.error('[API_CART_GET]', error);
@@ -127,34 +104,27 @@ export async function GET() {
     }
 }
 
-// POST: Gérer les actions sur le panier (ajouter, supprimer, mettre à jour)
+// POST: Gérer les actions sur le panier
 export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
-    if (session && session.user && (session.user as { id?: string }).id) {
-        console.log(`POST /api/cart - Session récupérée pour l'utilisateur ID: ${(session.user as { id: string }).id}`);
-    } else {
-        console.log("POST /api/cart - Session non récupérée ou ID utilisateur manquant.");
-    }
-
-    if (!session || !session.user || !(session.user as { id?: string }).id) {
-        console.error("POST /api/cart - Échec auth ou ID utilisateur manquant. Session:", session ? JSON.stringify({ userId: (session.user as {id?: string})?.id }) : 'null');
+    if (!session?.user?.id) {
         return NextResponse.json({ success: false, message: 'Authentification requise.' }, { status: 401 });
     }
-    const userId = (session.user as { id: string }).id;
+    const userId = session.user.id;
 
     try {
         const body = await request.json() as CartActionPayload;
         const { action = 'add', offerId, productModelId, cartItemId, quantity } = body;
 
         await dbConnect();
-        // cart n'est pas .lean() ici, donc il utilise les types Mongoose complets (ICart)
         let cart = await CartModel.findOne({ user: userId }); 
 
         if (!cart) {
             if (action === 'add') {
                 cart = new CartModel({ user: userId, items: [] });
             } else {
-                return NextResponse.json({ success: false, message: 'Panier non trouvé.' }, { status: 404 });
+                // Pour les actions autres que 'add', un panier doit exister.
+                return NextResponse.json({ success: false, message: 'Panier non trouvé pour effectuer cette action.' }, { status: 404 });
             }
         }
 
@@ -163,91 +133,82 @@ export async function POST(request: NextRequest) {
         switch (action) {
             case 'add':
                 if (!offerId || !Types.ObjectId.isValid(offerId) || !productModelId || !Types.ObjectId.isValid(productModelId)) {
-                    return NextResponse.json({ success: false, message: 'ID offre ou produit manquant/invalide pour l\'ajout.' }, { status: 400 });
+                    return NextResponse.json({ success: false, message: 'ID offre ou produit manquant/invalide.' }, { status: 400 });
                 }
-                const currentQuantity = quantity === undefined ? 1 : quantity;
-                if (typeof currentQuantity !== 'number' || currentQuantity <= 0) {
-                    return NextResponse.json({ success: false, message: 'Quantité invalide pour l\'ajout.' }, { status: 400 });
+                const addQuantity = quantity === undefined ? 1 : quantity;
+                if (typeof addQuantity !== 'number' || addQuantity <= 0) {
+                    return NextResponse.json({ success: false, message: 'Quantité invalide.' }, { status: 400 });
                 }
 
-                const offer = await ProductOfferModel.findById(offerId)
+                const offerToAdd = await ProductOfferModel.findById(offerId)
                     .select('_id transactionStatus productModel price') 
-                    .lean<LeanProductOffer | null>();
+                    .lean<{ _id: Types.ObjectId, transactionStatus?: string, productModel: Types.ObjectId, price: number } | null>();
 
-                if (!offer || offer.transactionStatus !== 'available') {
+                if (!offerToAdd || offerToAdd.transactionStatus !== 'available') {
                     return NextResponse.json({ success: false, message: 'Offre non disponible ou introuvable.' }, { status: 404 });
                 }
-                if (!offer.productModel || offer.productModel.toString() !== productModelId) {
-                    return NextResponse.json({ success: false, message: 'L\'offre ne correspond pas au produit spécifié.' }, { status: 400 });
+                if (offerToAdd.productModel.toString() !== productModelId) {
+                    return NextResponse.json({ success: false, message: 'L\'offre ne correspond pas au produit.' }, { status: 400 });
                 }
-                await cart.addItem({ offerId, productModelId, quantity: currentQuantity });
-                message = 'Article ajouté/mis à jour dans le panier.';
+                await cart.addItem({ offerId, productModelId, quantity: addQuantity });
+                message = 'Article ajouté/mis à jour.';
                 break;
 
             case 'remove':
                 if (!cartItemId || !Types.ObjectId.isValid(cartItemId)) {
-                    return NextResponse.json({ success: false, message: 'ID de l\'article du panier manquant/invalide pour la suppression.' }, { status: 400 });
+                    return NextResponse.json({ success: false, message: 'ID d\'article invalide.' }, { status: 400 });
                 }
-                const itemToRemove = cart.items.find((item: ICartItem) => item._id.equals(cartItemId)); 
+                // S'assurer que cart n'est pas null ici, ce qui est géré par la vérification initiale
+                const itemToRemove = cart!.items.find(item => item._id.equals(cartItemId)); 
                 if (!itemToRemove) {
-                    return NextResponse.json({ success: false, message: 'Article non trouvé dans le panier.' }, { status: 404 });
+                    return NextResponse.json({ success: false, message: 'Article non trouvé.' }, { status: 404 });
                 }
-                await cart.removeItem(itemToRemove.offer as Types.ObjectId); // Cast si removeItem attend un ObjectId 
-                message = 'Article supprimé du panier.';
+                await cart!.removeItem(cartItemId);
+                message = 'Article supprimé.';
                 break;
 
             case 'update':
                 if (!cartItemId || !Types.ObjectId.isValid(cartItemId) || typeof quantity !== 'number' || quantity <= 0) {
-                    return NextResponse.json({ success: false, message: "Données manquantes/invalides pour la mise à jour (ID article, quantité)." }, { status: 400 });
+                    return NextResponse.json({ success: false, message: "Données invalides pour la mise à jour." }, { status: 400 });
                 }
-                const itemToUpdateIndex = cart.items.findIndex((item: ICartItem) => item._id.equals(cartItemId));
-                if (itemToUpdateIndex === -1) {
-                    return NextResponse.json({ success: false, message: 'Article non trouvé pour la mise à jour.' }, { status: 404 });
+                // S'assurer que cart n'est pas null
+                const itemToUpdate = cart!.items.find(item => item._id.equals(cartItemId));
+                if (!itemToUpdate) {
+                    return NextResponse.json({ success: false, message: 'Article non trouvé pour mise à jour.' }, { status: 404 });
                 }
-                cart.items[itemToUpdateIndex].quantity = quantity as number;
-                await cart.save(); 
-                message = 'Quantité de l\'article mise à jour.';
+                itemToUpdate.quantity = quantity;
+                await cart!.save(); 
+                message = 'Quantité mise à jour.';
                 break;
 
             case 'clear':
-                await cart.clearCart();
-                message = 'Panier vidé avec succès.';
+                // S'assurer que cart n'est pas null
+                await cart!.clearCart();
+                message = 'Panier vidé.';
                 break;
 
             default:
                 return NextResponse.json({ success: false, message: 'Action non reconnue.' }, { status: 400 });
         }
-
-        // Recalculer le total et le nombre d'articles pour la réponse
-        let total = 0;
-        let count = 0;
         
+        // Récupérer l'état final du panier pour la réponse
         const finalCartState = await CartModel.findOne({ user: userId })
-            .populate({
-                path: 'items.offer',
-                model: ProductOfferModel,
-                select: '_id price seller', // Correspond à PopulatedOfferForCartItem
-                populate: {
-                    path: 'seller',
-                    select: '_id name username' // Correspond à PopulatedSellerForCart
-                }
-            })
-            .populate('items.productModel', '_id title standardImageUrls slug') // Correspond à PopulatedProductModelForCartItem
-            .lean<LeanCart | null>(); // Utilisation de LeanCart ici
+            .populate<{ items: { offer: PopulatedOfferForCartItem, productModel: PopulatedProductModelForCartItem }[] }>([
+                { 
+                    path: 'items.offer', 
+                    model: ProductOfferModel, 
+                    select: '_id price seller', 
+                    populate: { path: 'seller', select: '_id name username' } 
+                },
+                { path: 'items.productModel', select: '_id title standardImageUrls slug' }
+            ])
+            .lean<LeanCart | null>();
             
-        if (finalCartState && finalCartState.items && Array.isArray(finalCartState.items)) {
-            for (const item of finalCartState.items) { // item sera de type LeanCartItem
-                if (item.offer && typeof item.offer.price === 'number' && typeof item.quantity === 'number') {
-                    total += item.offer.price * item.quantity;
-                    count += item.quantity;
-                }
-            }
-        }
+        const { total, count } = calculateCartTotals(finalCartState?.items || []);
 
         return NextResponse.json({ 
             success: true, 
             message: message, 
-            // S'assurer que finalCartState.items existe avant de le spreader, ou fournir un tableau vide
             data: { items: finalCartState?.items || [], count, total } 
         }, { status: 200 });
 

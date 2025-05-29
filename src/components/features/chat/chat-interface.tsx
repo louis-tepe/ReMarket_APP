@@ -18,7 +18,6 @@ const ChatInterface: React.FC = () => {
     const {
         chatSessions,
         isLoadingHistory,
-        fetchChatSessions,
         setChatSessions
     } = useChatHistory();
 

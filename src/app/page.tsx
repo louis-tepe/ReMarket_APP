@@ -66,7 +66,7 @@ export default function HomePage() {
               <Link href="/categories">Trouver une perle</Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
-              <Link href="/sell">Vendre un article</Link>
+              <Link href="/account/sell">Vendre un article</Link>
             </Button>
           </div>
         </div>

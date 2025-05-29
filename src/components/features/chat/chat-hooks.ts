@@ -3,8 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
-import type { Content, Part } from '@google/generative-ai';
-import type { UIMessage, UISavedChatSession, StoredChatMessage, StoredMessagePart, ChatSessionDoc, ApiHistoryMessage } from './chat-types';
+import type { UIMessage, UISavedChatSession, StoredChatMessage, ChatSessionDoc, ApiHistoryMessage } from './chat-types';
 import { convertFileToBase64, createNewUIMessage as createUIMessageFromUtil, generateChatTitle } from '@/lib/chat-utils';
 
 // --- Helper Functions ---
@@ -31,10 +30,10 @@ export const useChatHistory = () => {
         if (authStatus !== "authenticated") return;
         setIsLoadingHistory(true);
         try {
-            const response = await fetch("/api/chat/history");
+            const response = await fetch("/api/chat/sessions");
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || "Erreur fetch sessions");
+                throw new Error(errorData.message || "Erreur fetch sessions");
             }
             const data = await response.json();
             if (data.success) {
@@ -147,10 +146,10 @@ export const useChatLogic = ({ initialMessages = [], onMessagesChange, scrollAre
             timestamp: msg.timestamp || new Date(),
         }));
     
-        let titleToSave = currentTitle || generateChatTitle(storedMessages);
+        const titleToSave = currentTitle || generateChatTitle(storedMessages);
             
         try {
-            const response = await fetch("/api/chat/history", {
+            const response = await fetch("/api/chat/sessions", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -162,7 +161,7 @@ export const useChatLogic = ({ initialMessages = [], onMessagesChange, scrollAre
             });
             const savedData = await response.json();
             if (!response.ok) {
-                throw new Error(savedData.error || "Erreur sauvegarde chat");
+                throw new Error(savedData.message || "Erreur sauvegarde chat");
             }
             return { updatedDbId: savedData.data?._id || currentDbId, updatedTitle: titleToSave || currentTitle };
         } catch (error) {
@@ -252,10 +251,10 @@ export const useChatLogic = ({ initialMessages = [], onMessagesChange, scrollAre
     const loadChatSessionFromHistory = useCallback(async (dbSessionId: string, sessionTitle?: string) => {
         setIsLoading(true);
         try {
-            const response = await fetch(`/api/chat/history/${dbSessionId}`);
+            const response = await fetch(`/api/chat/sessions/${dbSessionId}`);
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || "Erreur chargement session");
+                throw new Error(errorData.message || "Erreur chargement session");
             }
             const data = await response.json();
             if (data.success && data.data) {
@@ -283,10 +282,10 @@ export const useChatLogic = ({ initialMessages = [], onMessagesChange, scrollAre
 
     const handleDeleteSession = useCallback(async (dbSessionIdToDelete: string, sessionsSetter: React.Dispatch<React.SetStateAction<UISavedChatSession[]>>) => {
         try {
-            const response = await fetch(`/api/chat/history/${dbSessionIdToDelete}`, { method: 'DELETE' });
+            const response = await fetch(`/api/chat/sessions/${dbSessionIdToDelete}`, { method: 'DELETE' });
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || "Erreur suppression session");
+                throw new Error(errorData.message || "Erreur suppression session");
             }
             toast.success("Session de chat supprimée.");
             sessionsSetter(prev => prev.filter(s => s._id !== dbSessionIdToDelete));

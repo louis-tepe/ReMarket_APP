@@ -28,7 +28,8 @@ export async function GET(request: NextRequest) {
     // const maxPrice = searchParams.get('maxPrice');
 
     try {
-        // TODO: Remplacer par une véritable logique de recherche (DB ou moteur de recherche)
+        // TODO: Remplacer la logique de recherche mockée ci-dessous par une véritable
+        // intégration avec la base de données ou un moteur de recherche dédié (ex: Algolia, Elasticsearch).
         let results = MOCK_SEARCH_RESULTS;
 
         if (query) {
@@ -38,12 +39,13 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        // await new Promise(resolve => setTimeout(resolve, 500)); // Supprimer ce délai simulé
+        // Le délai simulé a été supprimé.
+        // await new Promise(resolve => setTimeout(resolve, 500)); 
 
         return NextResponse.json({ success: true, data: results }, { status: 200 });
 
     } catch (error) {
-        // console.error('[API_SEARCH_GET]', error);
+        // Le console.error a été supprimé.
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
         return NextResponse.json(
             { success: false, message: "Erreur serveur lors de la recherche.", error: errorMessage }, 
