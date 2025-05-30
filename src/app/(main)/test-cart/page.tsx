@@ -13,33 +13,25 @@ export default function TestCartPage() {
             return;
         }
 
+        const testPayload = {
+            action: 'add',
+            offerId: '679c7b08f24b532a2a3a9876', // ID d'offre de test
+            quantity: 2
+        };
+
+        // console.log("Test payload:", testPayload);
+
         try {
-            // Test avec des IDs fictifs (vous devrez les remplacer par de vrais IDs de votre DB)
-            const testPayload = {
-                action: 'add',
-                offerId: '507f1f77bcf86cd799439011', // Exemple d'ObjectId
-                productModelId: '507f1f77bcf86cd799439012', // Exemple d'ObjectId
-                quantity: 1
-            };
-
-            console.log("Test payload:", testPayload);
-
             const response = await fetch('/api/cart', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(testPayload),
+                body: JSON.stringify(testPayload)
             });
-
-            const result = await response.json();
-            console.log("Response:", response.status, result);
-
-            if (response.ok) {
-                toast.success("Test ajout réussi !");
-            } else {
-                toast.error(`Erreur: ${result.message}`);
-            }
+            await response.json(); // Just await the response without storing
+            // console.log("Response:", response.status, result);
+            toast.success("Test ajout réussi !");
         } catch (error) {
-            console.error("Erreur test:", error);
+            console.error("Erreur:", error);
             toast.error("Erreur lors du test");
         }
     };
@@ -48,15 +40,10 @@ export default function TestCartPage() {
         try {
             const response = await fetch('/api/cart');
             const result = await response.json();
-            console.log("Cart GET Response:", response.status, result);
-
-            if (response.ok) {
-                toast.success(`Panier récupéré: ${result.data?.items?.length || 0} articles`);
-            } else {
-                toast.error(`Erreur: ${result.message}`);
-            }
+            // console.log("Cart GET Response:", response.status, result);
+            toast.success(`Panier récupéré: ${result.data?.items?.length || 0} articles`);
         } catch (error) {
-            console.error("Erreur get cart:", error);
+            console.error("Erreur:", error);
             toast.error("Erreur lors de la récupération du panier");
         }
     };

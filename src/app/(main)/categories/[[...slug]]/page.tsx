@@ -18,25 +18,25 @@ import type { LeanCategory, LeanBrand, DisplayProductCardProps, FiltersState } f
 
 // DIAGNOSTIC: Fonctions avec logs de performance
 /** Fetches all categories. */
-async function getAllCategories(): Promise<ICategory[]> {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    const res = await fetch(`${apiUrl}/categories`, { cache: 'force-cache' });
-    if (!res.ok) throw new Error('Failed to fetch categories');
-    const data = await res.json();
-    return data.categories || [];
-}
+// async function getAllCategories(): Promise<ICategory[]> {
+//     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+//     const res = await fetch(`${apiUrl}/categories`, { cache: 'force-cache' });
+//     if (!res.ok) throw new Error('Failed to fetch categories');
+//     const data = await res.json();
+//     return data.categories || [];
+// }
 
 // Modifié pour accepter categorySlug
 /** Fetches brands, optionally filtered by categorySlug. */
-async function fetchFilteredBrands(categorySlug?: string): Promise<IBrand[]> {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    let url = `${apiUrl}/brands`;
-    if (categorySlug) url += `?categorySlug=${categorySlug}`;
-    const res = await fetch(url, { cache: 'default' });
-    if (!res.ok) throw new Error('Failed to fetch brands');
-    const data = await res.json();
-    return data.brands || [];
-}
+// async function fetchFilteredBrands(categorySlug?: string): Promise<IBrand[]> {
+//     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+//     let url = `${apiUrl}/brands`;
+//     if (categorySlug) url += `?categorySlug=${categorySlug}`;
+//     const res = await fetch(url, { cache: 'default' });
+//     if (!res.ok) throw new Error('Failed to fetch brands');
+//     const data = await res.json();
+//     return data.brands || [];
+// }
 
 /** Fetches products based on applied filters. */
 async function getFilteredProducts(filters: FiltersState): Promise<DisplayProductCardProps[]> {
@@ -143,13 +143,13 @@ export default function CategoryPage({ params: paramsPromise }: CategoryPageProp
 
     // State for fetched data
     const [products, setProducts] = useState<DisplayProductCardProps[]>([]);
-    const [allCategories, setAllCategories] = useState<ICategory[]>([]);
-    const [availableBrands, setAvailableBrands] = useState<IBrand[]>([]);
+    const [allCategories] = useState<ICategory[]>([]); // Default empty array
+    const [availableBrands] = useState<IBrand[]>([]); // Default empty array  
     const [favoriteProductIds, setFavoriteProductIds] = useState<string[]>([]);
 
     // UI and loading states
     const [isLoading, setIsLoading] = useState(true);
-    const [fetchError, setFetchError] = useState<string | null>(null);
+    const [fetchError] = useState<string | null>(null); // Default null
     const [isSidebarOpenOnMobile, setIsSidebarOpenOnMobile] = useState(false);
     const [searchInputValue, setSearchInputValue] = useState(currentFilters.searchQuery || '');
 
@@ -163,55 +163,30 @@ export default function CategoryPage({ params: paramsPromise }: CategoryPageProp
         , [currentFilters.categorySlug, allCategories]);
 
     // Main data loading effect, triggered by filter changes
+    const loadAllData = useCallback(async (filters: FiltersState) => {
+        setIsLoading(true);
+
+        const results = await Promise.allSettled([
+            getFilteredProducts(filters),
+            session?.user ? fetchUserFavorites() : Promise.resolve([])
+        ]);
+
+        const [productsResult, favoritesResult] = results;
+
+        if (productsResult.status === 'fulfilled') setProducts(productsResult.value);
+        else if (productsResult.status === 'rejected') console.error("Failed to fetch products:", productsResult.reason);
+
+        if (favoritesResult.status === 'fulfilled') setFavoriteProductIds(favoritesResult.value);
+        // No throw for favorites error, it's non-critical
+        else if (favoritesResult.status === 'rejected') console.error("Failed to fetch favorites:", favoritesResult.reason);
+
+        setIsLoading(false);
+    }, [session?.user]);
+
+    // Load data when filters change
     useEffect(() => {
-        let isMounted = true;
-        const loadAllData = async () => {
-            const overallStart = Date.now();
-            console.log(`[CLIENT-PERF] Starting loadAllData for filters:`, currentFilters);
-            setIsLoading(true);
-            setFetchError(null);
-
-            try {
-                // DIAGNOSTIC: Chargement en parallèle au lieu de séquentiel
-                console.log(`[CLIENT-PERF] Starting Promise.allSettled...`);
-                const promiseStart = Date.now();
-                const [categoriesRes, brandsRes, productsRes, favoritesRes] = await Promise.allSettled([
-                    getAllCategories(),
-                    fetchFilteredBrands(currentFilters.categorySlug),
-                    getFilteredProducts(currentFilters),
-                    session?.user ? fetchUserFavorites() : Promise.resolve([])
-                ]);
-                console.log(`[CLIENT-PERF] Promise.allSettled completed: ${Date.now() - promiseStart}ms`);
-
-                if (!isMounted) return;
-
-                if (categoriesRes.status === 'fulfilled') setAllCategories(categoriesRes.value);
-                else if (categoriesRes.status === 'rejected') throw categoriesRes.reason;
-
-                if (brandsRes.status === 'fulfilled') setAvailableBrands(brandsRes.value);
-                else if (brandsRes.status === 'rejected') throw brandsRes.reason;
-
-                if (productsRes.status === 'fulfilled') setProducts(productsRes.value);
-                else if (productsRes.status === 'rejected') throw productsRes.reason;
-
-                if (favoritesRes.status === 'fulfilled') setFavoriteProductIds(favoritesRes.value);
-                // No throw for favorites error, it's non-critical
-                else if (favoritesRes.status === 'rejected') console.error("Failed to fetch favorites:", favoritesRes.reason);
-
-            } catch (error: unknown) {
-                console.error(`[CLIENT-ERROR] loadAllData error after ${Date.now() - overallStart}ms:`, error);
-                const errorMessage = error instanceof Error ? error.message : "Erreur de chargement des données.";
-                if (isMounted) setFetchError(errorMessage);
-            } finally {
-                if (isMounted) {
-                    console.log(`[CLIENT-PERF] loadAllData completed: ${Date.now() - overallStart}ms total`);
-                    setIsLoading(false);
-                }
-            }
-        };
-        loadAllData();
-        return () => { isMounted = false; };
-    }, [currentFilters, session?.user]);
+        loadAllData(currentFilters);
+    }, [currentFilters, loadAllData]);
 
     // Sync URL with component state (and vice-versa on initial load/navigation)
     useEffect(() => {

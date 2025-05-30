@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Paperclip, Send, Loader2, X } from "lucide-react";
@@ -26,7 +27,13 @@ export const ChatInputForm: React.FC<ChatInputFormProps> = ({
         <>
             {imagePreview && (
                 <div className="mb-2 p-2 border rounded-md relative max-w-xs mx-auto">
-                    <img src={imagePreview} alt="Aperçu" className="max-h-40 rounded-md" />
+                    <Image
+                        src={imagePreview}
+                        alt="Aperçu"
+                        width={160}
+                        height={160}
+                        className="max-h-40 rounded-md object-contain"
+                    />
                     <Button
                         variant="ghost"
                         size="icon"

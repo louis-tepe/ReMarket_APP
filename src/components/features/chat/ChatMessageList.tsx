@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
@@ -20,10 +21,12 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({ messages, isLo
                 }`}
         >
             {msg.imagePreview && (
-                <img
+                <Image
                     src={msg.imagePreview}
                     alt="Aperçu utilisateur"
-                    className="max-w-xs max-h-48 rounded-md mb-2"
+                    width={300}
+                    height={192}
+                    className="max-w-xs max-h-48 rounded-md mb-2 object-contain"
                 />
             )}
             <p className="text-sm whitespace-pre-wrap break-words">{msg.text}</p>

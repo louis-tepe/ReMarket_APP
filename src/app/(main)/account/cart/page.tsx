@@ -5,11 +5,12 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input'; // Pour la quantité
-import { toast } from 'sonner';
 import { Loader2, ShoppingCart, Trash2, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import type { CartData, CartActionPayload, CartItem } from './types'; // Import types
+import type { CartData, CartItem } from './types'; // Import types
 import { useSession } from 'next-auth/react';
+import { Card } from '@/components/ui/card';
+import { signIn } from 'next-auth/react';
 
 // Placeholder for product image if none is available
 const PLACEHOLDER_IMAGE_URL = '/images/placeholder-product.png';
@@ -32,117 +33,79 @@ export default function CartPage() {
      * Handles API errors and authentication status.
      */
     const fetchCart = useCallback(async () => {
-        console.log("[CartPage] fetchCart appelé, sessionStatus:", sessionStatus);
-
-        if (sessionStatus !== 'authenticated') {
-            console.log("[CartPage] Session non authentifiée, arrêt du fetch");
-            setIsLoading(false);
+        if (sessionStatus !== "authenticated") {
             return;
         }
 
         setIsLoading(true);
         try {
-            console.log("[CartPage] Début de l'appel API /api/cart");
             const response = await fetch('/api/cart');
-            console.log("[CartPage] Response status:", response.status, response.statusText);
 
             if (!response.ok) {
-                if (response.status === 401) {
-                    toast.error("Veuillez vous connecter pour voir votre panier.");
-                    router.push('/signin?callbackUrl=/cart');
-                    return;
-                }
-                const errorData = await response.json().catch(() => ({ message: "Erreur lors du chargement du panier." }));
-                throw new Error(errorData.message);
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
 
             const result = await response.json();
-            console.log("[CartPage] Réponse API complète:", JSON.stringify(result, null, 2));
 
-            if (result.success) {
-                // Les données de l'API correspondent maintenant aux types attendus
-                const cartData: CartData = {
-                    items: result.data?.items || [],
-                    count: result.data?.count || 0,
-                    total: result.data?.total || 0
-                };
-
-                console.log("[CartPage] CartData formaté:", JSON.stringify(cartData, null, 2));
-                console.log("[CartPage] Nombre d'items:", cartData.items.length);
-                console.log("[CartPage] Count:", cartData.count);
-                console.log("[CartPage] Total:", cartData.total);
-
-                setCart(cartData);
-            } else {
-                console.error("[CartPage] API success=false:", result.message);
-                throw new Error(result.message || "Impossible de charger les données du panier.");
+            if (!result.success) {
+                throw new Error(result.message || 'Erreur lors de la récupération du panier');
             }
-        } catch (error: unknown) {
-            console.error("[CartPage] Erreur fetchCart:", error);
-            const errorMessage = error instanceof Error ? error.message : "Une erreur inconnue s'est produite.";
-            toast.error("Erreur Panier", { description: errorMessage });
-            // Définir un panier vide en cas d'erreur au lieu de null
+
+            const cartData = {
+                items: Array.isArray(result.data?.items) ? result.data.items : [],
+                count: result.data?.count || 0,
+                total: result.data?.total || 0
+            };
+
+            setCart(cartData);
+        } catch (error) {
+            console.error('[CartPage] Erreur lors de la récupération du panier:', error);
             setCart({ items: [], count: 0, total: 0 });
         } finally {
-            console.log("[CartPage] Fin fetchCart, setIsLoading(false)");
             setIsLoading(false);
         }
-    }, [router, sessionStatus]);
+    }, [sessionStatus]);
 
     useEffect(() => {
-        console.log("[CartPage] useEffect sessionStatus:", sessionStatus);
-        if (sessionStatus === 'authenticated') {
+        if (sessionStatus === "authenticated") {
             fetchCart();
-        } else if (sessionStatus === 'unauthenticated') {
-            toast.error("Veuillez vous connecter pour accéder à votre panier.");
-            router.push('/signin?callbackUrl=/cart');
+        } else if (sessionStatus === "unauthenticated") {
             setIsLoading(false);
+            setCart({ items: [], count: 0, total: 0 });
         }
-        // Pour le statut 'loading', on garde isLoading à true
-    }, [sessionStatus, fetchCart, router]);
+    }, [sessionStatus, fetchCart]);
 
     /**
      * Handles various cart actions like add, remove, update, or clear items.
-     * @param payload - The action details (type, item IDs, quantity).
      */
-    const handleCartAction = useCallback(async (payload: CartActionPayload) => {
-        if (sessionStatus !== 'authenticated') {
-            toast.error("Authentification requise pour modifier le panier.");
-            return;
-        }
-
+    const handleCartAction = async (action: string, offerId?: string, quantity?: number) => {
         try {
+            const body: Record<string, unknown> = { action };
+            if (offerId) body.offerId = offerId;
+            if (quantity !== undefined) body.quantity = quantity;
+
             const response = await fetch('/api/cart', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
+                body: JSON.stringify(body)
             });
-            const result = await response.json();
-            console.log("[CartPage] Réponse action panier:", result);
 
-            if (response.ok && result.success) {
-                toast.success(result.message || "Panier mis à jour.");
-                // Mettre à jour l'état local du panier avec les données retournées
-                const updatedCartData: CartData = {
-                    items: result.data?.items || [],
-                    count: result.data?.count || 0,
-                    total: result.data?.total || 0
-                };
-                setCart(updatedCartData);
+            const result = await response.json();
+
+            if (result.success) {
+                await fetchCart();
             } else {
-                throw new Error(result.message || "Erreur lors de la mise à jour du panier.");
+                console.error('Erreur lors de la modification du panier:', result.message);
             }
-        } catch (error: unknown) {
-            console.error("[CartPage] Erreur action panier:", error);
-            const errorMessage = error instanceof Error ? error.message : "Une erreur inconnue s'est produite.";
-            toast.error("Erreur Panier", { description: errorMessage });
+        } catch (error) {
+            console.error('Erreur lors de l\'action panier:', error);
         }
-    }, [sessionStatus]);
+    };
 
     const handleRemoveItem = (cartItemId: string) => {
         if (!cartItemId) return;
         setIsUpdatingQuantity(cartItemId);
-        handleCartAction({ action: 'remove', cartItemId })
+        handleCartAction('remove', cartItemId)
             .finally(() => setIsUpdatingQuantity(null));
     };
 
@@ -150,75 +113,65 @@ export default function CartPage() {
         if (!cartItemId || isNaN(newQuantity) || newQuantity < 0) return;
         setIsUpdatingQuantity(cartItemId);
         if (newQuantity === 0) {
-            handleCartAction({ action: 'remove', cartItemId })
+            handleCartAction('remove', cartItemId)
                 .finally(() => setIsUpdatingQuantity(null));
         } else {
-            handleCartAction({ action: 'update', cartItemId, quantity: newQuantity })
+            handleCartAction('update', cartItemId, newQuantity)
                 .finally(() => setIsUpdatingQuantity(null));
         }
     };
 
     const handleClearCart = () => {
         setIsClearingCart(true);
-        handleCartAction({ action: 'clear' })
+        handleCartAction('clear')
             .finally(() => setIsClearingCart(false));
     };
 
-    // Affichage du loader pendant le chargement
-    if (isLoading || sessionStatus === 'loading') {
-        console.log("[CartPage] Rendu - État de chargement. isLoading:", isLoading, "sessionStatus:", sessionStatus);
+    if (isLoading) {
         return (
-            <div className="container mx-auto px-4 py-8 text-center">
-                <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
-                <p className="mt-4 text-muted-foreground">Chargement de votre panier...</p>
+            <div className="container mx-auto px-4 py-8">
+                <div className="flex items-center justify-center min-h-[400px]">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                    <span className="ml-2">Chargement de votre panier...</span>
+                </div>
             </div>
         );
     }
 
-    // Redirection si non authentifié (déjà gérée dans useEffect, mais garde comme fallback)
-    if (sessionStatus === 'unauthenticated') {
-        console.log("[CartPage] Rendu - Session non authentifiée");
+    if (sessionStatus === "unauthenticated") {
         return (
-            <div className="container mx-auto px-4 py-8 text-center">
-                <ShoppingCart className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-                <h1 className="text-3xl font-bold mb-2">Connexion requise</h1>
-                <p className="text-muted-foreground mb-6">
-                    Veuillez vous connecter pour accéder à votre panier.
-                </p>
-                <Button asChild>
-                    <Link href="/signin?callbackUrl=/cart">Se connecter</Link>
-                </Button>
+            <div className="container mx-auto px-4 py-8">
+                <Card className="p-6 text-center">
+                    <h1 className="text-2xl font-bold mb-4">Connexion requise</h1>
+                    <p className="text-muted-foreground mb-6">
+                        Vous devez être connecté pour accéder à votre panier.
+                    </p>
+                    <Button onClick={() => signIn()} size="lg">
+                        Se connecter
+                    </Button>
+                </Card>
             </div>
         );
     }
 
-    // Log final avant le rendu du panier
-    console.log("[CartPage] État final avant rendu:", {
-        cart,
-        hasItems: cart?.items && cart.items.length > 0,
-        itemsLength: cart?.items?.length,
-        count: cart?.count,
-        total: cart?.total
-    });
-
-    // Panier vide (cart existe mais pas d'items)
     if (!cart || !cart.items || cart.items.length === 0) {
-        console.log("[CartPage] Rendu - Panier vide. cart:", cart);
         return (
-            <div className="container mx-auto px-4 py-12 text-center">
-                <ShoppingCart className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-                <h1 className="text-3xl font-bold mb-2">Votre panier est vide</h1>
-                <p className="text-muted-foreground mb-6">
-                    Parcourez nos catégories pour trouver votre bonheur !
-                </p>
-                <Button asChild>
-                    <Link href="/categories">Explorer les produits</Link>
-                </Button>
+            <div className="container mx-auto px-4 py-8">
+                <h1 className="text-2xl font-bold mb-6">Mon Panier</h1>
+                <Card className="p-6 text-center">
+                    <ShoppingCart className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <h2 className="text-xl font-semibold mb-2">Votre panier est vide</h2>
+                    <p className="text-muted-foreground mb-4">
+                        Découvrez nos produits et ajoutez-les à votre panier.
+                    </p>
+                    <Button onClick={() => router.push('/')} size="lg">
+                        Continuer les achats
+                    </Button>
+                </Card>
             </div>
         );
     }
 
-    console.log("[CartPage] Rendu - Panier avec articles. Nombre d'items:", cart.items.length);
     return (
         <div className="container mx-auto px-4 py-8">
             <div className="flex justify-between items-center mb-8">

@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import Link from 'next/link';
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
+import { notFound } from "next/navigation";
 
 // Component Imports
 import ProductImageGallery from './components/ProductImageGallery';
@@ -22,8 +23,8 @@ const NON_PRODUCT_SLUGS = ['cart', 'categories', 'chat', 'dashboard', 'favorites
 
 async function getProductDetails(slug: string): Promise<ProductDetails | null> {
     if (NON_PRODUCT_SLUGS.includes(slug)) {
-        console.log(`Skipping API call for non-product slug: ${slug}`);
-        return null; // Do not attempt to fetch if it's a known non-product page slug
+        // console.log(`Skipping API call for non-product slug: ${slug}`);
+        notFound();
     }
     try {
         const response = await fetch(`/api/products/${slug}`);

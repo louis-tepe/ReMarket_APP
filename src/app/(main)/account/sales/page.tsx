@@ -8,10 +8,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import Link from 'next/link';
 import Image from 'next/image';
-import { Edit3, Trash2, PlusCircle, AlertTriangle, Info, Package } from 'lucide-react';
+import { Edit3, Trash2, PlusCircle, AlertTriangle, Info, Package, Loader2 } from 'lucide-react';
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from 'sonner';
 import type { SellerOffer } from './types';
+import { useRouter } from 'next/navigation';
 
 export interface ProductModelInfo {
     id: string;
@@ -124,6 +125,8 @@ export default function SellerDashboardPage() {
     const [offers, setOffers] = useState<SellerOffer[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [deletingOffers, setDeletingOffers] = useState<Record<string, boolean>>({});
+    const router = useRouter();
 
     // Memoized fetch function to avoid re-creation on every render
     const loadOffers = useCallback(async (userId: string) => {
@@ -140,7 +143,15 @@ export default function SellerDashboardPage() {
         } finally {
             setIsLoading(false);
         }
-    }, []); // Empty dependency array as it doesn't depend on component state directly
+    }, []);
+
+    // Fonction pour recharger les offres utilisateur
+    const fetchUserOffers = useCallback(() => {
+        const userId = (session?.user as { id?: string })?.id;
+        if (userId) {
+            loadOffers(userId);
+        }
+    }, [session, loadOffers]);
 
     useEffect(() => {
         const userId = (session?.user as { id?: string })?.id;
@@ -158,9 +169,9 @@ export default function SellerDashboardPage() {
      * Placeholder for editing an offer.
      * @param offerId - The ID of the offer to edit.
      */
-    const handleEditOffer = (offerId: string) => {
-        console.log(`Modifier l'offre: ${offerId}`);
-        toast.info("Fonctionnalité à venir", { description: `La modification de l'offre ${offerId} sera bientôt disponible.` });
+    const handleModifyOffer = (offerId: string) => {
+        // console.log(`Modifier l'offre: ${offerId}`);
+        router.push(`/account/sell/edit/${offerId}`);
     };
 
     /**
@@ -168,22 +179,34 @@ export default function SellerDashboardPage() {
      * @param offerId - The ID of the offer to delete.
      */
     const handleDeleteOffer = async (offerId: string) => {
-        toast("Confirmation requise", {
-            description: "Êtes-vous sûr de vouloir supprimer cette offre ? Cette action est irréversible.",
-            action: {
-                label: "Supprimer",
-                onClick: async () => {
-                    console.log(`Suppression de l'offre: ${offerId}`);
-                    // TODO: Implement API call: await fetch(`/api/offers/${offerId}`, { method: 'DELETE' });
-                    // On success, update state: setOffers(prev => prev.filter(o => o.id !== offerId));
-                    toast.success("Offre supprimée (simulation)", { description: `L'offre ${offerId} a été marquée pour suppression.` });
-                },
-            },
-            cancel: {
-                label: "Annuler",
-                onClick: () => toast.info("Suppression annulée")
+        if (!confirm('Êtes-vous sûr de vouloir supprimer cette offre ?')) {
+            return;
+        }
+
+        try {
+            setDeletingOffers(prev => ({ ...prev, [offerId]: true }));
+
+            // console.log(`Suppression de l'offre: ${offerId}`);
+
+            const response = await fetch(`/api/offers/${offerId}`, {
+                method: 'DELETE',
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                toast.success("Offre supprimée avec succès");
+                // Recharger les offres
+                fetchUserOffers();
+            } else {
+                toast.error(result.message || "Erreur lors de la suppression");
             }
-        });
+        } catch (error) {
+            console.error('Erreur lors de la suppression:', error);
+            toast.error("Erreur lors de la suppression de l'offre");
+        } finally {
+            setDeletingOffers(prev => ({ ...prev, [offerId]: false }));
+        }
     };
 
     if (sessionStatus === 'loading' || (isLoading && sessionStatus !== 'unauthenticated')) {
@@ -287,13 +310,24 @@ export default function SellerDashboardPage() {
                                         <TableCell className="text-right px-2">
                                             <div className="flex justify-end items-center space-x-1 sm:space-x-2">
                                                 {(offer.status === 'available' || offer.status === 'archived') && (
-                                                    <Button variant="ghost" size="icon" onClick={() => handleEditOffer(offer.id)} title="Modifier l'offre">
+                                                    <Button variant="ghost" size="icon" onClick={() => handleModifyOffer(offer.id)} title="Modifier l'offre">
                                                         <Edit3 className="h-4 w-4" />
                                                     </Button>
                                                 )}
                                                 {(offer.status === 'available' || offer.status === 'archived') && (
-                                                    <Button variant="ghost" size="icon" onClick={() => handleDeleteOffer(offer.id)} title="Supprimer l'offre" className="text-destructive hover:text-destructive/90">
-                                                        <Trash2 className="h-4 w-4" />
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => handleDeleteOffer(offer.id)}
+                                                        title="Supprimer l'offre"
+                                                        className="text-destructive hover:text-destructive/90"
+                                                        disabled={deletingOffers[offer.id]}
+                                                    >
+                                                        {deletingOffers[offer.id] ? (
+                                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                                        ) : (
+                                                            <Trash2 className="h-4 w-4" />
+                                                        )}
                                                     </Button>
                                                 )}
                                                 {/* Ajouter d'autres actions si nécessaire, ex: voir l'annonce publique */}

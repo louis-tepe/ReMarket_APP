@@ -110,8 +110,7 @@ export default function SellPage() {
                     ]);
                 } else {
                     setAllCategories([]);
-                    console.warn("Structure de données des catégories inattendue reçue:", data);
-                    toast.error("Erreur Catégories", { description: data.message || "Format de données incorrect." });
+                    // console.warn("Structure de données des catégories inattendue reçue:", data);
                 }
             })
             .catch(err => {
@@ -270,7 +269,7 @@ export default function SellPage() {
                     } else if (data && data.success && Array.isArray(data.productModels)) {
                         items = processPmData(data.productModels);
                     } else if (data && data.message) {
-                        console.info("Message de l'API ProductModels:", data.message);
+                        // console.info("Message de l'API ProductModels:", data.message);
                     }
                     const notListedOption: ProductModelReMarketSelectItem = {
                         id: NOT_LISTED_ID,
@@ -555,8 +554,6 @@ export default function SellPage() {
             setIsLoadingSubmitOffer(false);
             return;
         }
-
-        console.log("[SellPage] Payload de l'offre avant envoi API:", JSON.stringify(payload, null, 2));
 
         try {
             toast.info("Publication de l'offre...", { id: "offer-toast" });

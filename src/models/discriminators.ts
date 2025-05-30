@@ -52,14 +52,15 @@ export function getProductOfferDiscriminator(kind: string): Model<IProductBase> 
 
 // Log pour vérifier quels discriminateurs ont été chargés au démarrage.
 // Cela se produit parce que chaque fichier de discriminateur est importé.
-if (ProductOfferModel.discriminators) {
-    console.log(
-        "[Discriminators] Modèles discriminateurs enregistrés au démarrage:", 
-        Object.keys(ProductOfferModel.discriminators)
-    );
-} else {
-    console.log("[Discriminators] Aucun discriminateur explicitement enregistré sur ProductOfferModel au démarrage.");
-}
+// Les logs sont désactivés pour éviter la verbosité en production
+// if (ProductOfferModel.discriminators) {
+//     console.log(
+//         "[Discriminators] Modèles discriminateurs enregistrés au démarrage:", 
+//         Object.keys(ProductOfferModel.discriminators)
+//     );
+// } else {
+//     console.log("[Discriminators] Aucun discriminateur explicitement enregistré sur ProductOfferModel au démarrage.");
+// }
 
 // Note: Il n'est généralement pas nécessaire d'appeler une fonction pour "pré-enregistrer"
 // les discriminateurs si chaque fichier de modèle discriminateur gère son propre enregistrement
