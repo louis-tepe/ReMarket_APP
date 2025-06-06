@@ -1,0 +1,9 @@
+{
+	"id": "m3FdVj7ZFCxewLN",
+	"json": "{\"id\":\"m3FdVj7ZFCxewLN\",\"url\":\"https://www.idealo.fr/prix/206079904/apple-mac-studio-2025.html\",\"loadedUrl\":\"https://www.idealo.fr/prix/206079904/apple-mac-studio-2025.html\",\"uniqueKey\":\"idealo_product_Apple_mac_studio\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":1,\"errorMessages\":[\"locator.textContent: Timeout 3000ms exceeded.\\nCall log:\\n\\u001b[2m  - waiting for locator('div#oopStage-conditionButton-new div.oopStage-conditionButton-wrapper-text-price > strong')\\u001b[22m\\n\\n    at PlaywrightCrawler.requestHandler (webpack-internal:///(rsc)/./src/services/scraping/idealo/idealo.scraper.ts:324:79)\\n    at async wrap (/Users/tepe/Documents/Code/Project/remarket-app/node_modules/@apify/timeout/cjs/index.cjs:54:21)\"],\"headers\":{\"Referer\":\"https://www.idealo.fr/prechcat.html?q=Apple%20mac%20studio\"},\"userData\":{\"__crawlee\":{\"state\":5}}}",
+	"method": "GET",
+	"orderNo": 1748583012622,
+	"retryCount": 1,
+	"uniqueKey": "idealo_product_Apple_mac_studio",
+	"url": "https://www.idealo.fr/prix/206079904/apple-mac-studio-2025.html"
+}

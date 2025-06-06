@@ -1,25 +1,26 @@
+import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ShoppingCart, Loader2 } from "lucide-react";
-import { SellerOffer } from '../types';
+import { Offer } from '../types';
 
 interface SellerOfferCardProps {
-    offer: SellerOffer;
-    onAddToCart: (offer: SellerOffer) => void;
+    offer: Offer;
+    onAddToCart: (offer: Offer) => void;
     isAddingToCart: boolean;
     isUserLoggedIn: boolean; // Added to control button state more granularly
     sessionLoading: boolean; // Added to control button state during session load
 }
 
-const CONDITION_BADGE_VARIANTS: Record<SellerOffer['condition'], 'default' | 'secondary'> = {
+const CONDITION_BADGE_VARIANTS: Record<Offer['condition'], 'default' | 'secondary'> = {
     new: 'default',
     used_likenew: 'default',
     used_good: 'secondary',
     used_fair: 'secondary',
 };
 
-const CONDITION_LABELS: Record<SellerOffer['condition'], string> = {
+const CONDITION_LABELS: Record<Offer['condition'], string> = {
     new: 'Neuf',
     used_likenew: 'Comme neuf',
     used_good: 'Bon état',
@@ -59,9 +60,9 @@ export default function SellerOfferCard({
                     </Badge>
                 </div>
             </CardHeader>
-            {offer.sellerDescription && (
+            {offer.description && (
                 <CardContent className="pt-0 pb-4">
-                    <p className="text-sm text-muted-foreground leading-relaxed">{offer.sellerDescription}</p>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{offer.description}</p>
                 </CardContent>
             )}
             <CardFooter>

@@ -22,8 +22,20 @@ async function fetchUserFavorites(): Promise<string[]> {
     return [];
 }
 
+// Hook personnalisé pour gérer l'hydratation
+function useIsClient() {
+    const [isClient, setIsClient] = useState(false);
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
+
+    return isClient;
+}
+
 export default function FeaturedProductsClientWrapper({ initialProducts }: FeaturedProductsClientWrapperProps) {
-    const { data: session } = useSession();
+    const isClient = useIsClient();
+    const { data: session, status } = useSession();
     const [productsToDisplay, setProductsToDisplay] = useState<ProductCardProps[]>(initialProducts);
     const [favoriteProductIds, setFavoriteProductIds] = useState<string[]>([]);
 
@@ -32,20 +44,23 @@ export default function FeaturedProductsClientWrapper({ initialProducts }: Featu
     }, [initialProducts]);
 
     useEffect(() => {
-        if (session?.user) {
+        // Ne charger les favoris que si on est côté client et que la session est authentifiée
+        if (isClient && status === 'authenticated' && session?.user) {
             fetchUserFavorites().then(setFavoriteProductIds);
-        } else {
+        } else if (isClient && status === 'unauthenticated') {
             setFavoriteProductIds([]);
         }
-    }, [session]);
+    }, [isClient, session, status]);
 
     const handleFavoriteToggle = useCallback((productId: string, isFavorite: boolean) => {
+        if (!isClient) return; // Éviter les actions avant l'hydratation
+
         setFavoriteProductIds(prevIds =>
             isFavorite
                 ? prevIds.includes(productId) ? prevIds : [...prevIds, productId]
                 : prevIds.filter(id => id !== productId)
         );
-    }, []);
+    }, [isClient]);
 
     if (!productsToDisplay || productsToDisplay.length === 0) {
         return <p className="text-center text-muted-foreground">Aucun produit vedette à afficher pour le moment.</p>;
@@ -57,7 +72,7 @@ export default function FeaturedProductsClientWrapper({ initialProducts }: Featu
                 <ProductCard
                     key={product.id}
                     {...product}
-                    initialIsFavorite={favoriteProductIds.includes(product.id)}
+                    initialIsFavorite={isClient ? favoriteProductIds.includes(product.id) : false}
                     onFavoriteToggle={handleFavoriteToggle}
                 />
             ))}

@@ -7,21 +7,23 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "m.media-amazon.com",
-        port: "",
-        pathname: "/images/I/**",
+        hostname: "images.unsplash.com",
       },
       {
         protocol: "https",
         hostname: "via.placeholder.com",
-        port: "",
-        pathname: "/**",
       },
       {
         protocol: "https",
-        hostname: "cdn.idealo.com",
-        port: "",
-        pathname: "/**",
+        hostname: "picsum.photos",
+      },
+      {
+        protocol: "https",
+        hostname: "ledenicheur.fr",
+      },
+      {
+        protocol: "https",
+        hostname: "www.ledenicheur.fr",
       },
     ],
     formats: ['image/webp', 'image/avif'],

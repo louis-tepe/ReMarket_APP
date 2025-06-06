@@ -32,6 +32,7 @@
     "@radix-ui/react-switch": "^1.2.5",
     "@radix-ui/react-tabs": "^1.1.11",
     "bcryptjs": "^3.0.2",
+    "cheerio": "^1.0.0-rc.12",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "crawlee": "^3.9.2",
@@ -48,9 +49,9 @@
     "react-hook-form": "^7.56.2",
     "slugify": "^1.6.6",
     "sonner": "^2.0.3",
+    "string-similarity": "^4.0.4",
     "tailwind-merge": "^3.2.0",
-    "zod": "^3.24.4",
-    "cheerio": "^1.0.0-rc.12"
+    "zod": "^3.24.4"
   },
   "devDependencies": {
     "@apify/tsconfig": "^0.1.1",
@@ -62,6 +63,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/string-similarity": "^4.0.2",
     "@types/uuid": "^10.0.0",
     "autoprefixer": "^10.4.21",
     "copy-webpack-plugin": "^13.0.0",

@@ -1,0 +1,9 @@
+{
+	"id": "BXZ7hX0C1oY1vlC",
+	"json": "{\"id\":\"BXZ7hX0C1oY1vlC\",\"url\":\"https://www.ledenicheur.fr/search.php?q=Apple%20mac%20studio\",\"loadedUrl\":\"https://ledenicheur.fr/search.php?q=Apple%20mac%20studio\",\"uniqueKey\":\"ledenicheur_search_Apple mac studio\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":0,\"errorMessages\":[],\"headers\":{},\"userData\":{\"__crawlee\":{\"state\":4}},\"handledAt\":\"2025-05-30T11:20:02.625Z\"}",
+	"method": "GET",
+	"orderNo": null,
+	"retryCount": 0,
+	"uniqueKey": "ledenicheur_search_Apple mac studio",
+	"url": "https://www.ledenicheur.fr/search.php?q=Apple%20mac%20studio"
+}

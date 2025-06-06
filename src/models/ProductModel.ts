@@ -16,13 +16,13 @@ interface IRawAttribute {
   value: string;
 }
 
-// Ajout des types pour les nouvelles données Idealo
-interface IIdealoOptionChoice {
+// Ajout des types pour les nouvelles données Ledenicheur
+interface ILedenicheurOptionChoice {
   optionName: string;
   availableValues: string[];
 }
 
-interface IIdealoQA {
+interface ILedenicheurQA {
   question: string;
   answer: string;
 }
@@ -40,7 +40,7 @@ export interface IProductModelBase {
   specifications: IStandardSpecification[];
   
   // Champs issus du scraping (anciennement ScrapedProduct)
-  scrapedSource?: string; // Source du scraping (ex: "idealo", "amazon")
+  scrapedSource?: string; // Source du scraping (ex: "ledenicheur", "amazon")
   scrapedSourceUrl?: string; // URL du produit sur la source
   rawTitle?: string; // Titre brut du scraping
   rawBrandName?: string; // Nom de la marque brute du scraping
@@ -58,13 +58,13 @@ export interface IProductModelBase {
   // Statut global du produit
   status: 'scraped_pending_review' | 'scraped_rejected' | 'standardization_pending' | 'active' | 'inactive' | 'error_standardization';
 
-  // Nouveaux champs pour les données Idealo
-  sourceUrlIdealo?: string;
+  // Nouveaux champs pour les données Ledenicheur
+  sourceUrlLedenicheur?: string;
   variantTitle?: string;
-  priceNewIdealo?: number;
-  priceUsedIdealo?: number;
-  optionChoicesIdealo?: IIdealoOptionChoice[];
-  qasIdealo?: IIdealoQA[];
+  priceNewLedenicheur?: number;
+  priceUsedLedenicheur?: number;
+  optionChoicesLedenicheur?: ILedenicheurOptionChoice[];
+  qasLedenicheur?: ILedenicheurQA[];
 }
 
 // Interface pour l'objet ProductModel tel qu'il pourrait être retourné (par ex. après .lean())
@@ -101,8 +101,8 @@ const RawAttributeSchema = new Schema<IRawAttribute>(
   { _id: false }
 );
 
-// Schémas pour les nouveaux types Idealo
-const IdealoOptionChoiceSchema = new Schema<IIdealoOptionChoice>(
+// Schémas pour les nouveaux types Ledenicheur
+const LedenicheurOptionChoiceSchema = new Schema<ILedenicheurOptionChoice>(
   {
     optionName: { type: String, required: true, trim: true },
     availableValues: [{ type: String, required: true, trim: true }]
@@ -110,7 +110,7 @@ const IdealoOptionChoiceSchema = new Schema<IIdealoOptionChoice>(
   { _id: false }
 );
 
-const IdealoQASchema = new Schema<IIdealoQA>(
+const LedenicheurQASchema = new Schema<ILedenicheurQA>(
   {
     question: { type: String, required: true, trim: true },
     answer: { type: String, required: true, trim: true }
@@ -165,13 +165,13 @@ const ProductModelSchema = new Schema<IProductModelDocument>(
       index: true // Indexer si on filtre souvent dessus
     },
     specifications: [StandardSpecificationSchema],
-    // Nouveaux champs pour les données Idealo
-    sourceUrlIdealo: { type: String, trim: true },
+    // Nouveaux champs pour les données Ledenicheur
+    sourceUrlLedenicheur: { type: String, trim: true },
     variantTitle: { type: String, trim: true },
-    priceNewIdealo: { type: Number },
-    priceUsedIdealo: { type: Number },
-    optionChoicesIdealo: [IdealoOptionChoiceSchema],
-    qasIdealo: [IdealoQASchema],
+    priceNewLedenicheur: { type: Number },
+    priceUsedLedenicheur: { type: Number },
+    optionChoicesLedenicheur: [LedenicheurOptionChoiceSchema],
+    qasLedenicheur: [LedenicheurQASchema],
     // Les lignes concernant 'status', 'approvedBy', 'approvedAt' sont supprimées ici
     // originalScrapedProductId: { type: Schema.Types.ObjectId, ref: 'ScrapedProduct' }, // Ce champ n'est plus nécessaire
 

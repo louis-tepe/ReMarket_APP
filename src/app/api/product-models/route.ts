@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { scrapeIdealoProduct, IdealoProductDetails } from '@/services/scraping/scraper';
+import { scrapeLedenicheurProduct } from '@/services/scraping/ledenicheur/ledenicheur.scraper';
+import { LedenicheurProductDetails } from '@/services/scraping/ledenicheur/ledenicheur.types';
 import dbConnect from '@/lib/db.Connect';
 import ProductModel, { IProductModel, IProductModelBase } from '@/models/ProductModel';
 import CategoryModel, { ICategory } from '@/models/CategoryModel';
@@ -234,21 +235,21 @@ export async function POST(request: NextRequest) {
     const brandDoc = await BrandModel.findOne({ slug: brandSlugFromRequest }).select('_id name').lean<Pick<IBrand, '_id' | 'name'> | null>();
     if (!brandDoc) return NextResponse.json({ error: `Marque non trouvée: ${brandSlugFromRequest}` }, { status: 404 });
 
-    const scrapedData = await scrapeIdealoProduct(productNameToScrape, brandDoc.name);
-    if (!scrapedData?.title) {
+    const scrapedData = await scrapeLedenicheurProduct(productNameToScrape);
+    if (!scrapedData?.pageTitle) {
       return NextResponse.json({ error: `Aucune donnée scrapée pour "${productNameToScrape}".` }, { status: 404 });
     }
     
-    const existingProductModel = await ProductModel.findOne({ scrapedSourceUrl: scrapedData.url, scrapedSource: 'idealo' });
+    const existingProductModel = await ProductModel.findOne({ scrapedSourceUrl: scrapedData.url, scrapedSource: 'ledenicheur' });
 
     if (existingProductModel) {
-      const rawUpdateData = mapIdealoToRawProductModelData(scrapedData, brandDoc, categoryDoc);
+      const rawUpdateData = mapLedenicheurToRawProductModelData(scrapedData, brandDoc, categoryDoc);
       Object.assign(existingProductModel, rawUpdateData);
       await existingProductModel.save();
       return NextResponse.json({ productModel: existingProductModel.toObject(), message: "ProductModel existant mis à jour." });
     }
     
-    const initialRawData = mapIdealoToRawProductModelData(scrapedData, brandDoc, categoryDoc);
+    const initialRawData = mapLedenicheurToRawProductModelData(scrapedData, brandDoc, categoryDoc);
     const standardizedData = standardizeScrapedData(initialRawData, brandDoc, categoryDoc);
     
     const titleForModel = standardizedData.title || initialRawData.rawTitle;
@@ -291,31 +292,24 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Fonction pour mapper IdealoProductDetails vers les champs raw de IProductModelBase
-const mapIdealoToRawProductModelData = (
-  scrapedData: IdealoProductDetails,
+// Fonction pour mapper LedenicheurProductDetails vers les champs raw de IProductModelBase
+const mapLedenicheurToRawProductModelData = (
+  scrapedData: LedenicheurProductDetails,
   brandDoc: Pick<IBrand, '_id' | 'name'>,
   categoryDoc: Pick<ICategory, '_id' | 'name'>
 ): Partial<IProductModelBase> => ({
-  scrapedSource: 'idealo',
+  scrapedSource: 'ledenicheur',
   scrapedSourceUrl: scrapedData.url,
-  rawTitle: scrapedData.title || '',
+  rawTitle: scrapedData.pageTitle || '',
   rawBrandName: brandDoc.name,
   rawCategoryName: categoryDoc.name,
-  rawDescription: scrapedData.description || '',
-  rawImageUrls: scrapedData.imageUrls || [],
-  rawCurrentPrice: scrapedData.priceNew || undefined,
+  rawDescription: scrapedData.productInfoTitle || '',
+  rawImageUrls: [], // LedenicheurProductDetails n'a pas d'images dans la version actuelle
+  rawCurrentPrice: undefined, // Pas de prix dans la version actuelle focalisée sur les spécifications
   rawCurrency: 'EUR',
-  rawAttributes: scrapedData.specifications?.map(spec => ({ label: spec.key, value: spec.value })) || [],
-  variantTitle: scrapedData.variantTitle || undefined,
-  priceNewIdealo: scrapedData.priceNew || undefined,
-  priceUsedIdealo: scrapedData.priceUsed || undefined,
-  optionChoicesIdealo: scrapedData.optionChoices?.map(choice => ({
-    ...choice,
-    optionName: choice.optionName || ''
-  })),
-  qasIdealo: scrapedData.qas,
-  keyFeatures: scrapedData.features || [], 
+  rawAttributes: scrapedData.specifications?.map((spec: { key: string; value: string }) => ({ label: spec.key, value: spec.value })) || [],
+  // Suppression des propriétés spécifiques à Idealo qui n'existent pas dans LedenicheurProductDetails
+  keyFeatures: [], // Pas de features dans la version actuelle
 });
 
 // Fonction pour tenter de standardiser les données scrapées en ProductModel
@@ -331,13 +325,8 @@ const standardizeScrapedData = (
   category: categoryDoc._id as Types.ObjectId,
   standardDescription: rawData.rawDescription || "Description standardisée à définir",
   standardImageUrls: rawData.rawImageUrls?.length ? rawData.rawImageUrls : ['/images/placeholder-product.png'],
-  specifications: rawData.rawAttributes?.map(attr => ({ label: attr.label, value: attr.value })) || [],
+  specifications: rawData.rawAttributes?.map((attr: { label: string; value: string }) => ({ label: attr.label, value: attr.value })) || [],
   keyFeatures: rawData.keyFeatures,
-  sourceUrlIdealo: rawData.scrapedSourceUrl,
-  variantTitle: rawData.variantTitle,
-  priceNewIdealo: rawData.priceNewIdealo,
-  priceUsedIdealo: rawData.priceUsedIdealo,
-  optionChoicesIdealo: rawData.optionChoicesIdealo,
-  qasIdealo: rawData.qasIdealo,
+  // Suppression des propriétés spécifiques à Idealo
   status: 'standardization_pending',
 });

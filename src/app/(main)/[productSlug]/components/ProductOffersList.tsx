@@ -1,11 +1,12 @@
+import React from 'react';
 import { Tag, Package } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import SellerOfferCard from "./SellerOfferCard";
-import { SellerOffer } from '../types';
+import { Offer } from '../types';
 
 interface ProductOffersListProps {
-    offers: SellerOffer[];
-    onAddToCart: (offer: SellerOffer) => void;
+    offers: Offer[];
+    onAddToCart: (offer: Offer) => void;
     addingToCartOfferId: string | null;
     isUserLoggedIn: boolean;
     sessionLoading: boolean;
@@ -32,10 +33,10 @@ export default function ProductOffersList({
                 <div className="space-y-4">
                     {offers.map((offer) => (
                         <SellerOfferCard
-                            key={offer.id}
+                            key={offer._id}
                             offer={offer}
                             onAddToCart={onAddToCart}
-                            isAddingToCart={addingToCartOfferId === offer.id}
+                            isAddingToCart={addingToCartOfferId === offer._id}
                             isUserLoggedIn={isUserLoggedIn}
                             sessionLoading={sessionLoading}
                         />

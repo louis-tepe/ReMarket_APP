@@ -1,6 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface Specification {
     label: string;
@@ -19,11 +18,10 @@ interface QA {
 }
 
 interface ProductDetailsTabsProps {
-    standardDescription: string;
+    specifications: Specification[];
     keyFeatures?: string[];
-    specifications?: Specification[];
-    optionChoicesIdealo?: OptionChoice[];
-    qasIdealo?: QA[];
+    optionChoicesLedenicheur?: OptionChoice[];
+    qasLedenicheur?: QA[];
 }
 
 /**
@@ -32,105 +30,116 @@ interface ProductDetailsTabsProps {
  * Tabs are conditionally rendered based on the availability of their respective data.
  */
 export default function ProductDetailsTabs({
-    standardDescription,
-    keyFeatures,
     specifications,
-    optionChoicesIdealo,
-    qasIdealo
+    keyFeatures,
+    optionChoicesLedenicheur,
+    qasLedenicheur
 }: ProductDetailsTabsProps) {
+    // Prepare tab data with visibility conditions
     const tabs = [
-        { value: "description", label: "Description", content: standardDescription, condition: true },
-        { value: "features", label: "Points Clés", content: keyFeatures, condition: keyFeatures && keyFeatures.length > 0 },
-        { value: "specs", label: "Spécifications", content: specifications, condition: specifications && specifications.length > 0 },
-        { value: "options", label: "Options", content: optionChoicesIdealo, condition: optionChoicesIdealo && optionChoicesIdealo.length > 0 },
-        { value: "qas", label: "Q&R", content: qasIdealo, condition: qasIdealo && qasIdealo.length > 0 },
-    ].filter(tab => tab.condition);
+        { value: "specifications", label: "Spécifications", content: specifications, condition: specifications && specifications.length > 0 },
+        { value: "features", label: "Caractéristiques", content: keyFeatures, condition: keyFeatures && keyFeatures.length > 0 },
+        { value: "options", label: "Options", content: optionChoicesLedenicheur, condition: optionChoicesLedenicheur && optionChoicesLedenicheur.length > 0 },
+        { value: "qas", label: "Q&R", content: qasLedenicheur, condition: qasLedenicheur && qasLedenicheur.length > 0 },
+    ];
+
+    // Filter tabs to show only those with content
+    const visibleTabs = tabs.filter(tab => tab.condition);
+
+    if (visibleTabs.length === 0) {
+        return null; // Don't render anything if no tabs have content
+    }
 
     return (
-        <Tabs defaultValue={tabs[0]?.value || "description"} className="w-full">
-            <TabsList className={`grid w-full grid-cols-${tabs.length || 1} mb-4`}>
-                {tabs.map(tab => (
-                    <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>
+        <Tabs defaultValue={visibleTabs[0]?.value} className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+                {visibleTabs.map((tab) => (
+                    <TabsTrigger key={tab.value} value={tab.value}>
+                        {tab.label}
+                    </TabsTrigger>
                 ))}
             </TabsList>
-            <TabsContent value="description">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Description Standardisée</CardTitle>
-                    </CardHeader>
-                    <CardContent className="prose prose-sm dark:prose-invert max-w-none">
-                        <p>{standardDescription || 'Aucune description détaillée disponible.'}</p>
-                    </CardContent>
-                </Card>
+
+            <TabsContent value="specifications" className="space-y-4">
+                {tabs.find(tab => tab.value === 'specifications') && specifications && specifications.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Spécifications Techniques</CardTitle>
+                            <CardDescription>Détails techniques du produit</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid gap-3">
+                                {specifications.map((spec, index) => (
+                                    <div key={index} className="flex justify-between items-center py-2 border-b last:border-b-0">
+                                        <span className="font-medium text-gray-700">{spec.label}</span>
+                                        <span className="text-gray-900">
+                                            {spec.value}
+                                            {spec.unit && <span className="text-gray-500 ml-1">{spec.unit}</span>}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
             </TabsContent>
-            {tabs.find(tab => tab.value === 'features') && keyFeatures && keyFeatures.length > 0 && (
-                <TabsContent value="features">
+
+            <TabsContent value="features" className="space-y-4">
+                {tabs.find(tab => tab.value === 'features') && keyFeatures && keyFeatures.length > 0 && (
                     <Card>
                         <CardHeader>
                             <CardTitle>Caractéristiques Principales</CardTitle>
+                            <CardDescription>Points forts du produit</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                            <ul className="space-y-2">
                                 {keyFeatures.map((feature, index) => (
                                     <li key={index} className="flex items-start">
-                                        <CheckCircle className="h-4 w-4 mr-2 mt-0.5 text-green-500 flex-shrink-0" />
+                                        <span className="text-green-500 mr-2 mt-1">✓</span>
                                         <span>{feature}</span>
                                     </li>
                                 ))}
                             </ul>
                         </CardContent>
                     </Card>
-                </TabsContent>
-            )}
-            {tabs.find(tab => tab.value === 'specs') && specifications && specifications.length > 0 && (
-                <TabsContent value="specs">
+                )}
+            </TabsContent>
+
+            <TabsContent value="options" className="space-y-4">
+                {tabs.find(tab => tab.value === 'options') && optionChoicesLedenicheur && optionChoicesLedenicheur.length > 0 && (
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Détails Techniques</CardTitle>
-                        </CardHeader>
+                        <CardHeader><CardTitle>Options Disponibles (selon Ledenicheur)</CardTitle></CardHeader>
                         <CardContent>
-                            <ul className="space-y-2 text-sm">
-                                {specifications.map((spec, index) => (
-                                    <li key={index} className="flex justify-between border-b pb-1 last:border-b-0">
-                                        <span className="font-medium text-foreground">{spec.label}:</span>
-                                        <span className="text-muted-foreground">{spec.value}{spec.unit ? ` ${spec.unit}` : ''}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-            )}
-            {tabs.find(tab => tab.value === 'options') && optionChoicesIdealo && optionChoicesIdealo.length > 0 && (
-                <TabsContent value="options">
-                    <Card>
-                        <CardHeader><CardTitle>Options Disponibles (selon Idealo)</CardTitle></CardHeader>
-                        <CardContent className="text-sm">
-                            {optionChoicesIdealo.map((option, index) => (
-                                <div key={index} className="mb-2">
-                                    <p className="font-semibold">{option.optionName}:</p>
-                                    <p className="text-muted-foreground">{option.availableValues.join(', ')}</p>
+                            {optionChoicesLedenicheur.map((option, index) => (
+                                <div key={index} className="mb-4">
+                                    <h4 className="font-semibold mb-2">{option.optionName}</h4>
+                                    <div className="flex flex-wrap gap-2">
+                                        {option.availableValues.map((value, valueIndex) => (
+                                            <span key={valueIndex} className="px-3 py-1 bg-gray-100 rounded-full text-sm">{value}</span>
+                                        ))}
+                                    </div>
                                 </div>
                             ))}
                         </CardContent>
                     </Card>
-                </TabsContent>
-            )}
-            {tabs.find(tab => tab.value === 'qas') && qasIdealo && qasIdealo.length > 0 && (
-                <TabsContent value="qas">
+                )}
+            </TabsContent>
+
+            <TabsContent value="qas" className="space-y-4">
+                {tabs.find(tab => tab.value === 'qas') && qasLedenicheur && qasLedenicheur.length > 0 && (
                     <Card>
-                        <CardHeader><CardTitle>Questions & Réponses (selon Idealo)</CardTitle></CardHeader>
-                        <CardContent className="space-y-3 text-sm">
-                            {qasIdealo.map((qa, index) => (
-                                <div key={index}>
-                                    <p className="font-semibold">Q: {qa.question}</p>
-                                    <p className="text-muted-foreground">R: {qa.answer}</p>
+                        <CardHeader><CardTitle>Questions & Réponses (selon Ledenicheur)</CardTitle></CardHeader>
+                        <CardContent>
+                            {qasLedenicheur.map((qa, index) => (
+                                <div key={index} className="mb-4 last:mb-0">
+                                    <h4 className="font-semibold text-gray-800 mb-1">Q: {qa.question}</h4>
+                                    <p className="text-gray-600 ml-4">R: {qa.answer}</p>
                                 </div>
                             ))}
                         </CardContent>
                     </Card>
-                </TabsContent>
-            )}
+                )}
+            </TabsContent>
         </Tabs>
     );
 } 

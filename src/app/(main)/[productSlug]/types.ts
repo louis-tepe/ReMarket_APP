@@ -1,13 +1,15 @@
 // Represents a seller's offer for a product model.
-export interface SellerOffer {
-    id: string;
-    seller: { id: string; name?: string };
+export interface Offer {
+    _id: string;
+    seller: { _id: string; name?: string };
     price: number;
     currency: string;
-    quantity: number;
     condition: 'new' | 'used_likenew' | 'used_good' | 'used_fair';
-    sellerDescription?: string;
-    sellerPhotos?: string[];
+    description?: string;
+    images?: string[];
+    stockQuantity?: number;
+    createdAt: string;
+    updatedAt: string;
 }
 
 // Represents basic information for a brand or category, typically for display.
@@ -16,22 +18,45 @@ export interface BrandOrCategory {
     slug: string;
 }
 
-// Defines the comprehensive details of a product, including offers and Idealo data.
-export interface ProductDetails {
-    id: string;
+// Simplified Brand interface for product display
+export interface SimpleBrand {
+    _id: string;
+    name: string;
     slug: string;
+}
+
+// Simplified Category interface for product display
+export interface SimpleCategory {
+    _id: string;
+    name: string;
+    slug: string;
+}
+
+// Specification interface
+export interface Specification {
+    label: string;
+    value: string;
+    unit?: string;
+}
+
+// Defines the comprehensive details of a product, including offers and Ledenicheur data.
+export interface Product {
+    _id: string;
     title: string;
-    brand: BrandOrCategory;
-    category: BrandOrCategory;
+    slug: string;
     standardDescription: string;
     standardImageUrls: string[];
+    specifications: Specification[];
     keyFeatures?: string[];
-    specifications?: { label: string; value: string; unit?: string }[];
-    offers: SellerOffer[];
-    sourceUrlIdealo?: string;
+    offers: Offer[];
+    brand: SimpleBrand;
+    category: SimpleCategory;
+    createdAt: string;
+    updatedAt: string;
+    sourceUrlLedenicheur?: string;
     variantTitle?: string;
-    priceNewIdealo?: number;
-    priceUsedIdealo?: number;
-    optionChoicesIdealo?: { optionName: string; availableValues: string[] }[];
-    qasIdealo?: { question: string; answer: string }[];
+    priceNewLedenicheur?: number;
+    priceUsedLedenicheur?: number;
+    optionChoicesLedenicheur?: { optionName: string; availableValues: string[] }[];
+    qasLedenicheur?: { question: string; answer: string }[];
 } 

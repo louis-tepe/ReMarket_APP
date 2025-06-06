@@ -14,14 +14,14 @@ import { notFound } from "next/navigation";
 import ProductImageGallery from './components/ProductImageGallery';
 import ProductMetaInfo from './components/ProductMetaInfo';
 import ProductOffersList from './components/ProductOffersList';
-import IdealoPriceInfo from './components/IdealoPriceInfo';
+import LedenicheurPriceInfo from './components/LedenicheurPriceInfo';
 import ProductDetailsTabs from './components/ProductDetailsTabs';
-import type { ProductDetails, SellerOffer } from './types'; // Import types
+import type { Product, Offer } from './types'; // Import types
 
 // List of top-level slugs that are not product pages.
 const NON_PRODUCT_SLUGS = ['cart', 'categories', 'chat', 'dashboard', 'favorites', 'search', 'sell', 'settings', 'account'];
 
-async function getProductDetails(slug: string): Promise<ProductDetails | null> {
+async function getProductDetails(slug: string): Promise<Product | null> {
     if (NON_PRODUCT_SLUGS.includes(slug)) {
         // console.log(`Skipping API call for non-product slug: ${slug}`);
         notFound();
@@ -103,7 +103,7 @@ interface ProductPageProps {
 export default function ProductPage({ params }: ProductPageProps) {
     const resolvedParams = use(params);
     const { productSlug } = resolvedParams;
-    const [product, setProduct] = useState<ProductDetails | null>(null);
+    const [product, setProduct] = useState<Product | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     // selectedImage state is now managed by ProductImageGallery
     const [isAddingToCartOfferId, setIsAddingToCartOfferId] = useState<string | null>(null);
@@ -165,7 +165,7 @@ export default function ProductPage({ params }: ProductPageProps) {
         return null;
     }
 
-    const handleAddToCart = async (offer: SellerOffer) => {
+    const handleAddToCart = async (offer: Offer) => {
         if (sessionStatus !== 'authenticated' || !session?.user) {
             toast.error("Veuillez vous connecter pour ajouter des articles au panier.");
             return;
@@ -173,7 +173,7 @@ export default function ProductPage({ params }: ProductPageProps) {
 
         if (!product) return;
 
-        setIsAddingToCartOfferId(offer.id);
+        setIsAddingToCartOfferId(offer._id);
         try {
             const response = await fetch('/api/cart', {
                 method: 'POST',
@@ -181,8 +181,8 @@ export default function ProductPage({ params }: ProductPageProps) {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    offerId: offer.id,
-                    productModelId: product.id, // product is available in this scope
+                    offerId: offer._id,
+                    productModelId: product._id, // product is available in this scope
                     quantity: 1,
                 }),
             });
@@ -239,18 +239,17 @@ export default function ProductPage({ params }: ProductPageProps) {
 
                     <Separator className="my-8" />
 
-                    <IdealoPriceInfo
-                        priceNewIdealo={product.priceNewIdealo}
-                        priceUsedIdealo={product.priceUsedIdealo}
-                        sourceUrlIdealo={product.sourceUrlIdealo}
+                    <LedenicheurPriceInfo
+                        priceNewLedenicheur={product.priceNewLedenicheur}
+                        priceUsedLedenicheur={product.priceUsedLedenicheur}
+                        sourceUrlLedenicheur={product.sourceUrlLedenicheur}
                     />
 
                     <ProductDetailsTabs
-                        standardDescription={product.standardDescription}
                         keyFeatures={product.keyFeatures}
                         specifications={product.specifications}
-                        optionChoicesIdealo={product.optionChoicesIdealo}
-                        qasIdealo={product.qasIdealo}
+                        optionChoicesLedenicheur={product.optionChoicesLedenicheur}
+                        qasLedenicheur={product.qasLedenicheur}
                     />
                 </div>
             </div>
