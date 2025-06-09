@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { fetchFeaturedProductData } from "@/services/core/product-service"; // Importer la fonction directe
 import FeaturedProductsClientWrapper from '@/components/features/product-listing/FeaturedProductsClientWrapper';
 import { ProductCardProps } from '@/components/shared/ProductCard'; // Importé pour le type de getFeaturedProducts
+import FadeIn from '@/components/layout/animation/FadeIn';
 
 // Fonction pour récupérer les produits vedettes côté serveur
 async function getFeaturedProducts(): Promise<ProductCardProps[]> {
@@ -53,78 +54,90 @@ export default function HomePage() {
   return (
     <>
       {/* Section Hero */}
-      <section className="py-12 md:py-20 lg:py-28 bg-gradient-to-b from-background to-secondary dark:from-gray-900 dark:to-gray-800/60">
-        <div className="container mx-auto px-4 text-center">
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl mb-6">
-            ReMarket: Le Seconde Main, <span className="text-primary">Standardisé et Simplifié</span>.
-          </h1>
-          <p className="text-lg text-muted-foreground mb-10 max-w-3xl mx-auto">
-            Découvrez des produits d&apos;occasion de qualité, présentés de manière uniforme. Achetez et vendez sans tracas, ReMarket s&apos;occupe de tout.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" asChild className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              <Link href="/categories">Trouver une perle</Link>
-            </Button>
-            <Button size="lg" variant="outline" asChild>
-              <Link href="/account/sell">Vendre un article</Link>
-            </Button>
+      <FadeIn>
+        <section className="py-12 md:py-20 lg:py-28 bg-gradient-to-b from-background to-secondary dark:from-gray-900 dark:to-gray-800/60">
+          <div className="container mx-auto px-4 text-center">
+            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl mb-6">
+              ReMarket: Le Seconde Main, <span className="text-primary">Standardisé et Simplifié</span>.
+            </h1>
+            <p className="text-lg text-muted-foreground mb-10 max-w-3xl mx-auto">
+              Découvrez des produits d&apos;occasion de qualité, présentés de manière uniforme. Achetez et vendez sans tracas, ReMarket s&apos;occupe de tout.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button size="lg" asChild className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Link href="/categories">Trouver une perle</Link>
+              </Button>
+              <Button size="lg" variant="outline" asChild>
+                <Link href="/account/sell">Vendre un article</Link>
+              </Button>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </FadeIn>
 
       {/* Section Produits Vedettes */}
-      <section className="py-12 md:py-16">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-10">Nos Pépites du Moment</h2>
-          <Suspense fallback={<FeaturedProductsSkeleton />}>
-            <FeaturedProductsList />
-          </Suspense>
-          <div className="text-center mt-10">
-            <Button variant="outline" asChild>
-              <Link href="/categories">Voir tous les produits</Link>
-            </Button>
+      <FadeIn>
+        <section className="py-12 md:py-16">
+          <div className="container mx-auto px-4">
+            <h2 className="text-3xl font-bold text-center mb-10">Nos Pépites du Moment</h2>
+            <Suspense fallback={<FeaturedProductsSkeleton />}>
+              <FeaturedProductsList />
+            </Suspense>
+            <div className="text-center mt-10">
+              <Button variant="outline" asChild>
+                <Link href="/categories">Voir tous les produits</Link>
+              </Button>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </FadeIn>
 
       {/* Section Comment ça marche ? (Concept ReMarket) */}
-      <section id="comment-ca-marche" className="py-12 md:py-16 bg-muted/50 dark:bg-card">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-4">ReMarket Simplifie le Seconde Main</h2>
-          <p className="text-muted-foreground text-center max-w-3xl mx-auto mb-12">
-            Nous standardisons l&apos;expérience d&apos;achat et de vente pour vous offrir la qualité du neuf, au prix de l&apos;occasion. Pas de contact direct, pas de tracas.
-          </p>
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="flex flex-col items-center text-center p-6 bg-background dark:bg-gray-800/50 rounded-lg shadow-sm">
-              <div className="p-3 bg-primary/10 rounded-full mb-4">
-                <PackageCheck className="h-8 w-8 text-primary" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">1. Vendez Facilement</h3>
-              <p className="text-sm text-muted-foreground">
-                Soumettez votre produit. Notre IA l&apos;analyse et le liste. Une fois vendu, envoyez-le simplement à notre point relais.
-              </p>
-            </div>
-            <div className="flex flex-col items-center text-center p-6 bg-background dark:bg-gray-800/50 rounded-lg shadow-sm">
-              <div className="p-3 bg-primary/10 rounded-full mb-4">
-                <ShieldCheck className="h-8 w-8 text-primary" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">2. Achetez en Confiance</h3>
-              <p className="text-sm text-muted-foreground">
-                Trouvez votre bonheur parmi des annonces standardisées. Chaque article est vérifié avant de vous être expédié.
-              </p>
-            </div>
-            <div className="flex flex-col items-center text-center p-6 bg-background dark:bg-gray-800/50 rounded-lg shadow-sm">
-              <div className="p-3 bg-primary/10 rounded-full mb-4">
-                <Repeat className="h-8 w-8 text-primary" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">3. Processus Simplifié</h3>
-              <p className="text-sm text-muted-foreground">
-                ReMarket gère la logistique et la communication. Plus besoin de négocier ou de rencontrer des inconnus.
-              </p>
+      <FadeIn>
+        <section id="comment-ca-marche" className="py-12 md:py-16 bg-muted/50 dark:bg-card">
+          <div className="container mx-auto px-4">
+            <h2 className="text-3xl font-bold text-center mb-4">ReMarket Simplifie le Seconde Main</h2>
+            <p className="text-muted-foreground text-center max-w-3xl mx-auto mb-12">
+              Nous standardisons l&apos;expérience d&apos;achat et de vente pour vous offrir la qualité du neuf, au prix de l&apos;occasion. Pas de contact direct, pas de tracas.
+            </p>
+            <div className="grid md:grid-cols-3 gap-8">
+              <FadeIn delay={0.2}>
+                <div className="flex flex-col items-center text-center p-6 bg-background dark:bg-gray-800/50 rounded-lg shadow-sm">
+                  <div className="p-3 bg-primary/10 rounded-full mb-4">
+                    <PackageCheck className="h-8 w-8 text-primary" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">1. Vendez Facilement</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Soumettez votre produit. Notre IA l&apos;analyse et le liste. Une fois vendu, envoyez-le simplement à notre point relais.
+                  </p>
+                </div>
+              </FadeIn>
+              <FadeIn delay={0.4}>
+                <div className="flex flex-col items-center text-center p-6 bg-background dark:bg-gray-800/50 rounded-lg shadow-sm">
+                  <div className="p-3 bg-primary/10 rounded-full mb-4">
+                    <ShieldCheck className="h-8 w-8 text-primary" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">2. Achetez en Confiance</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Trouvez votre bonheur parmi des annonces standardisées. Chaque article est vérifié avant de vous être expédié.
+                  </p>
+                </div>
+              </FadeIn>
+              <FadeIn delay={0.6}>
+                <div className="flex flex-col items-center text-center p-6 bg-background dark:bg-gray-800/50 rounded-lg shadow-sm">
+                  <div className="p-3 bg-primary/10 rounded-full mb-4">
+                    <Repeat className="h-8 w-8 text-primary" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">3. Processus Simplifié</h3>
+                  <p className="text-sm text-muted-foreground">
+                    ReMarket gère la logistique et la communication. Plus besoin de négocier ou de rencontrer des inconnus.
+                  </p>
+                </div>
+              </FadeIn>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </FadeIn>
 
       {/* TODO: Ajouter d'autres sections: Catégories populaires, Témoignages, etc. */}
     </>
