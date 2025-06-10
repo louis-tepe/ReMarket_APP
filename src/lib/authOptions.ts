@@ -3,8 +3,8 @@ import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import clientPromise from "@/lib/mongoClient";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import User, { IUser } from "@/models/User";
-import dbConnect from "@/lib/db.Connect";
+import User, { IUser } from "@/lib/mongodb/models/User";
+import dbConnect from "@/lib/mongodb/dbConnect";
 
 // Type pour éviter `any` dans le callback session
 type SessionUserWithId = { id?: string; email?: string | null; name?: string | null; image?: string | null };

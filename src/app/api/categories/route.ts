@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import dbConnect from '@/lib/db.Connect'; // Correction du chemin d'importation
-import CategoryModel, { ICategory } from '@/models/CategoryModel';
+import dbConnect from '@/lib/mongodb/dbConnect';
+import CategoryModel, { ICategory } from '@/lib/mongodb/models/CategoryModel';
 import { FilterQuery } from 'mongoose';
 
 /**

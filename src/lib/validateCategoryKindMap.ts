@@ -1,10 +1,10 @@
 import mongoose from 'mongoose';
-import CategoryModel from '../models/CategoryModel'; // Ajustez le chemin si nécessaire
-import { categorySlugToKindMap } from '../config/discriminatorMapping'; // ProductKind retiré
+import CategoryModel from './mongodb/models/CategoryModel'; // Ajustez le chemin si nécessaire
+import { categorySlugToKindMap } from '@/config/discriminatorMapping'; // ProductKind retiré
 import dotenv from 'dotenv';
 
 // Charger les variables d'environnement (ex: MONGO_URI)
-dotenv.config({ path: '.env.local' }); // Ajustez le chemin vers votre .env si différent
+dotenv.config({ path: '.env.local' });
 
 interface LeanCategory { // Interface pour typer les objets catégorie de .lean()
     slug: string;

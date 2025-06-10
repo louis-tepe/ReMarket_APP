@@ -1,31 +1,32 @@
-import { CheerioAPI, Element as CheerioElement } from 'cheerio';
+import { CheerioAPI } from 'cheerio';
 import * as cheerio from 'cheerio';
-import { PlaywrightCrawlingContext, log as crawleeLog } from 'crawlee';
+import { PlaywrightCrawlingContext } from 'crawlee';
+import type { Element as CheerioElement } from 'domhandler';
 import {
   LedenicheurProductDetails,
   ProductSpecification,
   PriceHistoryData,
 } from './ledenicheur.types';
 import { PRODUCT_PAGE_SELECTORS } from './ledenicheur.selectors';
+import { calculateDiceSimilarity } from '../utils/scraper.utils';
 
 /**
  * Extrait le texte d'un élément Cheerio, en gérant les cas où il pourrait être undefined.
  */
-const safeExtractText = ($element: cheerio.Cheerio<cheerio.Element> | undefined): string => {
+const safeExtractText = ($element: cheerio.Cheerio<CheerioElement> | undefined): string => {
   return $element?.text()?.trim() || '';
 };
 
 /**
  * Extrait les données d'une ligne de spécification en utilisant les nouveaux sélecteurs.
  */
-const getSpecRowData = ($: CheerioAPI, rowHtmlElement: CheerioElement, logger: PlaywrightCrawlingContext['log']): Omit<ProductSpecification, 'section'> | null => {
+const getSpecRowData = ($: CheerioAPI, rowHtmlElement: CheerioElement): Omit<ProductSpecification, 'section'> | null => {
   const $row = $(rowHtmlElement);
   
   const keyColumn = $row.find(PRODUCT_PAGE_SELECTORS.SPECIFICATION_ROW_KEY_COLUMN);
   const valueColumn = $row.find(PRODUCT_PAGE_SELECTORS.SPECIFICATION_ROW_VALUE_COLUMN);
 
   // Detailed logging for raw text extraction
-  const rawKeyText = keyColumn.find(PRODUCT_PAGE_SELECTORS.SPECIFICATION_KEY_TEXT).text()?.trim();
   let rawValueText = valueColumn.find(PRODUCT_PAGE_SELECTORS.SPECIFICATION_VALUE_TEXT_SIMPLE).text()?.trim();
   if (!rawValueText) {
     rawValueText = valueColumn.find(PRODUCT_PAGE_SELECTORS.SPECIFICATION_VALUE_LINK).text()?.trim();
@@ -97,7 +98,7 @@ export const extractLedenicheurProductDetails = async (
   context: PlaywrightCrawlingContext
 ): Promise<LedenicheurProductDetails | null> => {
   const { request, response, page, log } = context;
-  let $ = context.$ as CheerioAPI;
+  const $ = context.$ as CheerioAPI;
 
   const currentUrl = request.loadedUrl || request.url;
   log.info(`[EXTRACT_PRODUCT_DETAILS] Extraction des "Info produit" pour ${currentUrl}`);
@@ -130,7 +131,7 @@ export const extractLedenicheurProductDetails = async (
   const allSpecifications: ProductSpecification[] = [];
 
   // Chercher le conteneur racine des spécifications (maintenant div[data-test-type="product-info"]) depuis l'instance Cheerio globale
-  const specificationsRootContainer: cheerio.Cheerio<cheerio.Element> = cheerioInstance(PRODUCT_PAGE_SELECTORS.SPECIFICATIONS_CONTAINER_ROOT).first() as cheerio.Cheerio<cheerio.Element>;
+  const specificationsRootContainer: cheerio.Cheerio<CheerioElement> = cheerioInstance(PRODUCT_PAGE_SELECTORS.SPECIFICATIONS_CONTAINER_ROOT).first() as cheerio.Cheerio<CheerioElement>;
 
   if (specificationsRootContainer.length === 0) {
     log.warning(`[EXTRACT_PRODUCT_DETAILS_DEBUG] Conteneur racine des spécifications (${PRODUCT_PAGE_SELECTORS.SPECIFICATIONS_CONTAINER_ROOT}) non trouvé globalement sur la page.`);
@@ -140,9 +141,9 @@ export const extractLedenicheurProductDetails = async (
   log.info(`[EXTRACT_PRODUCT_DETAILS_DEBUG] Conteneur racine SPECIFICATIONS_CONTAINER_ROOT (${PRODUCT_PAGE_SELECTORS.SPECIFICATIONS_CONTAINER_ROOT}) trouvé. HTML: ${specificationsRootContainer.html()?.substring(0, 200)}...`);
   
   // specificationsRootContainer EST maintenant notre sectionsHost direct
-  const sectionsHost: cheerio.Cheerio<cheerio.Element> = specificationsRootContainer;
+  const sectionsHost: cheerio.Cheerio<CheerioElement> = specificationsRootContainer;
 
-  const processSection = (sectionElement: cheerio.Cheerio<cheerio.Element>, defaultSectionName: string, sectionIndex: number) => {
+  const processSection = (sectionElement: cheerio.Cheerio<CheerioElement>, defaultSectionName: string) => {
     const $section = sectionElement;
     let sectionTitle = safeExtractText($section.find(PRODUCT_PAGE_SELECTORS.SPECIFICATION_SECTION_TITLE).first());
     
@@ -167,7 +168,6 @@ export const extractLedenicheurProductDetails = async (
         }
     }
 
-
     const finalSectionName = sectionTitle || defaultSectionName;
     // log.info(`[EXTRACT_PRODUCT_DETAILS_DEBUG] Processing Section ${sectionIndex + 1}/${totalSections}: Title = "${finalSectionName}"`);
     // log.debug(`[EXTRACT_PRODUCT_DETAILS_DEBUG] Section HTML: ${$section.html()?.substring(0, 300)}...`);
@@ -177,7 +177,7 @@ export const extractLedenicheurProductDetails = async (
 
     rows.each((rowIndex, rowEl: CheerioElement) => {
       // log.debug(`[EXTRACT_PRODUCT_DETAILS_DEBUG]   Processing Row ${rowIndex + 1} in section "${finalSectionName}"`);
-      const specData = getSpecRowData(cheerioInstance, rowEl, log);
+      const specData = getSpecRowData(cheerioInstance, rowEl);
       if (specData) {
         // log.info(`[EXTRACT_PRODUCT_DETAILS_DEBUG]     SPEC_FOUND in "${finalSectionName}": "${specData.key}" = "${specData.value}"`);
         allSpecifications.push({ ...specData, section: finalSectionName });
@@ -197,7 +197,7 @@ export const extractLedenicheurProductDetails = async (
 
   sectionsToProcess.each((idx, sectionEl) => {
     // log.info(`[EXTRACT_PRODUCT_DETAILS_DEBUG] Iterating section ${idx + 1} of ${totalSectionsFound}`);
-    processSection(cheerioInstance(sectionEl), `Général (Section ${idx + 1})`, idx);
+    processSection(cheerioInstance(sectionEl), `Général (Section ${idx + 1})`);
   });
   
   const pageH1Title = safeExtractText(cheerioInstance('h1').first());
@@ -275,7 +275,7 @@ export const handleLedenicheurCookieConsent = async (
         bannerClicked = true;
         break; 
         }
-    } catch (e) {
+    } catch {
       // logger.debug(`[COOKIE_CONSENT] Sélecteur de cookie '${selector}' non trouvé/interactif sur ${pageName}: ${(e as Error).message.split('\n')[0]}`);
       }
     }
@@ -336,7 +336,7 @@ export const extractPriceHistoryData = async (
           statisticsTabFound = true;
           break;
         }
-      } catch (error) {
+      } catch {
         // Continue vers le sélecteur suivant
         continue;
       }
@@ -366,7 +366,7 @@ export const extractPriceHistoryData = async (
           log.info(`[EXTRACT_PRICE_HISTORY] Section d'historique trouvée avec: ${selector}`);
           break;
         }
-      } catch (error) {
+      } catch {
         continue;
       }
     }
@@ -400,7 +400,7 @@ export const extractPriceHistoryData = async (
             }
             break;
           }
-        } catch (error) {
+        } catch {
           continue;
         }
       }
@@ -428,7 +428,7 @@ export const extractPriceHistoryData = async (
           log.info(`[EXTRACT_PRICE_HISTORY] Prix le plus bas 3 mois: ${priceHistoryData.lowest3MonthsPrice}`);
           break;
         }
-      } catch (error) {
+      } catch {
         continue;
       }
     }
@@ -448,7 +448,7 @@ export const extractPriceHistoryData = async (
           log.info(`[EXTRACT_PRICE_HISTORY] Date du prix le plus bas: ${priceHistoryData.lowest3MonthsDate}`);
           break;
         }
-      } catch (error) {
+      } catch {
         continue;
       }
     }
@@ -469,7 +469,7 @@ export const extractPriceHistoryData = async (
           log.info(`[EXTRACT_PRICE_HISTORY] Prix le plus bas actuel: ${priceHistoryData.currentLowestPrice}`);
           break;
         }
-      } catch (error) {
+      } catch {
         continue;
       }
     }
@@ -490,7 +490,7 @@ export const extractPriceHistoryData = async (
           log.info(`[EXTRACT_PRICE_HISTORY] Magasin prix le plus bas: ${priceHistoryData.currentLowestShop}`);
           break;
         }
-      } catch (error) {
+      } catch {
         continue;
       }
     }
@@ -555,7 +555,7 @@ const calculateMedianPriceFromChart = async (
           lowest3MonthsText = await element.textContent();
           break;
         }
-      } catch (error) {
+      } catch {
         continue;
       }
     }
@@ -575,7 +575,7 @@ const calculateMedianPriceFromChart = async (
           currentLowestText = await element.textContent();
           break;
         }
-      } catch (error) {
+      } catch {
         continue;
       }
     }
@@ -688,7 +688,8 @@ const calculateMedianPriceFromChart = async (
 };
 
 /**
- * Calcule la similarité entre deux chaînes normalisées avec pondération par type de produit.
+ * Calcule la similarité entre deux chaînes normalisées avec une nouvelle logique de pondération.
+ * @returns Un score de similarité final entre 0 et 1.
  */
 export const calculateSimilarityWithProductTypeBonus = (
   searchQuery: string,
@@ -696,98 +697,61 @@ export const calculateSimilarityWithProductTypeBonus = (
   normalizedQuery: string,
   normalizedCandidate: string
 ): number => {
-  // Calcul de base (Jaccard)
-  const queryWords = new Set(normalizedQuery.split(' '));
-  const candidateWords = new Set(normalizedCandidate.split(' '));
-  const intersection = new Set([...queryWords].filter(x => candidateWords.has(x)));
-  const union = new Set([...queryWords, ...candidateWords]);
-  let baseSimilarity = intersection.size / union.size;
+    // Utiliser la similarité de Dice comme base, sur les chaînes normalisées sans espaces
+    // pour mieux capturer les séquences comme "rtx3060"
+    const diceSimilarity = calculateDiceSimilarity(
+        normalizedQuery.replace(/\s/g, ''),
+        normalizedCandidate.replace(/\s/g, '')
+    );
 
-  // Détection du type de produit recherché
-  const searchLower = searchQuery.toLowerCase();
-  const candidateLower = candidateTitle.toLowerCase();
-  
-  // Mots-clés d'accessoires (pénalité renforcée)
-  const accessoryKeywords = [
-    'case', 'cover', 'sleeve', 'protector', 'stand', 'mount', 'cable', 
-    'adapter', 'charger', 'keyboard', 'mouse', 'bag', 'skin', 'shell',
-    'housse', 'étui', 'protection', 'coque', 'support', 'chargeur',
-    'clavier', 'souris', 'sac', 'adaptateur', 'câble', 
-    // Nouveaux mots-clés détectés dans les logs
-    'skal', 'fodral', 'smartshell', 'speck', 'spigen', 'pouch', 
-    'armor', 'folio', 'smart', 'leather', 'rugged', 'lock', 
-    'adapter', 'batteri', 'battery'
-  ];
-  
-  // Mots-clés de vrais produits (bonus)
-  const coreProductKeywords = [
-    'macbook', 'iphone', 'ipad', 'imac', 'mac mini', 'air', 'pro max',
-    'laptop', 'computer', 'tablet', 'phone', 'desktop'
-  ];
-  
-  // Recherche de mots-clés de processeur/spécifications (bonus fort)
-  const processorKeywords = ['m1', 'm2', 'm3', 'm4', 'intel', 'amd', 'cpu', 'gpu', 'ram', 'ssd', 'storage', 'go', 'gb', 'tb'];
-  
-  let bonus = 0;
-  let penalty = 0;
-  
-  // Vérifier si c'est un accessoire (pénalité renforcée)
-  const hasAccessoryKeyword = accessoryKeywords.some(keyword => 
-    candidateLower.includes(keyword)
-  );
-  
-  // Vérifier si c'est un vrai produit
-  const hasCoreProductKeyword = coreProductKeywords.some(keyword => 
-    candidateLower.includes(keyword) && searchLower.includes(keyword)
-  );
-  
-  // Vérifier les spécifications techniques
-  const hasProcessorKeyword = processorKeywords.some(keyword => 
-    candidateLower.includes(keyword)
-  );
-  
-  // Vérifier les marques d'accessoires connues
-  const accessoryBrands = ['speck', 'spigen', 'compulocks'];
-  const hasAccessoryBrand = accessoryBrands.some(brand => 
-    candidateLower.includes(brand)
-  );
-  
-  // Appliquer les pénalités (renforcées)
-  if (hasAccessoryKeyword || hasAccessoryBrand) {
-    penalty = 0.6; // Augmentation de 0.3 à 0.6 pour une pénalité plus forte
-  }
-  
-  // Appliquer les bonus (améliorés)
-  if (hasCoreProductKeyword && hasProcessorKeyword) {
-    bonus = 0.3; // Augmentation de 0.2 à 0.3 pour vrais produits avec specs
-  } else if (hasCoreProductKeyword) {
-    bonus = 0.15; // Augmentation de 0.1 à 0.15 pour vrais produits
-  }
-  
-  // Bonus spécifique pour correspondance exacte de processeur
-  if (searchLower.includes('m2') && candidateLower.includes('m2')) {
-    bonus += 0.2; // Augmentation de 0.15 à 0.2
-  }
-  if (searchLower.includes('m3') && candidateLower.includes('m3')) {
-    bonus += 0.15; // Léger malus par rapport à M2 pour M3
-  }
-  if (searchLower.includes('m4') && candidateLower.includes('m4')) {
-    bonus += 0.15;
-  }
-  if (searchLower.includes('m1') && candidateLower.includes('m1')) {
-    bonus += 0.1; // Bonus plus faible pour génération antérieure
-  }
-  
-  // Bonus pour correspondance exacte de modèle
-  if (searchLower.includes('macbook pro') && candidateLower.includes('macbook pro')) {
-    bonus += 0.1;
-  }
-  if (searchLower.includes('macbook air') && candidateLower.includes('macbook air')) {
-    bonus += 0.1;
-  }
-  
-  // Calculer la similarité finale
-  const finalSimilarity = Math.max(0, Math.min(1, baseSimilarity + bonus - penalty));
-  
-  return finalSimilarity;
+    let bonus = 0;
+    const MAX_BONUS = 0.4; // Le bonus total ne peut pas dépasser 0.4 pour ne pas surcoter
+
+    // --- Bonus pour la correspondance des nombres (très important pour les modèles) ---
+    const queryNumbers = normalizedQuery.match(/\d+/g) || [];
+    const candidateNumbers = normalizedCandidate.match(/\d+/g) || [];
+    
+    if (queryNumbers.length > 0) {
+        const queryNumSet = new Set(queryNumbers);
+        const candidateNumSet = new Set(candidateNumbers);
+        const commonNumbers = new Set([...queryNumSet].filter(x => candidateNumSet.has(x)));
+
+        if (queryNumSet.size === commonNumbers.size) {
+            // Bonus maximal si tous les nombres de la requête sont dans le candidat
+            bonus += 0.25;
+        } else if (commonNumbers.size > 0) {
+            // Bonus partiel proportionnel au nombre de correspondances
+            bonus += 0.15 * (commonNumbers.size / queryNumSet.size);
+        }
+    }
+
+    // --- Bonus pour les termes techniques et variantes communes ---
+    const technicalTerms = ['ti', 'super', 'xt', 'oc', 'v2', 'lhr', 'gaming', 'pro', 'dual', 'fan', 'edition', 'white', 'black'];
+    const queryWords = new Set(normalizedQuery.split(' '));
+    const candidateWords = new Set(normalizedCandidate.split(' '));
+
+    const commonTechTerms = technicalTerms.filter(term => 
+        queryWords.has(term) && candidateWords.has(term)
+    );
+
+    // Ajoute un petit bonus pour chaque terme technique commun
+    bonus += Math.min(0.15, commonTechTerms.length * 0.05);
+
+    // --- Pénalité pour les mots indiquant une incompatibilité ---
+    // Par exemple, si l'on cherche "3060" et que le titre contient "3060 ti",
+    // mais que la recherche ne contient pas "ti".
+    const queryLower = normalizedQuery;
+    const candidateLower = normalizedCandidate;
+
+    if (candidateLower.includes('ti') && !queryLower.includes('ti') && queryLower.includes('3060')) {
+        // C'est un cas délicat, on peut choisir de ne pas pénaliser pour l'instant
+        // car un utilisateur pourrait omettre "ti" en cherchant une "3060 ti".
+    }
+
+    // Calculer la similarité finale
+    // On combine la similarité de Dice avec le bonus, en s'assurant que le résultat reste entre 0 et 1.
+    // La similarité de Dice a plus de poids.
+    const finalSimilarity = Math.min(1, (diceSimilarity * 0.7) + Math.min(bonus, MAX_BONUS));
+
+    return finalSimilarity;
 }; 

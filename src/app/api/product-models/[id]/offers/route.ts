@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import dbConnect from '@/lib/db.Connect';
-import ProductOfferModel, { IProductBase } from '@/models/ProductBaseModel';
-import ProductModel from '@/models/ProductModel';
-import UserModel from '@/models/User';
+import dbConnect from '@/lib/mongodb/dbConnect';
+import ProductOfferModel, { IProductBase } from '@/lib/mongodb/models/ProductBaseModel';
+import ProductModel from '@/lib/mongodb/models/ProductModel';
+import UserModel from '@/lib/mongodb/models/User';
 import { Types } from 'mongoose';
 
 /**

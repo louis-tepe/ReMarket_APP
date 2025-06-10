@@ -42,6 +42,7 @@ export default function SellerOfferCard({
 
     const conditionBadgeVariant = CONDITION_BADGE_VARIANTS[offer.condition] || 'secondary';
     const conditionLabel = CONDITION_LABELS[offer.condition] || offer.condition;
+    const isOfferAvailable = offer.transactionStatus === 'available' && offer.stockQuantity > 0;
 
     return (
         <Card className="shadow-sm hover:shadow-md transition-shadow bg-card">
@@ -69,12 +70,15 @@ export default function SellerOfferCard({
                 <Button
                     className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
                     onClick={() => onAddToCart(offer)}
-                    disabled={isAddingToCart || !isUserLoggedIn || sessionLoading}
+                    disabled={!isOfferAvailable || isAddingToCart || !isUserLoggedIn || sessionLoading}
+                    aria-label={isOfferAvailable ? "Ajouter au panier" : "Offre non disponible"}
                 >
                     {isAddingToCart ? (
                         <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Ajout...</>
-                    ) : (
+                    ) : isOfferAvailable ? (
                         <><ShoppingCart className="mr-2 h-5 w-5" /> Ajouter au panier</>
+                    ) : (
+                        <>Indisponible</>
                     )}
                 </Button>
             </CardFooter>

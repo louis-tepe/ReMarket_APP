@@ -1,29 +1,29 @@
-import { NextResponse, NextRequest } from 'next/server';
+import ProductOfferModel from '@/lib/mongodb/models/ProductBaseModel';
+import { NextRequest, NextResponse } from 'next/server';
 import type { FormFieldDefinition } from '@/types/form.types.ts';
-import ProductOfferModel from '@/models/ProductBaseModel';
 
 // Les imports des discriminateurs sont nécessaires pour que Mongoose les enregistre
 // et qu'ils soient disponibles via ProductOfferModel.discriminators.
-import '@/models/discriminators/SmartphoneModel';
-import '@/models/discriminators/LaptopModel';
-import '@/models/discriminators/MonitorModel';
-import '@/models/discriminators/CasesCoversModel';
-import '@/models/discriminators/ChargersCablesModel';
-import '@/models/discriminators/CpuModel';
-import '@/models/discriminators/DesktopComputerModel';
-import '@/models/discriminators/FeaturePhoneModel';
-import '@/models/discriminators/FitnessTrackerModel';
-import '@/models/discriminators/GpuModel';
-import '@/models/discriminators/KeyboardModel';
-import '@/models/discriminators/MotherboardModel';
-import '@/models/discriminators/PcCaseModel';
-import '@/models/discriminators/PowerBanksModel';
-import '@/models/discriminators/PsuModel';
-import '@/models/discriminators/RamModel';
-import '@/models/discriminators/ScreenProtectorsModel';
-import '@/models/discriminators/SmartwatchModel';
-import '@/models/discriminators/StorageModel';
-import '@/models/discriminators/TabletModel';
+import '@/lib/mongodb/models/discriminators/SmartphoneModel';
+import '@/lib/mongodb/models/discriminators/LaptopModel';
+import '@/lib/mongodb/models/discriminators/MonitorModel';
+import '@/lib/mongodb/models/discriminators/CasesCoversModel';
+import '@/lib/mongodb/models/discriminators/ChargersCablesModel';
+import '@/lib/mongodb/models/discriminators/CpuModel';
+import '@/lib/mongodb/models/discriminators/DesktopComputerModel';
+import '@/lib/mongodb/models/discriminators/FeaturePhoneModel';
+import '@/lib/mongodb/models/discriminators/FitnessTrackerModel';
+import '@/lib/mongodb/models/discriminators/GpuModel';
+import '@/lib/mongodb/models/discriminators/KeyboardModel';
+import '@/lib/mongodb/models/discriminators/MotherboardModel';
+import '@/lib/mongodb/models/discriminators/PcCaseModel';
+import '@/lib/mongodb/models/discriminators/PowerBanksModel';
+import '@/lib/mongodb/models/discriminators/PsuModel';
+import '@/lib/mongodb/models/discriminators/RamModel';
+import '@/lib/mongodb/models/discriminators/ScreenProtectorsModel';
+import '@/lib/mongodb/models/discriminators/SmartwatchModel';
+import '@/lib/mongodb/models/discriminators/StorageModel';
+import '@/lib/mongodb/models/discriminators/TabletModel';
 
 function generateLabel(name: string): string {
     const result = name.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ');

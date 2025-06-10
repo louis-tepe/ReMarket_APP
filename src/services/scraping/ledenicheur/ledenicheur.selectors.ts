@@ -47,6 +47,7 @@ export const PRODUCT_PAGE_SELECTORS = {
   FIRST_UNNAMED_SPECIFICATION_SECTION_CONTAINER: 'div[data-test-type="product-info"] > div.hideInViewports-sc-0-0:first-child > section[role="list"]',
 
   // Sélecteurs pour la galerie d'images (Lightbox/Carousel) - corrigés selon HTML réel
+  MAIN_IMAGE_CONTAINER: 'div[data-test="Carousel"]',
   PRODUCT_MEDIA_BUTTON: 'button[data-test="ProductMedia"]',
   LIGHTBOX_CAROUSEL_CONTAINER: 'div.Lightbox-sc-0-0, div[data-test="Carousel"]',
   CAROUSEL_CONTAINER: 'div[data-test="Carousel"]',
@@ -107,4 +108,8 @@ export const PRODUCT_PAGE_SELECTORS = {
   // REVIEW_ITEM: 'div.review',
   // REVIEW_RATING: 'span.review-rating',
   // REVIEW_TEXT: 'p.review-text',
+
+  // Popups et overlays
+  NEWSLETTER_POPUP: 'div[data-test="NewsletterPopup"]', // Placeholder, à vérifier
+  PRICE_ALERT_POPUP: 'div[data-test="PriceAlertPopup"]', // Placeholder, à vérifier
 }; 

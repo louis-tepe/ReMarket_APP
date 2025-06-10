@@ -1,7 +1,7 @@
-import type { IProductModel as BackendProductModel } from '@/models/ProductModel';
-import type { ICategory as BackendCategory } from '@/models/CategoryModel';
-import type { FormFieldDefinition } from '@/types/form.types'; // Assurez-vous que ce chemin est correct
-import type { IBrand as BackendBrand } from '@/models/BrandModel'; // Import IBrand
+import type { IProductModel as BackendProductModel } from '@/lib/mongodb/models/ProductModel';
+import type { ICategory as BackendCategory } from '@/lib/mongodb/models/CategoryModel';
+import type { FormFieldDefinition } from '@/types/form.types';
+import type { IBrand as BackendBrand } from '@/lib/mongodb/models/BrandModel'; // Import IBrand
 
 // Export IProductModelReMarketType directly
 export type IProductModelReMarketType = BackendProductModel;

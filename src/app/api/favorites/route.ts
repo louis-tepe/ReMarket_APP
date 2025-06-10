@@ -1,8 +1,8 @@
+import dbConnect from '@/lib/mongodb/dbConnect';
+import User from '@/lib/mongodb/models/User';
+import ProductModel, { IProductModel } from '@/lib/mongodb/models/ProductModel';
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import User from '@/models/User';
-import ProductModel, { IProductModel } from '@/models/ProductModel';
-import dbConnect from '@/lib/db.Connect';
 import { Types } from 'mongoose'; // Importer Types
 
 const isValidObjectId = (id: string): boolean => Types.ObjectId.isValid(id);

@@ -1,7 +1,7 @@
+import dbConnect from '@/lib/mongodb/dbConnect';
+import ProductOfferModel, { IProductBase } from '@/lib/mongodb/models/ProductBaseModel';
+import ProductModel, { IProductModel } from '@/lib/mongodb/models/ProductModel';
 import { NextResponse } from 'next/server';
-import dbConnect from '@/lib/db.Connect';
-import ProductOfferModel, { IProductBase } from '@/models/ProductBaseModel';
-import ProductModel, { IProductModel } from '@/models/ProductModel';
 import { Types } from 'mongoose';
 
 // Interface pour les informations de modèle de produit

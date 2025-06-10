@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { scrapeLedenicheurProduct } from '@/services/scraping/ledenicheur/ledenicheur.scraper';
 import { LedenicheurProductDetails } from '@/services/scraping/ledenicheur/ledenicheur.types';
-import dbConnect from '@/lib/db.Connect';
-import ProductModel, { IProductModel, IProductModelBase } from '@/models/ProductModel';
-import CategoryModel, { ICategory } from '@/models/CategoryModel';
-import BrandModel, { IBrand } from '@/models/BrandModel';
+import dbConnect from '@/lib/mongodb/dbConnect';
+import ProductModel, { IProductModel, IProductModelBase } from '@/lib/mongodb/models/ProductModel';
+import CategoryModel, { ICategory } from '@/lib/mongodb/models/CategoryModel';
+import BrandModel, { IBrand } from '@/lib/mongodb/models/BrandModel';
 import { Types, FilterQuery } from 'mongoose';
 
 // TODO: Connecter à la base de données et utiliser les modèles Mongoose
@@ -236,8 +236,17 @@ export async function POST(request: NextRequest) {
     if (!brandDoc) return NextResponse.json({ error: `Marque non trouvée: ${brandSlugFromRequest}` }, { status: 404 });
 
     const scrapedData = await scrapeLedenicheurProduct(productNameToScrape);
-    if (!scrapedData?.pageTitle) {
-      return NextResponse.json({ error: `Aucune donnée scrapée pour "${productNameToScrape}".` }, { status: 404 });
+    if (!scrapedData) {
+      return NextResponse.json({ error: `Aucune donnée scrapée pour "${productNameToScrape}". Le produit est introuvable ou le scraping a échoué.` }, { status: 404 });
+    }
+
+    // On a des données, mais elles peuvent être incomplètes.
+    // Un titre est essentiel. Si absent, on considère l'opération comme un échec partiel.
+    if (!scrapedData.pageTitle) {
+      return NextResponse.json({ 
+        error: `Données scrapées incomplètes pour "${productNameToScrape}" (titre manquant).`,
+        details: `Une page a été trouvée (${scrapedData.url}) mais le contenu essentiel n'a pas pu être extrait.`
+      }, { status: 404 });
     }
     
     const existingProductModel = await ProductModel.findOne({ scrapedSourceUrl: scrapedData.url, scrapedSource: 'ledenicheur' });

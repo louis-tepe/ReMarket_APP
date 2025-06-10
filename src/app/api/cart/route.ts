@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';
-import dbConnect from '@/lib/db.Connect';
-import CartModel, { ICart } from '@/models/CartModel';
-import ProductOfferModel from '@/models/ProductBaseModel';
+import dbConnect from '@/lib/mongodb/dbConnect';
+import CartModel, { ICart } from '@/lib/mongodb/models/CartModel';
+import ProductOfferModel from '@/lib/mongodb/models/ProductBaseModel';
 import { Types } from 'mongoose';
 
 // INTERFACES POUR LE PANIER LEAN ET LES OFFRES LEAN
@@ -141,11 +141,14 @@ export async function POST(request: NextRequest) {
                 }
 
                 const offerToAdd = await ProductOfferModel.findById(offerId)
-                    .select('_id transactionStatus productModel price') 
-                    .lean<{ _id: Types.ObjectId, transactionStatus?: string, productModel: Types.ObjectId, price: number } | null>();
+                    .select('_id transactionStatus productModel price stockQuantity')
+                    .lean<{ _id: Types.ObjectId, transactionStatus: string, productModel: Types.ObjectId, price: number, stockQuantity: number } | null>();
 
-                if (!offerToAdd || offerToAdd.transactionStatus !== 'available') {
-                    return NextResponse.json({ success: false, message: 'Offre non disponible ou introuvable.' }, { status: 404 });
+                if (!offerToAdd) {
+                    return NextResponse.json({ success: false, message: 'Offre introuvable.' }, { status: 404 });
+                }
+                if (offerToAdd.transactionStatus !== 'available' || offerToAdd.stockQuantity < 1) {
+                    return NextResponse.json({ success: false, message: 'Cette offre n\'est plus disponible.' }, { status: 404 });
                 }
                 if (offerToAdd.productModel.toString() !== productModelId) {
                     return NextResponse.json({ success: false, message: 'L\'offre ne correspond pas au produit.' }, { status: 400 });
@@ -176,8 +179,18 @@ export async function POST(request: NextRequest) {
                 if (!itemToUpdate) {
                     return NextResponse.json({ success: false, message: 'Article non trouvé pour mise à jour.' }, { status: 404 });
                 }
+                
+                // Check stock for update
+                const offerForUpdate = await ProductOfferModel.findById(itemToUpdate.offer)
+                    .select('stockQuantity transactionStatus')
+                    .lean<{ stockQuantity: number, transactionStatus: string } | null>();
+
+                if (!offerForUpdate || offerForUpdate.transactionStatus !== 'available' || offerForUpdate.stockQuantity < quantity) {
+                    return NextResponse.json({ success: false, message: 'Stock insuffisant ou offre non disponible.' }, { status: 400 });
+                }
+                
                 itemToUpdate.quantity = quantity;
-                await cart!.save(); 
+                await cart!.save();
                 message = 'Quantité mise à jour.';
                 break;
 

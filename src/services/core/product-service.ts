@@ -1,6 +1,6 @@
-import dbConnect from "@/lib/db.Connect";
-import ProductModel, { IProductModel } from "@/models/ProductModel";
-import ProductOfferModel, { IProductBase } from "@/models/ProductBaseModel";
+import dbConnect from "@/lib/mongodb/dbConnect";
+import ProductModel, { IProductModel } from "@/lib/mongodb/models/ProductModel";
+import ProductOfferModel, { IProductBase } from "@/lib/mongodb/models/ProductBaseModel";
 import { ProductCardProps } from "@/components/shared/ProductCard";
 
 const FEATURED_PRODUCTS_LIMIT = 4;

@@ -26,6 +26,7 @@ export type LedenicheurProductDetails = {
   productInfoTitle?: string | null; // Titre de la section "Info produit" (ex: "Info produit")
   specifications: ProductSpecification[]; // Liste de toutes les spécifications extraites
   imageUrls?: string[]; // URLs des images du produit
+  imageFiles?: string[]; // Chemins locaux des images téléchargées
   priceHistory?: PriceHistoryData | null; // Données d'historique des prix
 };
 

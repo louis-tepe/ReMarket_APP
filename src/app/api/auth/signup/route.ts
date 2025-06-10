@@ -1,7 +1,7 @@
+import dbConnect from '@/lib/mongodb/dbConnect'; // Connexion à la BDD
+import User from '@/lib/mongodb/models/User'; // Modèle User Mongoose
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import dbConnect from '@/lib/db.Connect'; // Utilitaire de connexion Mongoose
-import User from '@/models/User'; // Modèle User Mongoose
 
 const MIN_PASSWORD_LENGTH = 6;
 

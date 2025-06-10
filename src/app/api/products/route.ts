@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import dbConnect from '@/lib/db.Connect';
-import ProductModel, { IProductModel } from '@/models/ProductModel';
-import ProductOfferModel from '@/models/ProductBaseModel';
-import CategoryModel from '@/models/CategoryModel';
-import BrandModel from '@/models/BrandModel';
+import dbConnect from '@/lib/mongodb/dbConnect';
+import ProductModel, { IProductModel } from '@/lib/mongodb/models/ProductModel';
+import ProductOfferModel from '@/lib/mongodb/models/ProductBaseModel';
+import CategoryModel from '@/lib/mongodb/models/CategoryModel';
+import BrandModel from '@/lib/mongodb/models/BrandModel';
 import { FilterQuery, SortOrder, Types } from 'mongoose';
 
 // Type pour l'objet ProductModel après .lean()

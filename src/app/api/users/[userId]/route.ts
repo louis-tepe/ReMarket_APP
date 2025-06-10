@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/authOptions";
-import User from '@/models/User';
-import dbConnect from '@/lib/db.Connect';
+import dbConnect from '@/lib/mongodb/dbConnect';
+import User from '@/lib/mongodb/models/User';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/authOptions';
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ userId: string }> }) {
     await dbConnect();

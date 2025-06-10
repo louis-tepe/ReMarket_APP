@@ -1,6 +1,7 @@
 import { log } from 'crawlee';
 import { CheerioAPI } from 'cheerio';
 import * as cheerio from 'cheerio';
+import { type AnyNode } from 'domhandler';
 
 /**
  * Introduces a random delay between a minimum and maximum number of milliseconds.
@@ -35,11 +36,49 @@ export const normalizeProductTitle = (title: string): string => {
     normalized = normalized.replace(/\s+/g, " ").trim();
     // Étape 4: Séparer les mots, filtrer les mots vides (si certains caractères non alphanumériques ont été remplacés par des espaces seuls)
     const words = normalized.split(' ').filter(word => word.length > 0);
-    // Étape 5: Trier les mots
-    words.sort();
+    // Étape 5: Trier les mots - CETTE ETAPE EST SUPPRIMEE car elle peut nuire à la comparaison par n-grammes
+    // words.sort(); 
     // Étape 6: Rejoindre les mots
     normalized = words.join(' ');
     return normalized;
+};
+
+/**
+ * Calcule la similarité de Sørensen-Dice entre deux chaînes en utilisant des bigrammes.
+ * C'est efficace pour trouver des correspondances même avec de légères fautes de frappe ou des ordres de mots différents.
+ * @param str1 La première chaîne.
+ * @param str2 La deuxième chaîne.
+ * @returns Un score de similarité entre 0 et 1.
+ */
+export const calculateDiceSimilarity = (str1: string, str2: string): number => {
+    if (str1.length < 2 || str2.length < 2) {
+        return str1 === str2 ? 1 : 0;
+    }
+
+    const getBigrams = (str: string): Map<string, number> => {
+        const bigrams = new Map<string, number>();
+        for (let i = 0; i < str.length - 1; i++) {
+            const bigram = str.substring(i, i + 2);
+            bigrams.set(bigram, (bigrams.get(bigram) || 0) + 1);
+        }
+        return bigrams;
+    };
+
+    const bigrams1 = getBigrams(str1);
+    const bigrams2 = getBigrams(str2);
+
+    let intersectionSize = 0;
+    for (const [bigram, count1] of bigrams1.entries()) {
+        const count2 = bigrams2.get(bigram) || 0;
+        intersectionSize += Math.min(count1, count2);
+    }
+
+    const totalBigrams = Array.from(bigrams1.values()).reduce((sum, count) => sum + count, 0) + 
+                         Array.from(bigrams2.values()).reduce((sum, count) => sum + count, 0);
+
+    if (totalBigrams === 0) return 1;
+
+    return (2 * intersectionSize) / totalBigrams;
 };
 
 /**
@@ -96,7 +135,7 @@ export const parseNumberValue = (rawString: string | null | undefined): number |
  * @param context - (Optional) A Cheerio context to search within.
  * @returns The parsed number, or null if the element is not found or its text cannot be parsed.
  */
-export const parseNumberFromSelector = ($: CheerioAPI, selector: string, context?: cheerio.Cheerio<cheerio.AnyNode>): number | null => {
+export const parseNumberFromSelector = ($: CheerioAPI, selector: string, context?: cheerio.Cheerio<AnyNode>): number | null => {
     const rawValue = extractText($, selector, context);
     return parseNumberValue(rawValue);
 };
@@ -108,7 +147,7 @@ export const parseNumberFromSelector = ($: CheerioAPI, selector: string, context
  * @param context - (Optional) A Cheerio context (e.g., a specific part of the document) to search within.
  * @returns The trimmed text content of the element, or null if the element is not found or has no text.
  */
-export const extractText = ($: CheerioAPI, selector: string, context?: cheerio.Cheerio<cheerio.AnyNode>): string | null => {
+export const extractText = ($: CheerioAPI, selector: string, context?: cheerio.Cheerio<AnyNode>): string | null => {
     const element = context ? context.find(selector).first() : $(selector).first();
     const text = element.text().trim();
     return text || null;

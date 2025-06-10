@@ -24,16 +24,20 @@ export default function ProductOffersList({
     isUserLoggedIn,
     sessionLoading
 }: ProductOffersListProps) {
+    const availableOffers = offers.filter(
+        offer => offer.transactionStatus === 'available' && offer.stockQuantity > 0
+    );
+
     return (
         <div className="mb-8">
             <h2 className="text-2xl font-semibold mb-4 flex items-center">
                 <Tag className="h-6 w-6 mr-2 text-primary" /> Choisir une offre ReMarket
             </h2>
-            {offers.length > 0 ? (
+            {availableOffers.length > 0 ? (
                 <div className="space-y-4">
-                    {offers.map((offer) => (
+                    {availableOffers.map((offer, index) => (
                         <SellerOfferCard
-                            key={offer._id}
+                            key={offer._id || index}
                             offer={offer}
                             onAddToCart={onAddToCart}
                             isAddingToCart={addingToCartOfferId === offer._id}

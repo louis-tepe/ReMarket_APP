@@ -1,5 +1,5 @@
 import type { Content } from "@google/generative-ai";
-import type { IChatMessage as StoredChatMessage, IMessagePart as StoredMessagePart, IChatSession as ChatSessionDoc } from "@/models/ChatSession";
+import type { IChatMessage as StoredChatMessage, IMessagePart as StoredMessagePart, IChatSession as ChatSessionDoc } from "@/lib/mongodb/models/ChatSession";
 
 export interface UIMessage {
     id: string;

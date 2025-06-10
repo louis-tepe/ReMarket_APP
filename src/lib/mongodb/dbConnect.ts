@@ -1,7 +1,8 @@
     // lib/dbConnect.ts
     import mongoose from 'mongoose';
-    import '@/models/BrandModel';
-    import '@/models/CategoryModel';
+    import '@/lib/mongodb/models/BrandModel';
+    import '@/lib/mongodb/models/CategoryModel';
+    import '@/lib/mongodb/models/User';
 
     const MONGODB_URI = process.env.MONGODB_URI;
 

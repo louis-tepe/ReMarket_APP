@@ -1,9 +1,9 @@
 {
-  "usableSessionsCount": 4,
+  "usableSessionsCount": 3,
   "retiredSessionsCount": 0,
   "sessions": [
     {
-      "id": "session_lpMP9cyRhg",
+      "id": "session_aAOznd2Jla",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -16,14 +16,14 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-05-30T13:58:08.654Z",
-      "createdAt": "2025-05-30T13:08:08.654Z",
+      "expiresAt": "2025-06-10T22:03:02.224Z",
+      "createdAt": "2025-06-10T21:13:02.224Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_jk7Xke0O5O",
+      "id": "session_x977KI94ZO",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -34,88 +34,110 @@
         "cookies": [
           {
             "key": "pj:session",
-            "value": "eyJpZCI6IjFhZGE1OGU2LTE3OTItNDgwMC1hMTAzLTE3NTI1ZGM0ZjE5OCIsIl9leHBpcmUiOjIwNjM5NzA0OTIyNzQsIl9tYXhBZ2UiOjMxNTM2MDAwMDAwMH0=",
-            "expires": "2026-07-04T13:08:12.431Z",
+            "value": "eyJpZCI6IjQxNDY2ZjlkLWY1NzUtNDViMS1hMWUwLTFiZmIzODdkNmFkOSIsInZpZXdlZEV4cGVyaW1lbnRzIjp7InVzZS1uZXh0anMtcHJveHkiOnsidmFyaWFudCI6ImVuYWJsZWQifX0sIl9leHBpcmUiOjIwNjQ5NDk5ODY0MjYsIl9tYXhBZ2UiOjMxNTM2MDAwMDAwMH0=",
+            "expires": "2026-07-15T21:13:06.435Z",
             "domain": "ledenicheur.fr",
             "path": "/",
             "secure": true,
             "httpOnly": true,
             "hostOnly": false,
-            "creation": "2025-05-30T13:08:14.232Z",
-            "lastAccessed": "2025-05-30T13:08:14.232Z"
+            "creation": "2025-06-10T21:13:05.153Z",
+            "lastAccessed": "2025-06-10T21:13:06.843Z"
           },
           {
             "key": "pj:session.sig",
-            "value": "HCVpOf8cjHyNLUHQ3O3Ff1j_WBU",
-            "expires": "2026-07-04T13:08:12.431Z",
+            "value": "HzEicbjP07yRClxLSubMxbcXzL4",
+            "expires": "2026-07-15T21:13:06.435Z",
             "domain": "ledenicheur.fr",
             "path": "/",
             "secure": true,
             "httpOnly": true,
             "hostOnly": false,
-            "creation": "2025-05-30T13:08:14.232Z",
-            "lastAccessed": "2025-05-30T13:08:14.232Z"
+            "creation": "2025-06-10T21:13:05.153Z",
+            "lastAccessed": "2025-06-10T21:13:06.844Z"
           },
           {
             "key": "pj:cfexpuid",
-            "value": "9838c2e9-8306-49db-a8b5-7e61e7e713e0",
-            "expires": "2025-07-29T13:08:10.431Z",
+            "value": "84ba9473-da1f-465d-b220-7c02f962c4bd",
+            "expires": "2025-08-09T21:13:02.301Z",
             "domain": "ledenicheur.fr",
             "path": "/",
             "secure": true,
             "httpOnly": true,
             "hostOnly": true,
-            "creation": "2025-05-30T13:08:14.232Z",
-            "lastAccessed": "2025-05-30T13:08:14.232Z"
+            "creation": "2025-06-10T21:13:05.154Z",
+            "lastAccessed": "2025-06-10T21:13:06.843Z"
           },
           {
             "key": "__cf_bm",
-            "value": "io0shJolec1beGNzh6F1YYucJODnuDy6IA2XiHDX8mo-1748610492-1.0.1.1-l6_0sxh4r7s4z60MJsHgjg8tBjZl5BKWj4B5KuuqAULMQRGXCxmZTu0K0_cAFgYngQOdydI2TumN3otmy_c1OxXBsIME84tOmUvKYl4eRvU",
-            "expires": "2025-05-30T13:38:12.431Z",
+            "value": "trAXUczPuXV05wIQmAUyTxOzfVFDECPmLVgJazZMzxI-1749589983-1.0.1.1-fVq9Xf1PtVBWyYNyBiqpLCVbiNlYzxSqp2EdQY_7DCNOJRkcoKA83oZdVHaQr5Nzw9DAzUqM07KZYCCvtGy8yp_LG4z3hXFafC9yLPGGD_Y",
+            "expires": "2025-06-10T21:43:03.302Z",
             "domain": "ledenicheur.fr",
             "path": "/",
             "secure": true,
             "httpOnly": true,
             "hostOnly": false,
-            "creation": "2025-05-30T13:08:14.232Z",
-            "lastAccessed": "2025-05-30T13:08:14.232Z"
+            "creation": "2025-06-10T21:13:05.154Z",
+            "lastAccessed": "2025-06-10T21:13:06.843Z"
           },
           {
-            "key": "cf_clearance",
-            "value": ".EJIFRLVnB1FGBuYIf2.qB.ahea.o9OyzItfRPPSbcw-1748610493-1.2.1.1-q6LB92NLAF53or5jGQuLN1VAQWH3X7x1k1LXrPB2Q.tdsjYU70NRHPYHPBI8_wCn5FfIc3HvYUjAXgpekDlUlG3D2LgwjnWytpRhn57_F.itjazBC0moXVQ9KG5E8JkN84hj06xS6cQqX21vvp1KPRcwpK4t2nn8Veqa6GlblDJi1npOslcx8VX2JkFauGoFXXlIvpXfXDVxMZxRgbCh62i830Ut9NRhFFXyOmApZkTuZN.JhdYGef1zIRFAtMmACSTbJSPgLemCJ0DBxAwxdfkajHl_kjGXXebx.PEl8.8vvz4Y4bvq1PcBwc22ugPOT3kPEJLQ40PVr74ypeFGcekssbQfY3iy3pPBoP0VBtw",
-            "expires": "2026-05-30T13:08:13.947Z",
+            "key": "ph_phc_TnPym3OL45U3EXsGuiEDWdOjVKxJwYi9ckgN9iQeixM_posthog",
+            "value": "%7B%22distinct_id%22%3A%2201975bb0-8191-7073-9640-632a4bfcefff%22%2C%22%24sesid%22%3A%5B1749589983661%2C%2201975bb0-8190-7a75-af8c-5108758e26bd%22%2C1749589983632%5D%2C%22%24initial_person_info%22%3A%7B%22r%22%3A%22%24direct%22%2C%22u%22%3A%22https%3A%2F%2Fledenicheur.fr%2Fsearch%3Fquery%3DNintendo%25203DS%22%7D%7D",
+            "expires": "2026-06-10T21:13:04.000Z",
             "domain": "ledenicheur.fr",
             "path": "/",
             "secure": true,
-            "httpOnly": true,
             "hostOnly": false,
-            "creation": "2025-05-30T13:08:14.232Z",
-            "lastAccessed": "2025-05-30T13:08:14.232Z"
+            "creation": "2025-06-10T21:13:05.154Z",
+            "lastAccessed": "2025-06-10T21:13:06.843Z"
           },
           {
             "key": "pj_sid",
-            "value": "3f29c590-f974-448b-aec8-1ffb77c2c049",
-            "expires": "2025-05-30T13:38:14.072Z",
+            "value": "4be7dfcf-5c76-4bd1-a05e-3ae160e76f4c",
+            "expires": "2025-06-10T21:43:03.915Z",
             "domain": "ledenicheur.fr",
             "path": "/",
             "secure": true,
             "hostOnly": true,
-            "creation": "2025-05-30T13:08:14.232Z",
-            "lastAccessed": "2025-05-30T13:08:14.232Z"
+            "creation": "2025-06-10T21:13:05.154Z",
+            "lastAccessed": "2025-06-10T21:13:06.843Z"
+          },
+          {
+            "key": "consentUUID",
+            "value": "674b551b-4ebd-401c-8f3b-0eb718e3bd61",
+            "expires": "2026-06-10T21:13:04.187Z",
+            "domain": "ledenicheur.fr",
+            "path": "/",
+            "secure": true,
+            "hostOnly": true,
+            "creation": "2025-06-10T21:13:05.154Z",
+            "lastAccessed": "2025-06-10T21:13:06.843Z"
+          },
+          {
+            "key": "cf_clearance",
+            "value": "fl96R_gNKWlQUB5IENwcuN7GEWtsUiGjJmQ26YBC2xw-1749589985-1.2.1.1-zn9NQAYu9Ke1wghEOvDFeroZVV4qyB3_hBysQDhNi5FCOJcD4B2PjzYATFPCu64zJh60bMLnWybhuwv585NKFXTJRb5GtlsiVhC9MLhQD3c3I1weoXiYivAlnCJPUK2FR_Tgq054OFU2oVLb_jWtyo4gSXmRGDJCz7dWfDeAsxnD768Fx2srsq3YKgTdC7EccR23OwM1eFKayoPAM00FwxB5VPEhJpQEjM8VU5iOesaqaePhNqLEVcUoC6EXoe4QgQyrwWZqNzl36KSB2.7MIthA9naB8cm.t0NcWtnSnjLAk6Vgj3Xsx4aBGzh4gNNWI0l8DXLKmB4ZumcDfCjM2qM59IRgGNsISNB4J7tY8hs",
+            "expires": "2026-06-10T21:13:05.130Z",
+            "domain": "ledenicheur.fr",
+            "path": "/",
+            "secure": true,
+            "httpOnly": true,
+            "hostOnly": false,
+            "creation": "2025-06-10T21:13:05.154Z",
+            "lastAccessed": "2025-06-10T21:13:06.843Z"
           }
         ]
       },
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-05-30T13:58:08.655Z",
-      "createdAt": "2025-05-30T13:08:08.655Z",
+      "expiresAt": "2025-06-10T22:03:02.226Z",
+      "createdAt": "2025-06-10T21:13:02.226Z",
       "usageCount": 1,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_cXvNOSzVEK",
+      "id": "session_0a8Q7P0vQb",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -128,90 +150,9 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-05-30T13:58:17.754Z",
-      "createdAt": "2025-05-30T13:08:17.754Z",
+      "expiresAt": "2025-06-10T22:03:05.546Z",
+      "createdAt": "2025-06-10T21:13:05.546Z",
       "usageCount": 0,
-      "maxUsageCount": 50,
-      "errorScore": 0
-    },
-    {
-      "id": "session_C6zbWLNG4z",
-      "cookieJar": {
-        "version": "tough-cookie@5.1.2",
-        "storeType": "MemoryCookieStore",
-        "rejectPublicSuffixes": true,
-        "enableLooseMode": false,
-        "allowSpecialUseDomain": true,
-        "prefixSecurity": "silent",
-        "cookies": [
-          {
-            "key": "pj:cfexpuid",
-            "value": "ef9eeee3-bac3-4fa5-97a2-7c4c7374ec61",
-            "expires": "2025-07-29T13:08:19.929Z",
-            "domain": "ledenicheur.fr",
-            "path": "/",
-            "secure": true,
-            "httpOnly": true,
-            "hostOnly": true,
-            "creation": "2025-05-30T13:08:22.229Z",
-            "lastAccessed": "2025-05-30T13:08:22.229Z"
-          },
-          {
-            "key": "__cf_bm",
-            "value": "1KsIlA1AzBctVEK5WaAtKU2YwtOmtCueoSn33arzRxc-1748610500-1.0.1.1-lXhrIxlmN2_Jm2hzj53HYBakICoPjUOLKljvYuJ6xbc04pTRoFFce5.HDyZr7qTtBmuAZWdHOnhKVt2XfiJTHe8YhPd.9X8rRFws5A7kse8",
-            "expires": "2025-05-30T13:38:20.929Z",
-            "domain": "ledenicheur.fr",
-            "path": "/",
-            "secure": true,
-            "httpOnly": true,
-            "hostOnly": false,
-            "creation": "2025-05-30T13:08:22.229Z",
-            "lastAccessed": "2025-05-30T13:08:22.229Z"
-          },
-          {
-            "key": "cf_clearance",
-            "value": "232.6aR0AKEWHoLUvqAVteSdPEGMIDl6g7LoKKkynQg-1748610501-1.2.1.1-zZQvJfY4C6Eg4ywS4O0wiva5H14JfG49Ss662tgIWRiW1SnwEaFCKwlGgYJX1CPdhyhn1unqxS5HtV.JRcinkwncBQuVTSURDJCqwRmYkJE_kw5Ba5UwpgTI0SgO5.0ubd0XBbR8mlOZu7RCtW4G61UM8H_fd4FS6JtGHNy8Y3STrq1VvTShtLOhoqs.loUNbnDZmB6lIfa44YkVtD5JGw94Tbv0Zr2ffT.o9ML.w2LGNiqGqrjQYmj74KdCPsNyTC_FnfVegAnfGz0zjYTpobZqOvwlB3wWU_yYjPEBomN67UX9h0GocZRd2MbleWBY.lKSrP.6u8AJl8keCvi1c54262eLM9yMlYodf7yCvAY",
-            "expires": "2026-05-30T13:08:21.727Z",
-            "domain": "ledenicheur.fr",
-            "path": "/",
-            "secure": true,
-            "httpOnly": true,
-            "hostOnly": false,
-            "creation": "2025-05-30T13:08:22.230Z",
-            "lastAccessed": "2025-05-30T13:08:22.230Z"
-          },
-          {
-            "key": "pj:session",
-            "value": "eyJpZCI6ImQ2NDhjOWRiLWU1ZGItNDNiYS1iZTFkLWI5ZGNhZTE2NDEyMSIsInZpZXdlZEV4cGVyaW1lbnRzIjp7InVzZS1uZXh0anMtcHJveHkiOnsidmFyaWFudCI6ImVuYWJsZWQifX0sIl9leHBpcmUiOjIwNjM5NzA1MDIwNjAsIl9tYXhBZ2UiOjMxNTM2MDAwMDAwMH0=",
-            "expires": "2026-07-04T13:08:22.176Z",
-            "domain": "ledenicheur.fr",
-            "path": "/",
-            "secure": true,
-            "httpOnly": true,
-            "hostOnly": false,
-            "creation": "2025-05-30T13:08:22.230Z",
-            "lastAccessed": "2025-05-30T13:08:22.230Z"
-          },
-          {
-            "key": "pj:session.sig",
-            "value": "BP5ngNWS-1eB5dzfkFgmCWguKWY",
-            "expires": "2026-07-04T13:08:22.176Z",
-            "domain": "ledenicheur.fr",
-            "path": "/",
-            "secure": true,
-            "httpOnly": true,
-            "hostOnly": false,
-            "creation": "2025-05-30T13:08:22.230Z",
-            "lastAccessed": "2025-05-30T13:08:22.230Z"
-          }
-        ]
-      },
-      "userData": {},
-      "maxErrorScore": 3,
-      "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-05-30T13:58:17.755Z",
-      "createdAt": "2025-05-30T13:08:17.755Z",
-      "usageCount": 1,
       "maxUsageCount": 50,
       "errorScore": 0
     }

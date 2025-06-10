@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
-import dbConnect from "@/lib/db.Connect";
-import ChatSession from "@/models/ChatSession";
+import dbConnect from "@/lib/mongodb/dbConnect";
+import ChatSession from "@/lib/mongodb/models/ChatSession";
 import { Types } from "mongoose"; // Importer Types pour valider l'ObjectId
 
 // GET /api/chat/sessions/[sessionId] - Récupérer les messages d'une session de chat spécifique

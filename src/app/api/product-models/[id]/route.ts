@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import dbConnect from '@/lib/db.Connect';
-import ProductModel, { IProductModel } from '@/models/ProductModel';
+import dbConnect from '@/lib/mongodb/dbConnect';
+import ProductModel, { IProductModel } from '@/lib/mongodb/models/ProductModel';
 import mongoose, { Types } from 'mongoose';
 // import { getServerSession } from "next-auth/next"; // Décommenter si authOptions est utilisé
 // import { authOptions } from '@/app/api/auth/[...nextauth]/route'; // Décommenter pour la vérification admin

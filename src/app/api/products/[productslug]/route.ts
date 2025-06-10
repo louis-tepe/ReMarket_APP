@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import dbConnect from '@/lib/db.Connect';
+import dbConnect from '@/lib/mongodb/dbConnect';
 // Importé pour enregistrement Mongoose, nécessaire pour les opérations .populate()
-import '@/models/BrandModel'; 
-import '@/models/CategoryModel';
-import ProductModel, { IProductModel } from '@/models/ProductModel';
-import ProductOfferModel, { IProductBase } from '@/models/ProductBaseModel';
-import UserModel from '@/models/User';
+import '@/lib/mongodb/models/BrandModel'; 
+import '@/lib/mongodb/models/CategoryModel';
+import ProductModel, { IProductModel } from '@/lib/mongodb/models/ProductModel';
+import ProductOfferModel, { IProductBase } from '@/lib/mongodb/models/ProductBaseModel';
+import UserModel from '@/lib/mongodb/models/User';
 import { Types, FilterQuery } from 'mongoose';
 // import SellerProduct, { ISellerProduct } from '@/models/SellerProduct';
 // import ScrapedProduct, { IScrapedProduct } from '@/models/ScrapedProduct';

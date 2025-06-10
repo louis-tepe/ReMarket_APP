@@ -7,7 +7,8 @@ export interface Offer {
     condition: 'new' | 'used_likenew' | 'used_good' | 'used_fair';
     description?: string;
     images?: string[];
-    stockQuantity?: number;
+    stockQuantity: number;
+    transactionStatus: 'available' | 'pending_transaction' | 'sold' | 'archived';
     createdAt: string;
     updatedAt: string;
 }

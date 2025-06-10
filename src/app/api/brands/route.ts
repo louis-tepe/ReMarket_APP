@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import dbConnect from '@/lib/db.Connect'; // Assurez-vous que le chemin est correct
+import dbConnect from '@/lib/mongodb/dbConnect';
 // import ProductModel from '@/models/ProductModel'; 
-import BrandModel, { IBrand } from '@/models/BrandModel';
-import CategoryModel from '@/models/CategoryModel';
+import BrandModel, { IBrand } from '@/lib/mongodb/models/BrandModel';
+import CategoryModel from '@/lib/mongodb/models/CategoryModel';
 import { Types, Query, HydratedDocument } from 'mongoose';
 // import mongoose from 'mongoose';
 

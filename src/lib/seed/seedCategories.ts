@@ -1,6 +1,6 @@
 import '../loadEnv'; // Importe et exécute loadEnv.ts
-import dbConnect from '../db.Connect';
-import CategoryModel, { ICategory } from '../../models/CategoryModel';
+import dbConnect from '../mongodb/dbConnect';
+import CategoryModel, { ICategory } from '../mongodb/models/CategoryModel';
 import { Types } from 'mongoose';
 
 // Interface pour définir la structure d'une catégorie à créer, y compris ses enfants potentiels

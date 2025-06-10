@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
-import dbConnect from "@/lib/db.Connect";
-import ChatSession, { IChatMessage, IChatSession } from "@/models/ChatSession";
+import dbConnect from "@/lib/mongodb/dbConnect";
+import ChatSession, { IChatMessage, IChatSession } from "@/lib/mongodb/models/ChatSession";
 import { Types } from 'mongoose';
 
 interface ChatSessionRequestBody {

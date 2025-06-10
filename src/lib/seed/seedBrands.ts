@@ -1,7 +1,7 @@
 import '../loadEnv'; // Importe et exécute loadEnv.ts
-import dbConnect from '../db.Connect';
-import BrandModel from '../../models/BrandModel';
-import CategoryModel from '../../models/CategoryModel'; // Pour récupérer les IDs des catégories
+import dbConnect from '../mongodb/dbConnect';
+import BrandModel from '../mongodb/models/BrandModel';
+import CategoryModel from '../mongodb/models/CategoryModel'; // Pour récupérer les IDs des catégories
 import { Types } from 'mongoose';
 import slugify from 'slugify'; // Assurez-vous que slugify est installé ou utilisez une fonction similaire
 
