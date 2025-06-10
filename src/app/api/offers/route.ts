@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import type { Session } from "next-auth";
 import { authOptions } from '@/lib/authOptions';
+import { Types } from 'mongoose';
 import dbConnect from '@/lib/mongodb/dbConnect';
 import ProductOfferModel, { IProductBase } from '@/lib/mongodb/models/ProductBaseModel';
 import CategoryModel, { ICategory } from '@/lib/mongodb/models/CategoryModel';
@@ -9,7 +10,6 @@ import ProductModel from '@/lib/mongodb/models/ProductModel';
 import User from '@/lib/mongodb/models/User';
 import { analyzeImageCondition, ImagePart } from '@/services/ai/geminiService';
 import { getProductOfferDiscriminator } from '@/lib/mongodb/models/discriminators';
-import { Types } from 'mongoose';
 
 // Importer les modèles discriminateurs pour s'assurer qu'ils sont enregistrés auprès de Mongoose
 // Commenté car discriminators.ts devrait gérer l'enregistrement via ses imports.

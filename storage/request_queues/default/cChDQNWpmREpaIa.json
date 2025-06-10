@@ -1,9 +1,0 @@
-{
-	"id": "cChDQNWpmREpaIa",
-	"json": "{\"id\":\"cChDQNWpmREpaIa\",\"url\":\"https://ledenicheur.fr/search?query=Nintendo%203DS\",\"loadedUrl\":\"https://ledenicheur.fr/search?query=Nintendo%203DS\",\"uniqueKey\":\"https://ledenicheur.fr/search?query=Nintendo+3DS\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":0,\"errorMessages\":[],\"headers\":{},\"userData\":{\"type\":\"SEARCH\",\"__crawlee\":{\"state\":4}},\"handledAt\":\"2025-06-10T21:13:05.520Z\"}",
-	"method": "GET",
-	"orderNo": null,
-	"retryCount": 0,
-	"uniqueKey": "https://ledenicheur.fr/search?query=Nintendo+3DS",
-	"url": "https://ledenicheur.fr/search?query=Nintendo%203DS"
-}

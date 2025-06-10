@@ -1,11 +1,10 @@
-import dbConnect from '@/lib/mongodb/dbConnect';
 import User from '@/lib/mongodb/models/User';
 import ProductModel, { IProductModel } from '@/lib/mongodb/models/ProductModel';
 import { NextRequest, NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
-import { Types } from 'mongoose'; // Importer Types
-
-const isValidObjectId = (id: string): boolean => Types.ObjectId.isValid(id);
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/authOptions';
+import dbConnect from '@/lib/mongodb/dbConnect';
+import { isValidObjectId, Types } from 'mongoose';
 
 // Interface pour un ProductModel populé partiel dans les favoris
 interface PopulatedFavoriteProduct extends Pick<IProductModel, '_id' | 'title' | 'slug' | 'standardImageUrls'> {
@@ -13,14 +12,14 @@ interface PopulatedFavoriteProduct extends Pick<IProductModel, '_id' | 'title' |
 }
 
 // GET - Récupérer les produits favoris de l'utilisateur
-export async function GET(req: NextRequest) {
+export async function GET() {
     await dbConnect();
-    const token = await getToken({ req });
+    const session = await getServerSession(authOptions);
 
-    if (!token?.sub) { // Vérification concise
+    if (!session?.user.id) { // Vérification concise
         return NextResponse.json({ message: 'Non autorisé' }, { status: 401 });
     }
-    const userId = token.sub;
+    const userId = session.user.id;
 
     try {
         const user = await User.findById(userId).populate<{
@@ -63,12 +62,12 @@ export async function GET(req: NextRequest) {
 // POST - Ajouter un produit aux favoris
 export async function POST(req: NextRequest) {
     await dbConnect();
-    const token = await getToken({ req });
+    const session = await getServerSession(authOptions);
 
-    if (!token?.sub) {
+    if (!session?.user.id) {
         return NextResponse.json({ message: 'Non autorisé' }, { status: 401 });
     }
-    const userId = token.sub;
+    const userId = session.user.id;
 
     try {
         const { productId } = await req.json();
@@ -104,12 +103,12 @@ export async function POST(req: NextRequest) {
 // DELETE - Retirer un produit des favoris
 export async function DELETE(req: NextRequest) {
     await dbConnect();
-    const token = await getToken({ req });
+    const session = await getServerSession(authOptions);
 
-    if (!token?.sub) {
+    if (!session?.user.id) {
         return NextResponse.json({ message: 'Non autorisé' }, { status: 401 });
     }
-    const userId = token.sub;
+    const userId = session.user.id;
 
     try {
         const { searchParams } = new URL(req.url);

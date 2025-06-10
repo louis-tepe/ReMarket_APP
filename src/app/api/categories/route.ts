@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import dbConnect from '@/lib/mongodb/dbConnect';
 import CategoryModel, { ICategory } from '@/lib/mongodb/models/CategoryModel';
+import dbConnect from '@/lib/mongodb/dbConnect';
 import { FilterQuery } from 'mongoose';
 
 /**
@@ -99,4 +99,6 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}
+
+export const dynamic = 'force-dynamic'; 

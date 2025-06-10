@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
-import type { UIMessage, UISavedChatSession, StoredChatMessage, ChatSessionDoc, ApiHistoryMessage } from './chat-types';
+import type { UIMessage, UISavedChatSession, StoredChatMessage, ChatSessionDoc, ApiHistoryMessage, StoredMessagePart } from './chat-types';
 import { convertFileToBase64, createNewUIMessage as createUIMessageFromUtil, generateChatTitle } from '@/lib/chat-utils';
 
 // --- Helper Functions ---
@@ -259,9 +259,9 @@ export const useChatLogic = ({ initialMessages = [], onMessagesChange, scrollAre
             const data = await response.json();
             if (data.success && data.data) {
                 const loadedSession: ChatSessionDoc = data.data;
-                const uiMessages: UIMessage[] = loadedSession.messages.map((msg) => ({
+                const uiMessages: UIMessage[] = loadedSession.messages.map((msg: StoredChatMessage) => ({
                     id: uuidv4(), // Generate new UI IDs
-                    text: msg.parts.find(p => p.text)?.text || "",
+                    text: msg.parts.find((p: StoredMessagePart) => p.text)?.text || "",
                     sender: msg.role === "user" ? "user" : "gemini",
                     timestamp: msg.timestamp,
                 }));

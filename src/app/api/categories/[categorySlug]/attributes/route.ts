@@ -2,29 +2,6 @@ import ProductOfferModel from '@/lib/mongodb/models/ProductBaseModel';
 import { NextRequest, NextResponse } from 'next/server';
 import type { FormFieldDefinition } from '@/types/form.types.ts';
 
-// Les imports des discriminateurs sont nécessaires pour que Mongoose les enregistre
-// et qu'ils soient disponibles via ProductOfferModel.discriminators.
-import '@/lib/mongodb/models/discriminators/SmartphoneModel';
-import '@/lib/mongodb/models/discriminators/LaptopModel';
-import '@/lib/mongodb/models/discriminators/MonitorModel';
-import '@/lib/mongodb/models/discriminators/CasesCoversModel';
-import '@/lib/mongodb/models/discriminators/ChargersCablesModel';
-import '@/lib/mongodb/models/discriminators/CpuModel';
-import '@/lib/mongodb/models/discriminators/DesktopComputerModel';
-import '@/lib/mongodb/models/discriminators/FeaturePhoneModel';
-import '@/lib/mongodb/models/discriminators/FitnessTrackerModel';
-import '@/lib/mongodb/models/discriminators/GpuModel';
-import '@/lib/mongodb/models/discriminators/KeyboardModel';
-import '@/lib/mongodb/models/discriminators/MotherboardModel';
-import '@/lib/mongodb/models/discriminators/PcCaseModel';
-import '@/lib/mongodb/models/discriminators/PowerBanksModel';
-import '@/lib/mongodb/models/discriminators/PsuModel';
-import '@/lib/mongodb/models/discriminators/RamModel';
-import '@/lib/mongodb/models/discriminators/ScreenProtectorsModel';
-import '@/lib/mongodb/models/discriminators/SmartwatchModel';
-import '@/lib/mongodb/models/discriminators/StorageModel';
-import '@/lib/mongodb/models/discriminators/TabletModel';
-
 function generateLabel(name: string): string {
     const result = name.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ');
     return result.charAt(0).toUpperCase() + result.slice(1).toLowerCase();

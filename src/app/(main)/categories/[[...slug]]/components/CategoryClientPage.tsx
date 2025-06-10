@@ -10,7 +10,24 @@ import { cn } from '@/lib/utils';
 import { Types } from 'mongoose';
 import { Input } from "@/components/ui/input";
 import { useSession } from 'next-auth/react';
-import type { LeanCategory, LeanBrand, DisplayProductCardProps, FiltersState } from '../types';
+import type { LeanBrand } from '@/types/brand';
+import type { LeanCategory } from '@/types/category';
+
+// Interfaces spécifiques à cette page
+interface DisplayProductCardProps {
+    id: string;
+    slug: string;
+    name: string;
+    imageUrl?: string;
+    price: number;
+    offerCount?: number;
+}
+
+interface FiltersState {
+    categorySlug?: string;
+    brandSlugs?: string[];
+    searchQuery?: string;
+}
 
 interface InitialProduct {
     _id: Types.ObjectId | string;

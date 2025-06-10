@@ -1,14 +1,9 @@
 "use server";
 
 import dbConnect from "@/lib/mongodb/dbConnect";
-import BrandModel, { IBrand } from "@/lib/mongodb/models/BrandModel";
-import { unstable_cache as cache } from 'next/cache';
-
-// Type pour une marque "lean"
-export type LeanBrand = Omit<IBrand, never> & {
-    _id: string;
-    productCount?: number;
-};
+import BrandModel from "@/lib/mongodb/models/BrandModel";
+import { LeanBrand } from "@/types/brand";
+import { cache } from "react";
 
 // Fonction cachée pour récupérer toutes les marques
 const getCachedBrands = cache(
@@ -20,11 +15,6 @@ const getCachedBrands = cache(
             ...brand,
             _id: brand._id.toString(),
         }));
-    },
-    ['all-brands'],
-    {
-        revalidate: 60 * 60, // 1 hour
-        tags: ['brands'],
     }
 );
 

@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';
 import dbConnect from '@/lib/mongodb/dbConnect';
-import CartModel, { ICart } from '@/lib/mongodb/models/CartModel';
+import CartModel from '@/lib/mongodb/models/CartModel';
 import ProductOfferModel from '@/lib/mongodb/models/ProductBaseModel';
+import { LeanCart as GlobalLeanCart, LeanCartItem } from "@/types/cart";
 import { Types } from 'mongoose';
 
 // INTERFACES POUR LE PANIER LEAN ET LES OFFRES LEAN
@@ -28,19 +29,13 @@ interface PopulatedProductModelForCartItem {
     slug: string;
 }
 
-interface LeanCartItem {
-    _id: Types.ObjectId | string;
+interface LeanCartItemPopulated extends Omit<LeanCartItem, 'productOffer' | 'price'> {
     offer: PopulatedOfferForCartItem;
     productModel: PopulatedProductModelForCartItem;
-    quantity: number;
 }
 
-interface LeanCart {
-    _id: Types.ObjectId | string;
-    user: Types.ObjectId | string; 
-    items: LeanCartItem[];
-    createdAt?: Date; 
-    updatedAt?: Date;
+interface LeanCart extends Omit<GlobalLeanCart, 'items'> {
+    items: LeanCartItemPopulated[];
 }
 
 interface CartActionPayload {
@@ -52,13 +47,12 @@ interface CartActionPayload {
 }
 
 // Helper pour calculer le total et le nombre d'articles
-function calculateCartTotals(items: LeanCartItem[] | ICart['items']) {
+function calculateCartTotals(items: LeanCartItemPopulated[]) {
     let total = 0;
     let count = 0;
     if (items && Array.isArray(items)) { 
         for (const item of items) {
-            // S'assurer que item.offer est bien populé et a un prix
-            const offerPrice = (item.offer as PopulatedOfferForCartItem)?.price; 
+            const offerPrice = item.offer?.price; 
             if (offerPrice && typeof item.quantity === 'number') {
                 total += offerPrice * item.quantity;
                 count += item.quantity;

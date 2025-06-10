@@ -1,0 +1,9 @@
+{
+	"id": "rFxAcXxRkWv2dLF",
+	"json": "{\"id\":\"rFxAcXxRkWv2dLF\",\"url\":\"https://ledenicheur.fr/product.php?p=5147004\",\"loadedUrl\":\"https://ledenicheur.fr/product.php?p=5147004\",\"uniqueKey\":\"https://ledenicheur.fr/product.php?p=5147004\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":2,\"errorMessages\":[\"Error: requestHandler timed out after 60 seconds.\\n    at Timeout._onTimeout (/Users/tepe/Documents/Code/Project/remarket-app/node_modules/@apify/timeout/cjs/index.cjs:64:68)\\n    at listOnTimeout (node:internal/timers:581:17)\\n    at process.processTimers (node:internal/timers:519:7)\",\"Error: requestHandler timed out after 60 seconds.\\n    at Timeout._onTimeout (/Users/tepe/Documents/Code/Project/remarket-app/node_modules/@apify/timeout/cjs/index.cjs:64:68)\\n    at listOnTimeout (node:internal/timers:581:17)\\n    at process.processTimers (node:internal/timers:519:7)\"],\"headers\":{},\"userData\":{\"type\":\"PRODUCT\",\"__crawlee\":{\"state\":4}},\"handledAt\":\"2025-06-10T21:36:24.914Z\"}",
+	"method": "GET",
+	"orderNo": null,
+	"retryCount": 2,
+	"uniqueKey": "https://ledenicheur.fr/product.php?p=5147004",
+	"url": "https://ledenicheur.fr/product.php?p=5147004"
+}

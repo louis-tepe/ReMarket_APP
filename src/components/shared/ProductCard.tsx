@@ -69,8 +69,15 @@ export default function ProductCard({
         await toggleFavorite();
     };
 
+    let correctedImageUrl = imageUrl;
+    if (correctedImageUrl?.startsWith('https//')) {
+        correctedImageUrl = 'https://' + correctedImageUrl.slice('https//'.length);
+    } else if (correctedImageUrl?.startsWith('http//')) {
+        correctedImageUrl = 'http://' + correctedImageUrl.slice('http//'.length);
+    }
+
     const placeholderImage = '/images/placeholder-product.webp';
-    const finalImageUrl = imageError || !imageUrl ? placeholderImage : imageUrl;
+    const finalImageUrl = imageError || !correctedImageUrl ? placeholderImage : correctedImageUrl;
 
     return (
         <Link

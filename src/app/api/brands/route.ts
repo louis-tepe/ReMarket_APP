@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Query, HydratedDocument } from 'mongoose';
 import dbConnect from '@/lib/mongodb/dbConnect';
 // import ProductModel from '@/models/ProductModel'; 
 import BrandModel, { IBrand } from '@/lib/mongodb/models/BrandModel';
 import CategoryModel from '@/lib/mongodb/models/CategoryModel';
-import { Types, Query, HydratedDocument } from 'mongoose';
+import { Types } from 'mongoose';
 // import mongoose from 'mongoose';
 
 interface SelectedCategory {

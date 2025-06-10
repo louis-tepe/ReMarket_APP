@@ -19,4 +19,8 @@ export interface UISavedChatSession {
 
 export type ApiHistoryMessage = Content;
 
+export interface ChatMessage extends Omit<StoredChatMessage, 'role'> {
+    rawResponse?: string;
+}
+
 export { StoredChatMessage, StoredMessagePart, ChatSessionDoc }; 

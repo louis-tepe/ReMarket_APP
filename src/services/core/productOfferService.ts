@@ -3,7 +3,6 @@ import ProductOfferModel, { IProductBase } from '@/lib/mongodb/models/ProductBas
 import { getKindFromSlug, ProductKind } from '@/config/discriminatorMapping';
 import { Types } from 'mongoose';
 
-
 // Interface de base pour les données d'une offre attendues en entrée.
 interface BaseOfferData {
   productModel: Types.ObjectId | string;
@@ -68,8 +67,6 @@ export async function createProductOfferService(
   }
 }
 
-
-
 // Interface pour les filtres de recherche d'offres.
 export interface OfferFilters {
     category?: string | string[];
@@ -82,4 +79,11 @@ export interface OfferFilters {
     transactionStatus?: 'available' | 'reserved' | 'pending_shipment' | 'shipped' | 'delivered' | 'cancelled' | 'sold';
     listingStatus?: 'active' | 'inactive' | 'rejected' | 'sold'; // 'pending_approval' a été retiré car géré par d'autres mécanismes.
     // Autres filtres potentiels peuvent être ajoutés ici.
+} 
+
+export async function getOffer(offerId: string): Promise<IProductBase | null> {
+  if (!Types.ObjectId.isValid(offerId)) {
+    return null;
+  }
+  return await ProductOfferModel.findById(offerId).lean<IProductBase>();
 } 

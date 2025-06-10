@@ -7,6 +7,7 @@ import ProductModel, { IProductModel } from '@/lib/mongodb/models/ProductModel';
 import ProductOfferModel, { IProductBase } from '@/lib/mongodb/models/ProductBaseModel';
 import UserModel from '@/lib/mongodb/models/User';
 import { Types, FilterQuery } from 'mongoose';
+// import { LeanProductModel } from '@/types/product';
 // import SellerProduct, { ISellerProduct } from '@/models/SellerProduct';
 // import ScrapedProduct, { IScrapedProduct } from '@/models/ScrapedProduct';
 

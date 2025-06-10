@@ -1,5 +1,5 @@
-import dbConnect from '@/lib/mongodb/dbConnect'; // Connexion à la BDD
 import User from '@/lib/mongodb/models/User'; // Modèle User Mongoose
+import dbConnect from '@/lib/mongodb/dbConnect';
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 

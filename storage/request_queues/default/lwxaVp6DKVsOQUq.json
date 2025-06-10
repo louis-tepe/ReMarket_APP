@@ -1,0 +1,9 @@
+{
+	"id": "lwxaVp6DKVsOQUq",
+	"json": "{\"id\":\"lwxaVp6DKVsOQUq\",\"url\":\"https://ledenicheur.fr/search?query=Microsoft%20Xbox%20series%20X\",\"loadedUrl\":\"https://ledenicheur.fr/search?query=Microsoft%20Xbox%20series%20X\",\"uniqueKey\":\"https://ledenicheur.fr/search?query=Microsoft+Xbox+series+X\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":0,\"errorMessages\":[],\"headers\":{},\"userData\":{\"type\":\"SEARCH\",\"__crawlee\":{\"state\":4}},\"handledAt\":\"2025-06-10T21:34:19.709Z\"}",
+	"method": "GET",
+	"orderNo": null,
+	"retryCount": 0,
+	"uniqueKey": "https://ledenicheur.fr/search?query=Microsoft+Xbox+series+X",
+	"url": "https://ledenicheur.fr/search?query=Microsoft%20Xbox%20series%20X"
+}

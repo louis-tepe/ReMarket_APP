@@ -72,3 +72,8 @@ export type Specifications = AttributeItem[];
 // Constant for the special ID used when a product is not listed.
 export const NOT_LISTED_ID = "---PRODUCT_NOT_LISTED---"; 
 
+export interface CategorySpecificField {
+    label: string;
+    // ... existing code ...
+}
+

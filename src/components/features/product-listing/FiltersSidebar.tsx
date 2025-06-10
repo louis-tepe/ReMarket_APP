@@ -1,8 +1,6 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-// import { ICategory } from '@/models/CategoryModel'; // Remplacé par LeanCategory
-// import { IBrand } from '@/models/BrandModel'; // Remplacé par LeanBrand
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -15,34 +13,11 @@ import {
 import { ChevronDown, ChevronRight, X } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { Types } from 'mongoose'; // Importer Types pour ObjectId
+import { Types } from 'mongoose';
+import type { LeanBrand } from '@/types/brand';
+import type { LeanCategory } from '@/types/category';
 
-// Définition d'un type "lean" pour les catégories
-interface LeanCategory {
-    _id: Types.ObjectId | string; // _id peut être string après serialisation
-    name: string;
-    slug: string;
-    description?: string;
-    depth: number;
-    parent?: Types.ObjectId | string; // parent peut être string après serialisation
-    isLeafNode: boolean;
-    createdAt: Date | string; // Date peut devenir string
-    updatedAt: Date | string;
-}
-
-// Définition d'un type "lean" pour les marques
-interface LeanBrand {
-    _id: Types.ObjectId | string;
-    name: string;
-    slug: string;
-    description?: string;
-    logoUrl?: string;
-    categories?: (Types.ObjectId | string)[]; // Peut aussi être des strings après serialisation
-    createdAt: Date | string;
-    updatedAt: Date | string;
-}
-
-interface CategoryNode extends LeanCategory { // Utilise LeanCategory
+interface CategoryNode extends Omit<LeanCategory, 'children'> {
     children: CategoryNode[];
 }
 
@@ -56,8 +31,8 @@ interface FiltersSidebarProps {
     basePath?: string;
 }
 
-const BASE_CATEGORY_ITEM_PADDING_X = "px-2"; // Padding horizontal de base pour chaque item de catégorie
-const INDENT_PER_DEPTH = 10; // Augmentation du padding-left (en px) par niveau de profondeur
+const BASE_CATEGORY_ITEM_PADDING_X = "px-2";
+const INDENT_PER_DEPTH = 10;
 
 export default function FiltersSidebar({
     allCategories,

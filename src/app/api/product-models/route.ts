@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { scrapeLedenicheurProduct } from '@/services/scraping/ledenicheur/ledenicheur.scraper';
-import { LedenicheurProductDetails } from '@/services/scraping/ledenicheur/ledenicheur.types';
 import dbConnect from '@/lib/mongodb/dbConnect';
 import ProductModel, { IProductModel, IProductModelBase } from '@/lib/mongodb/models/ProductModel';
 import CategoryModel, { ICategory } from '@/lib/mongodb/models/CategoryModel';
 import BrandModel, { IBrand } from '@/lib/mongodb/models/BrandModel';
 import { Types, FilterQuery } from 'mongoose';
+import { scrapeLedenicheurProduct } from '@/services/scraping/ledenicheur/ledenicheur.scraper';
+import { LedenicheurProductDetails } from '@/services/scraping/ledenicheur/ledenicheur.types';
 
 // TODO: Connecter à la base de données et utiliser les modèles Mongoose
 // import dbConnect from '@/lib/db.Connect';

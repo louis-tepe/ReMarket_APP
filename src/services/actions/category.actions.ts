@@ -1,16 +1,9 @@
 "use server";
 
 import dbConnect from "@/lib/mongodb/dbConnect";
-import CategoryModel, { ICategory } from "@/lib/mongodb/models/CategoryModel";
-import { unstable_cache as cache } from 'next/cache';
-
-// Type pour une catégorie "lean" (sans les méthodes Mongoose)
-export type LeanCategory = Omit<ICategory, 'parent' | 'children'> & {
-    _id: string;
-    parent?: string;
-    children?: string[];
-    productCount?: number;
-};
+import CategoryModel from "@/lib/mongodb/models/CategoryModel";
+import { LeanCategory } from "@/types/category";
+import { cache } from "react";
 
 // Fonction cachée pour récupérer toutes les catégories
 const getCachedCategories = cache(
@@ -27,11 +20,6 @@ const getCachedCategories = cache(
             _id: cat._id.toString(),
             parent: cat.parent ? cat.parent.toString() : undefined,
         }));
-    },
-    ['all-categories'], // Clé de cache
-    {
-        revalidate: 60 * 60, // Révalider toutes les heures
-        tags: ['categories'], // Tag pour la révalidation à la demande
     }
 );
 
@@ -52,4 +40,17 @@ export async function getAllCategories(): Promise<{
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
         return { success: false, data: [], message: errorMessage };
     }
-} 
+}
+
+/**
+ * @returns {Promise<LeanCategory[]>} Une promesse qui résout à un tableau de catégories "lean".
+ */
+export const getCategories = cache(async (): Promise<LeanCategory[]> => {
+  console.log("Fetching categories...");
+  await dbConnect();
+
+  // Remplacez 'parent: null' par le critère de recherche que vous souhaitez utiliser par défaut
+  const categories = await CategoryModel.find({ parent: null }).sort({ name: 1 }).lean<LeanCategory[]>();
+
+  return categories;
+}); 

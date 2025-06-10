@@ -7,6 +7,7 @@ export interface ICategory extends Document {
   slug: string; // Slug unique pour l'URL (ex: "telephones-mobiles")
   description?: string; // Description optionnelle
   depth: number; // Profondeur dans la hiérarchie (0 pour racine)
+  path: string; // Chemin hiérarchique (ex: ",id1,id2,")
   parent?: Types.ObjectId; // Réf. à la catégorie parente (si depth > 0)
   isLeafNode: boolean; // Vrai si peut avoir des champs de formulaire spécifiques
   imageAnalysisPrompt?: string; // Prompt pour l'analyse d'image par IA
@@ -31,6 +32,11 @@ const CategorySchema = new Schema<ICategory>(
       unique: true,
       index: true,
       // Slug généré par le hook pre-save
+    },
+    path: {
+      type: String,
+      index: true,
+      // Le path est géré manuellement ou via un hook
     },
     description: {
       type: String,
