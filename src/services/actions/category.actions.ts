@@ -4,41 +4,80 @@ import dbConnect from "@/lib/mongodb/dbConnect";
 import CategoryModel from "@/lib/mongodb/models/CategoryModel";
 import { LeanCategory } from "@/types/category";
 import { cache } from "react";
+import { Types } from "mongoose";
 
-// Fonction cachée pour récupérer toutes les catégories
-const getCachedCategories = cache(
-    async (): Promise<LeanCategory[]> => {
-        console.log('Fetching all categories from DB...');
-        await dbConnect();
-        
-        const categories = await CategoryModel.find({})
-            .populate('parent', 'name slug')
-            .lean<LeanCategory[]>();
+interface GetAllCategoriesOptions {
+    activeSlug?: string;
+}
 
-        return categories.map(cat => ({
-            ...cat,
-            _id: cat._id.toString(),
-            parent: cat.parent ? cat.parent.toString() : undefined,
-        }));
-    }
-);
+const getCategoriesByParent = cache(async (parentId: Types.ObjectId | null = null): Promise<LeanCategory[]> => {
+    await dbConnect();
+    const categories = await CategoryModel.find({ parent: parentId })
+        .sort({ name: 1 })
+        .lean<LeanCategory>();
+    return JSON.parse(JSON.stringify(categories));
+});
 
-/**
- * Récupère toutes les catégories depuis la base de données, en utilisant un cache.
- * @returns Un objet avec `success`, `data` (la liste des catégories) et optionnellement `message`.
- */
-export async function getAllCategories(): Promise<{
+export async function getAllCategories(options: GetAllCategoriesOptions = {}): Promise<{
     success: boolean;
-    data: LeanCategory[];
+    data: {
+        allRootCategories: LeanCategory[];
+        currentCategory: LeanCategory | null;
+        currentCategoryChildren: LeanCategory[];
+        breadcrumbs: LeanCategory[];
+    };
     message?: string;
 }> {
+    const { activeSlug } = options;
+    const fallbackData = { allRootCategories: [], currentCategory: null, currentCategoryChildren: [], breadcrumbs: [] };
+
     try {
-        const categories = await getCachedCategories();
-        return { success: true, data: categories };
+        await dbConnect();
+        const allCategories = await CategoryModel.find({}).lean<LeanCategory[]>();
+        const allRootCategories = allCategories.filter(c => !c.parent);
+
+        if (!activeSlug) {
+            return {
+                success: true,
+                data: { ...fallbackData, allRootCategories: JSON.parse(JSON.stringify(allRootCategories)) }
+            };
+        }
+
+        const currentCategory = allCategories.find(c => c.slug === activeSlug) || null;
+        if (!currentCategory) {
+            return {
+                success: true,
+                data: { ...fallbackData, allRootCategories: JSON.parse(JSON.stringify(allRootCategories)) }
+            };
+        }
+
+        const currentCategoryChildren = allCategories.filter(c => c.parent?.toString() === currentCategory._id.toString());
+
+        const breadcrumbs: LeanCategory[] = [];
+        let parentId = currentCategory.parent;
+        while (parentId) {
+            const parent = allCategories.find(c => c._id.toString() === parentId?.toString());
+            if (parent) {
+                breadcrumbs.unshift(parent);
+                parentId = parent.parent;
+            } else {
+                break;
+            }
+        }
+
+        return {
+            success: true,
+            data: JSON.parse(JSON.stringify({
+                allRootCategories,
+                currentCategory,
+                currentCategoryChildren,
+                breadcrumbs,
+            }))
+        };
     } catch (error) {
         console.error("Error in getAllCategories:", error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
-        return { success: false, data: [], message: errorMessage };
+        return { success: false, data: fallbackData, message: errorMessage };
     }
 }
 

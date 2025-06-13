@@ -14,13 +14,6 @@ const authorizeCredentials = async (credentials: Record<"email" | "password", st
     throw new Error("Email et mot de passe requis.");
   }
 
-  try {
-    await dbConnect();
-  } catch (error) {
-    console.error("Erreur de connexion à la base de données lors de l'autorisation:", error);
-    throw new Error("Erreur serveur lors de la connexion à la base de données.");
-  }
-
   const user: IUser | null = await User.findOne({ email: credentials.email }).select("+password");
 
   if (!user || !user.password) {

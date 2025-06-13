@@ -1,9 +1,0 @@
-{
-	"id": "WnilYZg6rfNt3Ic",
-	"json": "{\"id\":\"WnilYZg6rfNt3Ic\",\"url\":\"https://www.idealo.fr/prix/202277837/samsung-galaxy-s23.html\",\"uniqueKey\":\"idealo_product_samsung galaxy s23\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":0,\"errorMessages\":[],\"headers\":{\"Referer\":\"https://www.idealo.fr/prechcat.html?q=samsung%20galaxy%20s23\"},\"userData\":{}}",
-	"method": "GET",
-	"orderNo": 1748184454914,
-	"retryCount": 0,
-	"uniqueKey": "idealo_product_samsung galaxy s23",
-	"url": "https://www.idealo.fr/prix/202277837/samsung-galaxy-s23.html"
-}

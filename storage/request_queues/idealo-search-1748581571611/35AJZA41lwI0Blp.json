@@ -1,9 +1,0 @@
-{
-	"id": "35AJZA41lwI0Blp",
-	"json": "{\"id\":\"35AJZA41lwI0Blp\",\"url\":\"https://www.idealo.fr/prechcat.html?q=Apple%20mac%20studio\",\"loadedUrl\":\"https://www.idealo.fr/prechcat.html?q=Apple%20mac%20studio\",\"uniqueKey\":\"idealo_search_Apple mac studio\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":2,\"errorMessages\":[\"Error: requestHandler timed out after 120 seconds.\\n    at Timeout._onTimeout (/Users/tepe/Documents/Code/Project/remarket-app/node_modules/@apify/timeout/cjs/index.cjs:64:68)\\n    at listOnTimeout (node:internal/timers:581:17)\\n    at process.processTimers (node:internal/timers:519:7)\",\"Error: requestHandler timed out after 120 seconds.\\n    at Timeout._onTimeout (/Users/tepe/Documents/Code/Project/remarket-app/node_modules/@apify/timeout/cjs/index.cjs:64:68)\\n    at listOnTimeout (node:internal/timers:581:17)\\n    at process.processTimers (node:internal/timers:519:7)\"],\"headers\":{},\"userData\":{\"__crawlee\":{\"state\":5}}}",
-	"method": "GET",
-	"orderNo": 1748582449939,
-	"retryCount": 2,
-	"uniqueKey": "idealo_search_Apple mac studio",
-	"url": "https://www.idealo.fr/prechcat.html?q=Apple%20mac%20studio"
-}

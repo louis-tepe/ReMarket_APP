@@ -1,9 +1,0 @@
-{
-	"id": "ZTCYaJVp4TRylQu",
-	"json": "{\"id\":\"ZTCYaJVp4TRylQu\",\"url\":\"https://www.ledenicheur.fr/search.php?q=Apple%20macbook%20air%20m3\",\"loadedUrl\":\"https://ledenicheur.fr/search.php?q=Apple%20macbook%20air%20m3\",\"uniqueKey\":\"ledenicheur_search_Apple macbook air m3\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":0,\"errorMessages\":[],\"headers\":{},\"userData\":{\"__crawlee\":{\"state\":4}},\"handledAt\":\"2025-05-30T11:28:45.526Z\"}",
-	"method": "GET",
-	"orderNo": null,
-	"retryCount": 0,
-	"uniqueKey": "ledenicheur_search_Apple macbook air m3",
-	"url": "https://www.ledenicheur.fr/search.php?q=Apple%20macbook%20air%20m3"
-}

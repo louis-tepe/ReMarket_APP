@@ -1,9 +1,0 @@
-{
-	"id": "WnilYZg6rfNt3Ic",
-	"json": "{\"id\":\"WnilYZg6rfNt3Ic\",\"url\":\"https://www.idealo.fr/prix/202277837/samsung-galaxy-s23.html\",\"loadedUrl\":\"https://www.idealo.fr/prix/202277837/samsung-galaxy-s23.html\",\"uniqueKey\":\"idealo_product_samsung galaxy s23\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":1,\"errorMessages\":[\"Error: requestHandler timed out after 120 seconds.\\n    at Timeout._onTimeout (/Users/tepe/Documents/Code/Project/remarket-app/node_modules/@apify/src/index.ts:88:74)\\n    at listOnTimeout (node:internal/timers:581:17)\\n    at process.processTimers (node:internal/timers:519:7)\"],\"headers\":{\"Referer\":\"https://www.idealo.fr/prechcat.html?q=samsung%20galaxy%20s23\"},\"userData\":{\"__crawlee\":{\"state\":5}}}",
-	"method": "GET",
-	"orderNo": 1747917482182,
-	"retryCount": 1,
-	"uniqueKey": "idealo_product_samsung galaxy s23",
-	"url": "https://www.idealo.fr/prix/202277837/samsung-galaxy-s23.html"
-}

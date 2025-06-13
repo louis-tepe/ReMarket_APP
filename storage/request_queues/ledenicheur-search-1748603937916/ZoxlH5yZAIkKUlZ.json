@@ -1,9 +1,0 @@
-{
-	"id": "ZoxlH5yZAIkKUlZ",
-	"json": "{\"id\":\"ZoxlH5yZAIkKUlZ\",\"url\":\"https://www.ledenicheur.fr/search.php?q=Apple%20mac%20mini%20m4\",\"loadedUrl\":\"https://ledenicheur.fr/search.php?q=Apple%20mac%20mini%20m4\",\"uniqueKey\":\"ledenicheur_search_Apple mac mini m4\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":0,\"errorMessages\":[],\"headers\":{},\"userData\":{\"__crawlee\":{\"state\":4}},\"handledAt\":\"2025-05-30T11:19:09.661Z\"}",
-	"method": "GET",
-	"orderNo": null,
-	"retryCount": 0,
-	"uniqueKey": "ledenicheur_search_Apple mac mini m4",
-	"url": "https://www.ledenicheur.fr/search.php?q=Apple%20mac%20mini%20m4"
-}

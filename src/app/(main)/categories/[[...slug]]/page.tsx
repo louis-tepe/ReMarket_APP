@@ -16,32 +16,32 @@ export default async function CategoryPage({ params: paramsPromise, searchParams
     const params = await paramsPromise;
     const searchParams = await searchParamsPromise;
 
-    const categorySlug = params.slug?.[0];
+    const categorySlug = params.slug?.slice(-1)[0];
     const brandSlugs = searchParams.brands ? String(searchParams.brands).split(',') : undefined;
 
-    const [products, categoriesResult, brandsResult] = await Promise.all([
+    const [productsResult, categoriesResult, brandsResult] = await Promise.all([
         getProducts({ categorySlug, brandSlugs }),
-        getAllCategories(),
+        getAllCategories({ activeSlug: categorySlug }),
         getAllBrands()
     ]);
 
-    if (!categoriesResult.success || !brandsResult.success) {
+    if (!categoriesResult.success || !brandsResult.success || !productsResult.success) {
         // Log the errors for debugging on the server
-        console.error("Failed to fetch page data:", { categoriesResult, brandsResult });
+        console.error("Failed to fetch page data:", { categoriesResult, brandsResult, productsResult });
         // Render a user-friendly error message
         return <div>Erreur lors du chargement des données de la page. Veuillez réessayer plus tard.</div>;
     }
 
-    // Correctif: Sérialiser les données pour s'assurer qu'aucun type complexe (comme ObjectId) n'est passé au composant client.
-    const serializedProducts = JSON.parse(JSON.stringify(products));
-    const serializedCategories = JSON.parse(JSON.stringify(categoriesResult.data));
-    const serializedBrands = JSON.parse(JSON.stringify(brandsResult.data));
+    const { allRootCategories, currentCategory, currentCategoryChildren, breadcrumbs } = categoriesResult.data;
 
     return (
         <CategoryClientPage
-            initialProducts={serializedProducts}
-            allCategories={serializedCategories}
-            allBrands={serializedBrands}
+            initialProducts={JSON.parse(JSON.stringify(productsResult.data?.products || []))}
+            allRootCategories={allRootCategories}
+            currentCategory={currentCategory}
+            currentCategoryChildren={currentCategoryChildren}
+            breadcrumbs={breadcrumbs}
+            allBrands={JSON.parse(JSON.stringify(brandsResult.data || []))}
             slug={params.slug}
         />
     );

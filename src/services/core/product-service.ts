@@ -61,14 +61,29 @@ export async function fetchFeaturedProductData(): Promise<FeaturedProductData[]>
 }
 
 async function getCategoryWithDescendants(categorySlug: string): Promise<Types.ObjectId[]> {
-  const category = await CategoryModel.findOne({ slug: categorySlug });
-  if (!category) return [];
+    const mainCategory = await CategoryModel.findOne({ slug: categorySlug }).lean();
+    if (!mainCategory) {
+        return [];
+    }
 
-  const categories = await CategoryModel.find({
-    path: { $regex: `^${category.path},` },
-  });
-  
-  return [category._id, ...categories.map(c => c._id)];
+    const allCategories = await CategoryModel.find({}).lean();
+    const categoryMap = new Map(allCategories.map(c => [c._id.toString(), c]));
+    
+    const descendants: Types.ObjectId[] = [mainCategory._id];
+    const queue: Types.ObjectId[] = [mainCategory._id];
+
+    while (queue.length > 0) {
+        const currentId = queue.shift()?.toString();
+        if (!currentId) continue;
+        
+        for (const category of allCategories) {
+            if (category.parent?.toString() === currentId) {
+                descendants.push(category._id);
+                queue.push(category._id);
+            }
+        }
+    }
+    return descendants;
 }
 
 export async function searchProducts(filters: SearchFilters): Promise<ProductSearchServiceResult> {

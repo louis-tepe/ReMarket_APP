@@ -1,9 +1,0 @@
-{
-	"id": "hLEWNJGoSLVow7l",
-	"json": "{\"id\":\"hLEWNJGoSLVow7l\",\"url\":\"https://www.idealo.fr/prechcat.html?q=Apple%20mac%20mini%20m2\",\"loadedUrl\":\"https://www.idealo.fr/prechcat.html?q=Apple%20mac%20mini%20m2\",\"uniqueKey\":\"idealo_search_Apple mac mini m2\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":1,\"errorMessages\":[\"locator.textContent: Timeout 30000ms exceeded.\\nCall log:\\n\\u001b[2m  - waiting for locator('a[class^=\\\"sr-resultItemTile__link_\\\"][class*=\\\"sr-resultItemTile__link--GRID\\\"]').first().locator('div[class*=\\\"sr-resultItemTile__title\\\"]')\\u001b[22m\\n\\n    at PlaywrightCrawler.requestHandler (webpack-internal:///(rsc)/./src/services/scraping/scraper.ts:446:60)\\n    at async wrap (/Users/tepe/Documents/Code/Project/remarket-app/node_modules/@apify/timeout/cjs/index.cjs:54:21)\"],\"headers\":{},\"userData\":{\"__crawlee\":{\"state\":5}}}",
-	"method": "GET",
-	"orderNo": 1748576345305,
-	"retryCount": 1,
-	"uniqueKey": "idealo_search_Apple mac mini m2",
-	"url": "https://www.idealo.fr/prechcat.html?q=Apple%20mac%20mini%20m2"
-}

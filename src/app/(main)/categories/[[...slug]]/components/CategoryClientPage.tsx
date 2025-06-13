@@ -7,13 +7,11 @@ import FiltersSidebar from '@/components/features/product-listing/FiltersSidebar
 import { AlertTriangle, Info, PanelLeftOpen, Search as SearchIcon, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Types } from 'mongoose';
 import { Input } from "@/components/ui/input";
 import { useSession } from 'next-auth/react';
 import type { LeanBrand } from '@/types/brand';
 import type { LeanCategory } from '@/types/category';
 
-// Interfaces spécifiques à cette page
 interface DisplayProductCardProps {
     id: string;
     slug: string;
@@ -30,7 +28,7 @@ interface FiltersState {
 }
 
 interface InitialProduct {
-    _id: Types.ObjectId | string;
+    _id: string;
     slug: string;
     title: string;
     standardImageUrls?: string[];
@@ -39,7 +37,10 @@ interface InitialProduct {
 
 interface CategoryClientPageProps {
     initialProducts: InitialProduct[];
-    allCategories: LeanCategory[];
+    allRootCategories: LeanCategory[];
+    currentCategory: LeanCategory | null;
+    currentCategoryChildren: LeanCategory[];
+    breadcrumbs: LeanCategory[];
     allBrands: LeanBrand[];
     slug?: string[];
 }
@@ -53,14 +54,22 @@ async function fetchUserFavorites(): Promise<string[]> {
     return [];
 }
 
-export default function CategoryClientPage({ initialProducts, allCategories, allBrands, slug }: CategoryClientPageProps) {
+export default function CategoryClientPage({
+    initialProducts,
+    allRootCategories,
+    currentCategory,
+    currentCategoryChildren,
+    breadcrumbs,
+    allBrands,
+    slug
+}: CategoryClientPageProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { data: session } = useSession();
     const [isPending, startTransition] = useTransition();
 
     const [currentFilters, setCurrentFilters] = useState<FiltersState>(() => {
-        const categorySlugFromUrl = slug?.[0];
+        const categorySlugFromUrl = slug?.slice(-1)[0];
         const brandSlugsFromUrl = searchParams.get('brands')?.split(',').filter(Boolean) || [];
         const searchQueryFromUrl = searchParams.get('search') || '';
         return {
@@ -70,7 +79,7 @@ export default function CategoryClientPage({ initialProducts, allCategories, all
         };
     });
 
-    const [products] = useState<DisplayProductCardProps[]>(
+    const products = useMemo(() =>
         initialProducts.map((product) => {
             const offers = product.sellerOffers || [];
             const cheapestOffer = offers.length > 0 ? offers.reduce((min, p) => p.price < min.price ? p : min, offers[0]) : null;
@@ -82,91 +91,52 @@ export default function CategoryClientPage({ initialProducts, allCategories, all
                 price: cheapestOffer?.price || 0,
                 offerCount: offers.length,
             };
-        })
-    );
-    const [availableBrands] = useState<LeanBrand[]>(allBrands);
+        }), [initialProducts]);
+        
     const [favoriteProductIds, setFavoriteProductIds] = useState<string[]>([]);
-    const [fetchError] = useState<string | null>(null);
+    const [fetchError, setFetchError] = useState<string | null>(null);
     const [isSidebarOpenOnMobile, setIsSidebarOpenOnMobile] = useState(false);
     const [searchInputValue, setSearchInputValue] = useState(currentFilters.searchQuery || '');
 
-    const currentCategoryObject = useMemo(() =>
-        allCategories.find(cat => cat.slug === currentFilters.categorySlug)
-        , [currentFilters.categorySlug, allCategories]);
-        
-    const getCategoryAncestors = (categorySlug: string | undefined, categories: LeanCategory[]): string[] => {
-        if (!categorySlug || categories.length === 0) return [];
-        const ancestors: string[] = [];
-        let currentCategory = categories.find(c => c.slug === categorySlug);
-
-        while (currentCategory?.parent) {
-            const parentIdStr = typeof currentCategory.parent === 'string'
-                ? currentCategory.parent
-                : (currentCategory.parent as Types.ObjectId).toString();
-
-            const parentCategory = categories.find(c =>
-                (typeof c._id === 'string' ? c._id : (c._id as Types.ObjectId).toString()) === parentIdStr
-            );
-
-            if (parentCategory) {
-                ancestors.push(typeof parentCategory._id === 'string' ? parentCategory._id : (parentCategory._id as Types.ObjectId).toString());
-                currentCategory = parentCategory;
-            } else {
-                break;
-            }
-        }
-        return ancestors.reverse();
-    }
-    
-    const activeCategoryAncestors = useMemo(() =>
-        getCategoryAncestors(currentFilters.categorySlug, allCategories)
-        , [currentFilters.categorySlug, allCategories]);
-
     useEffect(() => {
-        // Fetch favorites on initial load if user is logged in
         if (session?.user) {
-            fetchUserFavorites().then(setFavoriteProductIds);
+            fetchUserFavorites().then(setFavoriteProductIds).catch(() => setFetchError("Impossible de charger vos favoris."));
         }
     }, [session?.user]);
+    
+    const updateUrl = useCallback((newFilters: FiltersState) => {
+        let newPath = "/categories";
+        if (newFilters.categorySlug) {
+            const categoryInBreadcrumbs = breadcrumbs.find(b => b.slug === newFilters.categorySlug);
+            const slugPath = breadcrumbs.map(b => b.slug).join('/') + (categoryInBreadcrumbs ? '' : `/${newFilters.categorySlug}`);
+            newPath = `/categories/${slugPath}`;
+        }
 
-    const updateUrlAndRefetch = useCallback((newFilters: FiltersState) => {
         const query = new URLSearchParams();
-        if (newFilters.brandSlugs?.length) {
-            query.set('brands', newFilters.brandSlugs.join(','));
-        }
-        if (newFilters.searchQuery?.trim()) {
-            query.set('search', newFilters.searchQuery.trim());
-        }
+        if (newFilters.brandSlugs?.length) query.set('brands', newFilters.brandSlugs.join(','));
+        if (newFilters.searchQuery?.trim()) query.set('search', newFilters.searchQuery.trim());
 
-        const newPath = `/categories${newFilters.categorySlug ? `/${newFilters.categorySlug}` : ''}`;
         const finalUrl = `${newPath}${query.toString() ? `?${query.toString()}` : ''}`;
         
-        // Update URL and let the server component handle data refetching via router.refresh()
         startTransition(() => {
-            // Using window.history.pushState to avoid a full page reload, 
-            // but relying on router.refresh() to re-run the server component's data fetching.
-            window.history.pushState(null, '', finalUrl);
-            router.refresh();
+            router.push(finalUrl, { scroll: false });
         });
-    }, [router]);
+    }, [router, breadcrumbs]);
 
     const handleFiltersChange = useCallback((newFilterValues: Partial<FiltersState>) => {
         const updatedFilters = { ...currentFilters, ...newFilterValues };
         
-        // If category changes, reset brands and search query
         if (newFilterValues.categorySlug !== undefined && currentFilters.categorySlug !== newFilterValues.categorySlug) {
             updatedFilters.brandSlugs = [];
             updatedFilters.searchQuery = '';
-            setSearchInputValue(''); // also reset input field
+            setSearchInputValue('');
         }
         
         setCurrentFilters(updatedFilters);
-        updateUrlAndRefetch(updatedFilters);
+        updateUrl(updatedFilters);
 
-        if (window.innerWidth < 768) {
-            setIsSidebarOpenOnMobile(false);
-        }
-    }, [currentFilters, updateUrlAndRefetch]);
+        if (window.innerWidth < 768) setIsSidebarOpenOnMobile(false);
+    }, [currentFilters, updateUrl]);
 
     const handleSearchSubmit = useCallback((event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -182,8 +152,7 @@ export default function CategoryClientPage({ initialProducts, allCategories, all
         );
     }, []);
 
-    const pageTitle = currentCategoryObject?.name ||
-        (currentFilters.categorySlug ? currentFilters.categorySlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : "Catalogue des produits");
+    const pageTitle = currentCategory?.name || "Catalogue des produits";
     const currentSearchTerm = searchParams.get('search') || '';
 
     return (
@@ -196,7 +165,6 @@ export default function CategoryClientPage({ initialProducts, allCategories, all
             >
                 <PanelLeftOpen className="h-5 w-5" />
             </Button>
-
             <div className={cn("flex flex-col md:flex-row md:gap-8 lg:gap-10")}>
                 <div className={cn(
                     "fixed inset-0 z-40 bg-background/80 backdrop-blur-sm md:hidden",
@@ -208,13 +176,14 @@ export default function CategoryClientPage({ initialProducts, allCategories, all
                     isSidebarOpenOnMobile ? "translate-x-0 w-full max-w-xs sm:max-w-sm" : "-translate-x-full"
                 )}>
                     <FiltersSidebar
-                        allCategories={allCategories}
-                        allBrands={availableBrands}
-                        activeCategorySlug={currentFilters.categorySlug}
+                        allRootCategories={allRootCategories}
+                        currentCategory={currentCategory}
+                        currentCategoryChildren={currentCategoryChildren}
+                        breadcrumbs={breadcrumbs}
+                        allBrands={allBrands}
                         activeBrandSlugs={currentFilters.brandSlugs || []}
                         onFiltersChange={handleFiltersChange}
                         basePath="/categories"
-                        currentCategoryAncestors={activeCategoryAncestors}
                     />
                 </div>
                 <div className="hidden md:block md:w-64 lg:w-72 flex-shrink-0"></div>
@@ -222,11 +191,10 @@ export default function CategoryClientPage({ initialProducts, allCategories, all
                 <main className="flex-1 pt-4 md:pt-0">
                     <div className="mb-6 md:mb-8 p-4 border rounded-lg shadow-sm">
                         <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">{pageTitle}</h1>
-
                         <form onSubmit={handleSearchSubmit} className="mt-4 mb-6 flex w-full max-w-lg items-center space-x-2">
                             <Input
                                 type="search"
-                                placeholder={currentCategoryObject ? `Rechercher dans ${currentCategoryObject.name}...` : "Rechercher des produits..."}
+                                placeholder={currentCategory ? `Rechercher dans ${currentCategory.name}...` : "Rechercher des produits..."}
                                 value={searchInputValue}
                                 onChange={(e) => setSearchInputValue(e.target.value)}
                                 className="flex-1"
@@ -238,7 +206,6 @@ export default function CategoryClientPage({ initialProducts, allCategories, all
                                 Rechercher
                             </Button>
                         </form>
-
                         {isPending && <p className="text-muted-foreground mt-1 text-sm sm:text-base">Mise à jour des résultats...</p>}
                         {!isPending && products.length > 0 && !currentSearchTerm && <p className="text-muted-foreground mt-1 text-sm sm:text-base">{products.length} produits trouvés.</p>}
                         {!isPending && products.length > 0 && currentSearchTerm && <p className="text-muted-foreground mt-1 text-sm sm:text-base">{products.length} résultats pour &quot;{currentSearchTerm}&quot;.</p>}
