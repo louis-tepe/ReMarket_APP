@@ -16,13 +16,14 @@ interface ProductActionResult {
 
 export async function getProducts(filters: SearchFilters): Promise<ProductActionResult> {
     try {
-        const result = await searchProducts(filters);
+        const { products, totalProducts } = await searchProducts(filters);
+        const limit = filters.limit || 12;
         return {
             success: true,
             data: {
-                products: result.products,
-                total: result.total,
-                totalPages: result.totalPages,
+                products: products,
+                total: totalProducts,
+                totalPages: Math.ceil(totalProducts / limit),
             }
         };
     } catch (error) {
@@ -33,6 +34,6 @@ export async function getProducts(filters: SearchFilters): Promise<ProductAction
 }
 
 export async function getFeaturedProducts(): Promise<LeanProduct[]> {
-  const result = await searchProducts({ isFeatured: true, limit: 4 });
+  const result = await searchProducts({ limit: 4 });
   return result.products;
 } 

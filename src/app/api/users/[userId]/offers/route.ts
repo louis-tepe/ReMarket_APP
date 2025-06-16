@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import ProductOfferModel, { IProductBase } from '@/lib/mongodb/models/ProductBaseModel';
-import ProductModel, { IProductModel } from '@/lib/mongodb/models/ProductModel';
+import ProductOfferModel, { IProductBase } from '@/lib/mongodb/models/SellerProduct';
+import ProductModel, { IProductModel } from '@/lib/mongodb/models/ScrapingProduct';
 import dbConnect from '@/lib/mongodb/dbConnect';
 import { Types } from 'mongoose';
 
@@ -56,11 +56,13 @@ function mapToSellerOffer(offerDoc: IProductBase): SellerOffer {
             clientCondition = offerDoc.condition as SellerOffer['condition']; // En dernier recours, tenter un cast
     }
 
+    // Sécurisation de l'accès aux données du modèle de produit
+    const hasProductModelData = productModel && typeof productModel === 'object' && 'product' in productModel;
 
     const productModelInfo: ProductModelInfo = {
-        id: (productModel._id as unknown as Types.ObjectId).toString(),
-        name: productModel.title,
-        imageUrl: productModel.standardImageUrls && productModel.standardImageUrls.length > 0 ? productModel.standardImageUrls[0] : undefined,
+        id: (productModel?._id as unknown as Types.ObjectId)?.toString() || 'id-inconnu',
+        name: hasProductModelData ? productModel.product.title : 'Produit Inconnu',
+        imageUrl: hasProductModelData && productModel.product.images?.length > 0 ? productModel.product.images[0] : undefined,
     };
 
     return {
@@ -97,7 +99,7 @@ export async function GET(
             .populate<{ productModel: IProductModel }>({ // Typage pour la population
                 path: 'productModel',
                 model: ProductModel, // Nécessaire car ProductModel n'est pas directement "enregistré" via import direct dans ProductBaseModel
-                select: 'title standardImageUrls _id' // Sélectionner les champs nécessaires
+                select: 'product' // Sélectionner le sous-document 'product' qui contient title, images, etc.
             })
             .sort({ createdAt: -1 });
 

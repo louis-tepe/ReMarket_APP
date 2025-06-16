@@ -1,4 +1,4 @@
-import ProductOfferModel from '@/lib/mongodb/models/ProductBaseModel';
+import ProductOfferModel from '@/lib/mongodb/models/SellerProduct';
 import { NextRequest, NextResponse } from 'next/server';
 import type { FormFieldDefinition } from '@/types/form.types.ts';
 

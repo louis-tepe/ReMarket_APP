@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';
 import dbConnect from '@/lib/mongodb/dbConnect';
 import CartModel from '@/lib/mongodb/models/CartModel';
-import ProductOfferModel from '@/lib/mongodb/models/ProductBaseModel';
+import ProductOfferModel from '@/lib/mongodb/models/SellerProduct';
 import { LeanCart as GlobalLeanCart, LeanCartItem } from "@/types/cart";
 import { Types } from 'mongoose';
 

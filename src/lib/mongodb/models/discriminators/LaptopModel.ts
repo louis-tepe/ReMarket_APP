@@ -1,5 +1,5 @@
 import { Schema, models, Model } from 'mongoose';
-import ProductOfferModel, { IProductBase } from '../ProductBaseModel'; // Chemin vers le modèle de base
+import ProductOfferModel, { IProductBase } from '../SellerProduct'; // Chemin vers le modèle de base
 
 // Interface pour les champs spécifiques aux ordinateurs portables
 export interface ILaptopOffer extends IProductBase {

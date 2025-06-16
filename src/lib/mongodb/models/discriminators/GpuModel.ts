@@ -1,5 +1,5 @@
 import { Schema, models, Model } from 'mongoose';
-import ProductOfferModel, { IProductBase } from '../ProductBaseModel';
+import ProductOfferModel, { IProductBase } from '../SellerProduct';
 
 export interface IGpuOffer extends IProductBase {
   brand: 'NVIDIA' | 'AMD' | 'Intel';

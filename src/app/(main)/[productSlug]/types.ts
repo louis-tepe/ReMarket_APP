@@ -56,8 +56,6 @@ export interface Product {
     updatedAt: string;
     sourceUrlLedenicheur?: string;
     variantTitle?: string;
-    priceNewLedenicheur?: number;
-    priceUsedLedenicheur?: number;
+    averagePriceLedenicheur?: number;
     optionChoicesLedenicheur?: { optionName: string; availableValues: string[] }[];
-    qasLedenicheur?: { question: string; answer: string }[];
 } 

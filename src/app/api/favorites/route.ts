@@ -1,5 +1,5 @@
 import User from '@/lib/mongodb/models/User';
-import ProductModel, { IProductModel } from '@/lib/mongodb/models/ProductModel';
+import ProductModel, { IProductModel } from '@/lib/mongodb/models/ScrapingProduct';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';

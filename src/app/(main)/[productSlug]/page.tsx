@@ -240,8 +240,7 @@ export default function ProductPage({ params }: ProductPageProps) {
                     <Separator className="my-8" />
 
                     <LedenicheurPriceInfo
-                        priceNewLedenicheur={product.priceNewLedenicheur}
-                        priceUsedLedenicheur={product.priceUsedLedenicheur}
+                        averagePriceLedenicheur={product.averagePriceLedenicheur}
                         sourceUrlLedenicheur={product.sourceUrlLedenicheur}
                     />
 
@@ -249,7 +248,6 @@ export default function ProductPage({ params }: ProductPageProps) {
                         keyFeatures={product.keyFeatures}
                         specifications={product.specifications}
                         optionChoicesLedenicheur={product.optionChoicesLedenicheur}
-                        qasLedenicheur={product.qasLedenicheur}
                     />
                 </div>
             </div>

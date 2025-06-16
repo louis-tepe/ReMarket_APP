@@ -1,5 +1,5 @@
 import dbConnect from "@/lib/mongodb/dbConnect";
-import ProductModel from "@/lib/mongodb/models/ProductModel";
+import ProductModel from "@/lib/mongodb/models/ScrapingProduct";
 import CategoryModel from "@/lib/mongodb/models/CategoryModel";
 import BrandModel from "@/lib/mongodb/models/BrandModel";
 import { Types, FilterQuery, SortOrder } from "mongoose";
@@ -43,15 +43,15 @@ export async function fetchFeaturedProductData(): Promise<FeaturedProductData[]>
             "$slug",
             {
               $replaceAll: {
-                input: { $toLower: "$title" },
+                input: { $toLower: "$product.title" },
                 find: " ",
                 replacement: "-",
               },
             },
           ],
         },
-        name: "$title",
-        imageUrl: { $arrayElemAt: ["$standardImageUrls", 0] },
+        name: "$product.title",
+        imageUrl: { $arrayElemAt: ["$product.images", 0] },
         price: { $arrayElemAt: ["$offers.price", 0] },
       },
     },
@@ -96,7 +96,7 @@ export async function searchProducts(filters: SearchFilters): Promise<ProductSea
     includeOffers = false,
   } = filters;
 
-  const query: FilterQuery<typeof ProductModel> = {};
+  const query: FilterQuery<any> = {};
 
   if (filters.searchQuery) {
     query.$text = { $search: filters.searchQuery };
@@ -118,8 +118,10 @@ export async function searchProducts(filters: SearchFilters): Promise<ProductSea
     }
   }
 
+  const totalProducts = await ProductModel.countDocuments(query);
+
   const sortOptions: { [key: string]: SortOrder | { $meta: "textScore" } } = {};
-  if (sort === 'relevance' && query.$text) {
+  if (sort === 'relevance' && filters.searchQuery) {
     sortOptions.score = { $meta: "textScore" };
   } else if (sort === 'price-asc') {
     sortOptions.minPrice = 1;
@@ -129,19 +131,52 @@ export async function searchProducts(filters: SearchFilters): Promise<ProductSea
 
   const skip = (page - 1) * limit;
 
-  const populateOptions: { path: string; select?: string }[] = [];
-  if (includeOffers) {
-    populateOptions.push({ path: 'sellerOffers' });
+  const aggregationPipeline: any[] = [
+    { $match: query },
+    {
+      $lookup: {
+        from: "productoffers",
+        localField: "_id",
+        foreignField: "productModel",
+        as: "sellerOffers",
+        pipeline: [
+          { $match: { transactionStatus: "available" } },
+          { $sort: { price: 1 } },
+        ],
+      },
+    },
+    {
+      $addFields: {
+        minPrice: { $ifNull: [{ $min: "$sellerOffers.price" }, null] },
+      },
+    },
+    {
+      $project: {
+        _id: 1,
+        slug: 1,
+        title: "$product.title",
+        standardImageUrls: "$product.images",
+        category: 1,
+        brand: 1,
+        minPrice: 1,
+        sellerOffers: {
+          $cond: {
+            if: includeOffers,
+            then: "$sellerOffers",
+            else: [],
+          },
+        },
+      },
+    },
+  ];
+
+  if (Object.keys(sortOptions).length > 0) {
+    aggregationPipeline.push({ $sort: sortOptions });
   }
 
-  const products = await ProductModel.find(query)
-    .sort(sortOptions)
-    .skip(skip)
-    .limit(limit)
-    .populate(populateOptions)
-    .lean<LeanProduct[]>();
+  aggregationPipeline.push({ $skip: skip }, { $limit: limit });
 
-  const totalProducts = await ProductModel.countDocuments(query);
+  const products = await ProductModel.aggregate(aggregationPipeline).exec();
 
   return { products, totalProducts };
 }

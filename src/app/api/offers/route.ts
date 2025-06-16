@@ -4,9 +4,9 @@ import type { Session } from "next-auth";
 import { authOptions } from '@/lib/authOptions';
 import { Types } from 'mongoose';
 import dbConnect from '@/lib/mongodb/dbConnect';
-import ProductOfferModel, { IProductBase } from '@/lib/mongodb/models/ProductBaseModel';
+import ProductOfferModel, { IProductBase } from '@/lib/mongodb/models/SellerProduct';
 import CategoryModel, { ICategory } from '@/lib/mongodb/models/CategoryModel';
-import ProductModel from '@/lib/mongodb/models/ProductModel';
+import ProductModel from '@/lib/mongodb/models/ScrapingProduct';
 import User from '@/lib/mongodb/models/User';
 import { analyzeImageCondition, ImagePart } from '@/services/ai/geminiService';
 import { getProductOfferDiscriminator } from '@/lib/mongodb/models/discriminators';
@@ -126,7 +126,6 @@ import { getProductOfferDiscriminator } from '@/lib/mongodb/models/discriminator
 
 interface OfferCreationBody {
   productModelId: string;
-  categoryId: string; // ID de la catégorie feuille (slug technique)
   images: string[];
   price: number;
   condition: 'new' | 'like-new' | 'good' | 'fair' | 'poor';
@@ -152,10 +151,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body: OfferCreationBody = await request.json();
-    const { productModelId, categoryId, images, price, condition, description, kind, stockQuantity = 1, ...specificFields } = body;
+    const { productModelId, images, price, condition, description, kind, stockQuantity = 1, ...specificFields } = body;
 
     const requiredFields: (keyof Omit<OfferCreationBody, 'currency' | 'stockQuantity' | 'specificFields'>)[] = 
-        ['productModelId', 'categoryId', 'images', 'price', 'condition', 'description', 'kind'];
+        ['productModelId', 'images', 'price', 'condition', 'description', 'kind'];
     const missingFields = requiredFields.filter(field => 
         field === 'images' ? (!body[field] || body[field].length === 0) : !body[field]
     );
@@ -164,9 +163,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: `Champs requis manquants: ${missingFields.join(', ')}.` }, { status: 400 });
     }
 
-    const categoryDoc = await CategoryModel.findById(categoryId).lean<ICategory | null>();
-    if (!categoryDoc || !categoryDoc.isLeafNode || categoryDoc.slug !== kind) {
-      return NextResponse.json({ success: false, message: "Catégorie feuille invalide, non correspondante ou non spécifiée." }, { status: 400 });
+    const categoryDoc = await CategoryModel.findOne({ slug: kind }).lean<ICategory | null>();
+    if (!categoryDoc || !categoryDoc.isLeafNode) {
+      return NextResponse.json({ success: false, message: "Catégorie feuille invalide ou non spécifiée par 'kind'." }, { status: 400 });
     }
 
     const productModelDoc = await ProductModel.findById(productModelId).lean(); // .lean() pour performance

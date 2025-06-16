@@ -1,5 +1,5 @@
 import CategoryModel, { ICategory } from '@/lib/mongodb/models/CategoryModel';
-import ProductOfferModel, { IProductBase } from '@/lib/mongodb/models/ProductBaseModel';
+import ProductOfferModel, { IProductBase } from '@/lib/mongodb/models/SellerProduct';
 import { getKindFromSlug, ProductKind } from '@/config/discriminatorMapping';
 import { Types } from 'mongoose';
 

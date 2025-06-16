@@ -1,4 +1,4 @@
-import type { IProductModel as BackendProductModel } from '@/lib/mongodb/models/ProductModel';
+import type { IProductModel as BackendProductModel } from '@/lib/mongodb/models/ScrapingProduct';
 import type { ICategory as BackendCategory } from '@/lib/mongodb/models/CategoryModel';
 import type { FormFieldDefinition } from '@/types/form.types';
 import type { IBrand as BackendBrand } from '@/lib/mongodb/models/BrandModel'; // Import IBrand

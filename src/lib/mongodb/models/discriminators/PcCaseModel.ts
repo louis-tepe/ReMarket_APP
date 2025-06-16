@@ -1,5 +1,5 @@
 import { Schema, models, Model } from 'mongoose';
-import ProductOfferModel, { IProductBase } from '../ProductBaseModel';
+import ProductOfferModel, { IProductBase } from '../SellerProduct';
 
 export interface IPcCaseOffer extends IProductBase {
   type: 'Tower (Mid, Full, Mini)' | 'SFF (Small Form Factor)' | 'Cube' | 'Desktop (Horizontal)';

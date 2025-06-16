@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import ProductModel, { IProductModel } from '@/lib/mongodb/models/ProductModel';
+import ProductModel, { IProductModel } from '@/lib/mongodb/models/ScrapingProduct';
 import dbConnect from '@/lib/mongodb/dbConnect';
 import mongoose, { Types } from 'mongoose';
 // import { getServerSession } from "next-auth/next"; // Décommenter si authOptions est utilisé
@@ -152,16 +152,63 @@ export async function GET(
 
   try {
     await dbConnect();
-    const product = await ProductModel.findById(id)
+    const productModel = await ProductModel.findById(id)
       .populate('brand', 'name slug') // Populater la marque
       .populate('category', 'name slug') // Populater la catégorie
-      .lean<IProductModel | null>();
+      .lean<any | null>();
 
-    if (!product) {
+    if (!productModel) {
       return NextResponse.json({ message: 'ProductModel non trouvé.' }, { status: 404 });
     }
-    return NextResponse.json(product, { status: 200 });
+
+    const specifications = productModel.specifications
+      ? Object.entries(productModel.specifications).flatMap(([category, specsObject]) => {
+          if (typeof specsObject !== 'object' || specsObject === null) return [];
+          return Object.entries(specsObject).map(([label, value]) => ({
+            label: `${category} > ${label}`,
+            value: String(value),
+          }));
+        })
+      : [];
+
+    const optionChoicesLedenicheur = productModel.options
+      ? Object.entries(productModel.options).map(([optionName, availableValues]) => ({
+          optionName,
+          availableValues
+        }))
+      : [];
+      
+    const averagePriceLedenicheur = productModel.price_analysis?.['3_months']?.average_price;
+
+    // Transformer le modèle de données pour correspondre à ce que le frontend attend
+    const productData = {
+      _id: productModel._id.toString(),
+      slug: productModel.slug,
+      title: productModel.product.title,
+      brand: {
+        _id: productModel.brand?._id,
+        name: productModel.brand?.name || productModel.product.brand,
+        slug: productModel.brand?.slug,
+      },
+      category: {
+        _id: productModel.category?._id,
+        name: productModel.category?.name,
+        slug: productModel.category?.slug,
+      },
+      standardDescription: productModel.product.description || '',
+      standardImageUrls: productModel.product.images || [],
+      keyFeatures: [], // Donnée non disponible depuis le scraper
+      specifications: specifications,
+      
+      // Données Ledenicheur
+      sourceUrlLedenicheur: productModel.product.url,
+      averagePriceLedenicheur: averagePriceLedenicheur,
+      optionChoicesLedenicheur: optionChoicesLedenicheur,
+    };
+
+    return NextResponse.json(productData, { status: 200 });
   } catch (error) {
+    console.error(`Erreur API /api/product-models/${id}:`, error);
     const errorMessage = error instanceof Error ? error.message : 'Erreur serveur inconnue.';
     return NextResponse.json({ message: 'Erreur serveur lors de la récupération du ProductModel.', errorDetails: errorMessage }, { status: 500 });
   }

@@ -92,7 +92,7 @@ export default function ProductCard({
 
                 <Image
                     src={finalImageUrl}
-                    alt={name}
+                    alt={name || 'Image du produit'}
                     fill
                     sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
                     className={cn(
@@ -136,8 +136,8 @@ export default function ProductCard({
             </div>
 
             <div className="p-3 sm:p-4 flex-grow flex flex-col">
-                <h3 className="font-semibold text-sm sm:text-base leading-tight group-hover:text-primary transition-colors truncate" title={name}>
-                    {name}
+                <h3 className="font-semibold text-sm sm:text-base leading-tight group-hover:text-primary transition-colors truncate" title={name || 'Produit'}>
+                    {name || "Produit non disponible"}
                 </h3>
 
                 {/* OPTIMISATION: Affichage optimisé du nombre d'offres */}

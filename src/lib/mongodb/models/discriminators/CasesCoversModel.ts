@@ -1,5 +1,5 @@
 import { Schema, models, Model } from 'mongoose';
-import ProductOfferModel, { IProductBase } from '../ProductBaseModel';
+import ProductOfferModel, { IProductBase } from '../SellerProduct';
 
 // Pour les accessoires comme coques, housses, chargeurs etc.,
 // les champs spécifiques peuvent être moins nombreux ou plus génériques.

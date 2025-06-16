@@ -1,5 +1,5 @@
 import { Model } from 'mongoose';
-import ProductOfferModel, { IProductBase } from './ProductBaseModel';
+import ProductOfferModel, { IProductBase } from './SellerProduct';
 
 // Importe tous les modèles de discriminateurs spécifiques
 // Chaque fichier de discriminateur s'auto-enregistre auprès de Mongoose

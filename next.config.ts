@@ -1,6 +1,4 @@
 import type { NextConfig } from "next";
-import CopyPlugin from "copy-webpack-plugin";
-import path from "path";
 
 const nextConfig: NextConfig = {
   images: {
@@ -29,6 +27,10 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "cdn.idealo.com",
       },
+      {
+        protocol: "https",
+        hostname: "pricespy-75b8.kxcdn.com",
+      }
     ],
     formats: ['image/webp', 'image/avif'],
     minimumCacheTTL: 3600,
@@ -62,27 +64,8 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  serverExternalPackages: ["crawlee"],
   webpack: (config, { isServer, dev }) => {
     if (isServer) {
-      const headerGeneratorEntryPoint = require.resolve("header-generator");
-      const headerGeneratorRootDir = path.dirname(headerGeneratorEntryPoint);
-      const headerGeneratorDataFilesPath = path.join(
-        headerGeneratorRootDir,
-        "data_files"
-      );
-
-      config.plugins.push(
-        new CopyPlugin({
-          patterns: [
-            {
-              from: headerGeneratorDataFilesPath,
-              to: path.join("vendor-chunks", "data_files"),
-            },
-          ],
-        })
-      );
-
       if (!config.externals) {
         config.externals = [];
       }

@@ -248,11 +248,12 @@ export default function SellPage() {
         if (finalSelectedLeafCategory && selectedBrandId) {
             setIsLoadingProductModels(true);
             setProductModelsReMarketSelectItems([]);
-            setSelectedProductModelReMarketId(null);
-            setShowCreateByName(false);
-            fetch(`/api/product-models?categorySlug=${finalSelectedLeafCategory.slug}&brandSlug=${selectedBrandId}`)
+            fetch(`/api/product-models/search?categorySlug=${finalSelectedLeafCategory.slug}&brandSlug=${selectedBrandId}`)
                 .then(res => {
-                    if (!res.ok) throw new Error(`Erreur HTTP: ${res.status} - ${res.statusText}`);
+                    if (!res.ok) {
+                        const error = new Error(`Erreur HTTP: ${res.status} - ${res.statusText}`);
+                        throw error;
+                    }
                     return res.json();
                 })
                 .then((data: { success: boolean; productModels?: Array<{ _id?: string; id?: string; title?: string; name?: string; }>; message?: string } | Array<{ _id?: string; id?: string; title?: string; name?: string; }>) => {
@@ -349,7 +350,7 @@ export default function SellPage() {
         toast.info("Recherche en cours...", { description: `Recherche d'informations pour "${nameForScraping}".` });
 
         try {
-            const response = await fetch('/api/product-models', {
+            const response = await fetch('/api/product-models/create', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -517,64 +518,40 @@ export default function SellPage() {
             });
         }
 
-        const payload: Record<string, string | number | boolean | string[]> = { // More specific than any
-            productModelId: selectedProductModel!._id.toString(),
+        const finalOfferPayload = {
+            productModelId: selectedProductModel._id,
+            categoryId: finalSelectedLeafCategory._id,
+            kind: finalSelectedLeafCategory.slug,
             price: parseFloat(offerDetails.price),
-            currency: offerDetails.currency || 'EUR',
+            currency: offerDetails.currency,
             condition: offerDetails.condition,
             description: offerDetails.sellerDescription,
-            images: uploadedPhotoUrls, // string[]
-            stockQuantity: parseInt(offerDetails.stockQuantity, 10) || 1,
-            ...typedOfferSpecificFieldValues, // string | number | boolean
-            kind: finalSelectedLeafCategory?.slug || '',
-            categoryId: finalSelectedLeafCategory?._id || '',
+            images: uploadedPhotoUrls,
+            stockQuantity: parseInt(offerDetails.stockQuantity, 10),
+            ...typedOfferSpecificFieldValues,
         };
 
-        // Refined logic for deleting keys from payload
-        const keysInPayload = Object.keys(payload) as Array<keyof typeof payload>;
-        for (const key of keysInPayload) {
-            if (payload[key] === undefined) {
-                delete payload[key];
-            } else if (payload[key] === '') {
-                // Define fields that are allowed to be empty strings if necessary
-                const allowedEmptyStrings = ['description', 'graphicsCard', 'processor', 'operatingSystem', 'color', 'imei'];
-                if (!allowedEmptyStrings.includes(key as string)) {
-                    delete payload[key];
-                }
-            }
-        }
-
-        if (!payload.kind) {
-            toast.error("Erreur Catégorie", { description: "Le type de produit (kind/slug de catégorie) est manquant." });
-            setIsLoadingSubmitOffer(false);
-            return;
-        }
-        if (!payload.categoryId) {
-            toast.error("Erreur Catégorie", { description: "L'ID de catégorie est manquant." });
-            setIsLoadingSubmitOffer(false);
-            return;
-        }
-
         try {
-            toast.info("Publication de l'offre...", { id: "offer-toast" });
-            const response = await fetch('/api/offers', {
+            toast.info("Publication de l'offre...", { id: "submit-toast" });
+            const offerResponse = await fetch('/api/offers', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
+                body: JSON.stringify(finalOfferPayload),
             });
-            const createdOfferData = await response.json();
-            if (!response.ok) {
-                throw new Error(createdOfferData.message || `Erreur HTTP: ${response.status}`);
+
+            const offerData = await offerResponse.json();
+            if (!offerResponse.ok) {
+                throw new Error(offerData.message || "Échec de la création de l'offre.");
             }
             toast.success("Offre Publiée !", {
-                description: `Votre offre pour "${selectedProductModel!.title}" à ${createdOfferData.data?.price || payload.price}€ est en ligne.`,
+                description: `Votre offre pour "${selectedProductModel!.title}" à ${offerData.data?.price || finalOfferPayload.price}€ est en ligne.`,
                 action: { label: "Vendre un autre article", onClick: resetSellProcess },
                 cancel: { label: "Voir mes offres", onClick: () => router.push('/account/sales') }
             });
             resetSellProcess();
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : "Erreur inconnue.";
-            toast.error("Erreur Soumission Offre", { description: errorMessage, id: "offer-toast" });
+            toast.error("Erreur Soumission Offre", { description: errorMessage, id: "submit-toast" });
         } finally {
             setIsLoadingSubmitOffer(false);
         }

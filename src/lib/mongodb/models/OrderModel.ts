@@ -1,6 +1,6 @@
 import { Schema, model, models, Document, Types, Model as MongooseModel } from 'mongoose';
 import { IUser } from './User';
-import { IProductBase } from './ProductBaseModel'; // Renommé IOffer en IProductBase pour clarté
+import { IProductBase } from './SellerProduct'; // Renommé IOffer en IProductBase pour clarté
 
 // Statuts possibles pour une commande
 export type OrderStatus =
