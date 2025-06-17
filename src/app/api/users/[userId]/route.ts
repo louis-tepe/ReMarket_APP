@@ -42,7 +42,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ userId
             return NextResponse.json({ message: 'Utilisateur non trouvé' }, { status: 404 });
         }
 
-        return NextResponse.json(updatedUser, { status: 200 });
+        const userResponse = {
+            id: updatedUser._id,
+            name: updatedUser.name,
+            email: updatedUser.email,
+        };
+
+        return NextResponse.json(userResponse, { status: 200 });
 
     } catch (error) {
         if (error instanceof Error && error.name === 'ValidationError') {

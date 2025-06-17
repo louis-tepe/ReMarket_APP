@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import ProductModel, { IProductModel } from '@/lib/mongodb/models/ScrapingProduct';
+import ProductModel, { IScrapedProduct } from '@/lib/mongodb/models/ScrapingProduct';
 import dbConnect from '@/lib/mongodb/dbConnect';
 import mongoose, { Types } from 'mongoose';
+import { z } from 'zod';
 // import { getServerSession } from "next-auth/next"; // Décommenter si authOptions est utilisé
 // import { authOptions } from '@/app/api/auth/[...nextauth]/route'; // Décommenter pour la vérification admin
 // Décommentez si la vérification des offres est réactivée dans DELETE
@@ -141,8 +142,37 @@ import mongoose, { Types } from 'mongoose';
  *          type: string
  *          format: date-time
  */
+
+type PopulatedBrand = {
+  _id: Types.ObjectId;
+  name: string;
+  slug: string;
+};
+
+type PopulatedCategory = {
+  _id: Types.ObjectId;
+  name: string;
+  slug: string;
+};
+
+// Étend IScrapedProduct pour inclure les champs populés et _id
+type PopulatedScrapedProduct = Omit<IScrapedProduct, 'brand' | 'category'> & {
+  _id: Types.ObjectId;
+  brand?: PopulatedBrand;
+  category?: PopulatedCategory;
+};
+
+const UpdateProductModelSchema = z.object({
+  title: z.string().min(1, "Le titre est requis.").optional(),
+  brand: z.string().optional(), // Attendu comme ObjectId de la marque
+  category: z.string().optional(), // Attendu comme ObjectId de la catégorie
+  standardDescription: z.string().optional(),
+  standardImageUrls: z.array(z.string().url("URL d'image invalide.")).optional(),
+  specifications: z.record(z.unknown()).optional(), // Validation basique pour le moment
+}).strict(); // Rejette les champs non définis dans le schéma
+
 export async function GET(
-  request: NextRequest, // Non utilisé, mais conservé pour la signature de la route
+  request: NextRequest, 
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -153,9 +183,9 @@ export async function GET(
   try {
     await dbConnect();
     const productModel = await ProductModel.findById(id)
-      .populate('brand', 'name slug') // Populater la marque
-      .populate('category', 'name slug') // Populater la catégorie
-      .lean<any | null>();
+      .populate('brand', 'name slug')
+      .populate('category', 'name slug')
+      .lean<PopulatedScrapedProduct | null>();
 
     if (!productModel) {
       return NextResponse.json({ message: 'ProductModel non trouvé.' }, { status: 404 });
@@ -171,16 +201,6 @@ export async function GET(
         })
       : [];
 
-    const optionChoicesLedenicheur = productModel.options
-      ? Object.entries(productModel.options).map(([optionName, availableValues]) => ({
-          optionName,
-          availableValues
-        }))
-      : [];
-      
-    const averagePriceLedenicheur = productModel.price_analysis?.['3_months']?.average_price;
-
-    // Transformer le modèle de données pour correspondre à ce que le frontend attend
     const productData = {
       _id: productModel._id.toString(),
       slug: productModel.slug,
@@ -197,13 +217,8 @@ export async function GET(
       },
       standardDescription: productModel.product.description || '',
       standardImageUrls: productModel.product.images || [],
-      keyFeatures: [], // Donnée non disponible depuis le scraper
+      keyFeatures: [],
       specifications: specifications,
-      
-      // Données Ledenicheur
-      sourceUrlLedenicheur: productModel.product.url,
-      averagePriceLedenicheur: averagePriceLedenicheur,
-      optionChoicesLedenicheur: optionChoicesLedenicheur,
     };
 
     return NextResponse.json(productData, { status: 200 });
@@ -228,18 +243,51 @@ export async function PUT(
   try {
     await dbConnect();
     const body = await request.json();
+
+    const validationResult = UpdateProductModelSchema.safeParse(body);
+
+    if (!validationResult.success) {
+      return NextResponse.json({ 
+        message: 'Données d\'entrée invalides.',
+        errors: validationResult.error.flatten().fieldErrors,
+      }, { status: 400 });
+    }
+    
+    const { title, brand, category, standardDescription, standardImageUrls, specifications } = validationResult.data;
+
+    const updateData: Record<string, unknown> = {};
+    if (title) updateData['product.title'] = title;
+    if (brand) updateData['brand'] = new Types.ObjectId(brand);
+    if (category) updateData['category'] = new Types.ObjectId(category);
+    if (standardDescription) updateData['product.description'] = standardDescription;
+    if (standardImageUrls) updateData['product.images'] = standardImageUrls;
+    if (specifications) updateData['specifications'] = specifications;
+    
     // Le slug est géré par le hook pre-save du modèle, pas besoin de le manipuler ici.
 
     const updatedProductModel = await ProductModel.findByIdAndUpdate(
       id,
-      { $set: body }, // S'assurer que `body` est validé/nettoyé par ailleurs
+      { $set: updateData }, // Utilise l'objet nettoyé et validé
       { new: true, runValidators: true }
-    ).lean<IProductModel | null>();
+    ).lean<PopulatedScrapedProduct | null>();
 
     if (!updatedProductModel) {
       return NextResponse.json({ message: 'ProductModel non trouvé pour la mise à jour.' }, { status: 404 });
     }
-    return NextResponse.json(updatedProductModel, { status: 200 });
+
+    // Créer une réponse sécurisée, ne retournant que les champs nécessaires
+    const responseData = {
+      _id: updatedProductModel._id.toString(),
+      slug: updatedProductModel.slug,
+      title: updatedProductModel.product.title,
+      brand: updatedProductModel.brand, // Peut nécessiter une population si seuls les IDs sont retournés
+      category: updatedProductModel.category, // Idem
+      standardDescription: updatedProductModel.product.description,
+      standardImageUrls: updatedProductModel.product.images,
+      specifications: updatedProductModel.specifications,
+    };
+
+    return NextResponse.json(responseData, { status: 200 });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Erreur serveur inconnue.';
     if (error instanceof mongoose.Error.ValidationError) {

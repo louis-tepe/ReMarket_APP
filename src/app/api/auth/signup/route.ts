@@ -2,43 +2,18 @@ import User from '@/lib/mongodb/models/User'; // Modèle User Mongoose
 import dbConnect from '@/lib/mongodb/dbConnect';
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-
-const MIN_PASSWORD_LENGTH = 6;
+import { SignUpSchema } from '@/lib/validators/auth';
+import { ZodError } from 'zod';
 
 export async function POST(req: NextRequest) {
   try {
     await dbConnect(); // Assurer la connexion à la base de données
 
-    const { email, name, password } = await req.json();
+    const body = await req.json();
+    const { email, name, password } = SignUpSchema.parse(body);
 
-    if (!email || !password) {
-      return NextResponse.json(
-        { message: 'L\'email et le mot de passe sont requis.' },
-        { status: 400 }
-      );
-    }
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    if (password.length < MIN_PASSWORD_LENGTH) {
-        return NextResponse.json(
-            { message: `Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caractères.` },
-            { status: 400 }
-        );
-    }
-
-    // Vérifier si l'utilisateur existe déjà
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      // Message générique pour ne pas révéler l'existence d'un email
-      return NextResponse.json(
-        { message: 'Impossible de créer le compte avec ces informations.' }, 
-        { status: 409 } 
-      );
-    }
-
-    // Hacher le mot de passe
-    const hashedPassword = await bcrypt.hash(password, 10); // 10 est le nombre de tours de salage
-
-    // Créer le nouvel utilisateur
     const newUser = new User({
       name,
       email,
@@ -47,7 +22,6 @@ export async function POST(req: NextRequest) {
 
     await newUser.save();
 
-    // Ne pas retourner le mot de passe, même haché, dans la réponse
     return NextResponse.json(
       {
         message: 'Utilisateur créé avec succès.',
@@ -60,16 +34,19 @@ export async function POST(req: NextRequest) {
       { status: 201 } // 201 Created
     );
   } catch (error) {
-    console.error("Erreur lors de la création de l'utilisateur:", error);
-    if (error instanceof Error && error.name === 'ValidationError') {
-        // Extrait les messages d'erreur de validation spécifiques
-        interface ValidationError {
-            errors: Record<string, { message: string }>;
-        }
-        const validationError = error as unknown as ValidationError;
-        const messages = Object.values(validationError.errors).map((e) => e.message).join(', ');
-        return NextResponse.json({ message: `Erreur de validation: ${messages}` }, { status: 400 });
+    if (error instanceof ZodError) {
+      return NextResponse.json({ message: error.issues[0].message }, { status: 400 });
     }
+    
+    // Erreur de clé dupliquée de MongoDB (email déjà utilisé)
+    if (error instanceof Error && 'code' in error && (error as { code: number }).code === 11000) {
+        return NextResponse.json(
+            { message: 'Un utilisateur avec cet email existe déjà.' },
+            { status: 409 }
+        );
+    }
+
+    console.error("Erreur lors de la création de l'utilisateur:", error);
     return NextResponse.json(
       { message: "Erreur serveur lors de la création de l'utilisateur." },
       { status: 500 }

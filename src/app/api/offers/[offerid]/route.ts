@@ -6,6 +6,17 @@ import ProductOfferModel, { IProductBase } from '@/lib/mongodb/models/SellerProd
 import ProductModel from '@/lib/mongodb/models/ScrapingProduct';
 import UserModel from '@/lib/mongodb/models/User';
 import { Types } from 'mongoose';
+import { z } from 'zod';
+
+const UpdateOfferSchema = z.object({
+  price: z.number().positive("Le prix doit être positif.").optional(),
+  condition: z.enum(['new', 'used_likenew', 'used_good', 'used_fair']).optional(),
+  description: z.string().max(2000, "La description ne peut excéder 2000 caractères.").optional(),
+  images: z.array(z.string().url("URL d'image invalide.")).optional(),
+  stockQuantity: z.number().int("La quantité doit être un nombre entier.").min(0).optional(),
+  // Accepte un objet plat de champs supplémentaires pour les discriminateurs
+  specificFields: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+}).strict(); // N'autorise que les champs définis ci-dessus
 
 /**
  * @swagger
@@ -60,8 +71,54 @@ import { Types } from 'mongoose';
  *         description: Erreur serveur.
  */
 
-// Champs autorisés pour la mise à jour d'une offre
-const ALLOWED_OFFER_UPDATE_FIELDS = ['price', 'condition', 'description', 'images', 'stockQuantity', 'specificFields']; // 'specificFields' pour les champs dynamiques
+// Champs autorisés pour la mise à jour d'une offre (Obsolète, validation via Zod)
+// const ALLOWED_OFFER_UPDATE_FIELDS = ['price', 'condition', 'description', 'images', 'stockQuantity', 'specificFields'];
+
+// Type pour une offre avec les champs populés
+type PopulatedOffer = IProductBase & {
+  _id: Types.ObjectId;
+  seller: { _id: Types.ObjectId; name: string; };
+  productModel: { 
+    _id: Types.ObjectId; 
+    title: string; 
+    slug: string; 
+    brand: { _id: Types.ObjectId; name: string; slug: string; };
+    category: { _id: Types.ObjectId; name: string; slug: string; };
+  };
+};
+
+// Fonction pour transformer l'objet de l'offre en un objet sûr pour le client
+const toSafeOfferDTO = (offer: PopulatedOffer | null) => {
+  if (!offer) return null;
+
+  // Le 'offer' est un objet lean, déjà un POJO.
+  // On copie toutes ses propriétés pour créer un DTO propre.
+  const { _id, seller, productModel, ...restOfOffer } = offer;
+
+  const dto: Record<string, unknown> = {
+    id: _id.toString(),
+    ...restOfOffer
+  };
+
+  if (seller) {
+    dto.seller = {
+      id: seller._id.toString(),
+      name: seller.name,
+    };
+  }
+
+  if (productModel) {
+    dto.productModel = {
+      id: productModel._id.toString(),
+      title: productModel.title,
+      slug: productModel.slug,
+      brand: productModel.brand,
+      category: productModel.category,
+    };
+  }
+  
+  return dto;
+};
 
 export async function PUT(
   request: NextRequest,
@@ -82,6 +139,15 @@ export async function PUT(
     const body = await request.json();
     await dbConnect();
 
+    // 1. Valider le corps de la requête avec Zod
+    const validationResult = UpdateOfferSchema.safeParse(body);
+    if (!validationResult.success) {
+      return NextResponse.json({ 
+        message: 'Données d\'entrée invalides.',
+        errors: validationResult.error.flatten().fieldErrors,
+      }, { status: 400 });
+    }
+    
     const offer = await ProductOfferModel.findById(offerid);
     if (!offer) {
       return NextResponse.json({ message: 'Offre non trouvée.' }, { status: 404 });
@@ -93,36 +159,27 @@ export async function PUT(
       return NextResponse.json({ message: 'Cette offre ne peut plus être modifiée.' }, { status: 403 });
     }
 
-    // Filtrer le corps de la requête pour ne garder que les champs modifiables
-    const updateData: Partial<IProductBase> & Record<string, unknown> = {};
-    for (const key in body) {
-        if (ALLOWED_OFFER_UPDATE_FIELDS.includes(key) || offer.schema.pathType(key) === 'real') { // Accepter aussi les champs du discriminateur
-            // Attention: specificFields doit être traité correctement si c'est un objet imbriqué
-            if (key === 'specificFields' && typeof body[key] === 'object') {
-                 Object.assign(updateData, body[key]); // Écraser les champs spécifiques directement à la racine
-            } else {
-                updateData[key] = body[key];
-            }
-        }
-    }
-    // S'assurer que les champs non modifiables ne sont pas passés
-    delete updateData.productModel;
-    delete updateData.seller;
-    delete updateData.listingStatus;
-    delete updateData.transactionStatus;
-    delete updateData.kind;
-    delete updateData.category;
+    // 2. Construire l'objet de mise à jour à partir des données validées
+    const { specificFields, ...otherFields } = validationResult.data;
+    const updateData = { ...otherFields, ...specificFields };
 
     if (Object.keys(updateData).length === 0) {
         return NextResponse.json({ message: "Aucune donnée valide à mettre à jour." }, { status: 400 });
     }
 
-    const updatedOffer = await ProductOfferModel.findByIdAndUpdate(offerid, { $set: updateData }, { new: true, runValidators: true });
+    const updatedOffer = await ProductOfferModel.findByIdAndUpdate(offerid, { $set: updateData }, { new: true, runValidators: true })
+        .populate([
+            { path: 'productModel', model: ProductModel, select: 'title slug brand category', populate: [{ path: 'brand', select: 'name slug' }, { path: 'category', select: 'name slug'}] },
+            { path: 'seller', model: UserModel, select: 'name _id' }
+        ])
+        .lean<PopulatedOffer | null>();
 
-    return NextResponse.json(updatedOffer, { status: 200 });
+    return NextResponse.json(toSafeOfferDTO(updatedOffer), { status: 200 });
   } catch (error) {
-    // console.error(`[PUT /api/offers/${offerid}]`, error); // Log serveur optionnel
     const errorMessage = error instanceof Error ? error.message : "Erreur inconnue.";
+    if (error instanceof Error && error.name === 'ZodError') {
+      return NextResponse.json({ message: 'Données invalides.', errorDetails: error.message }, { status: 400 });
+    }
     if (error instanceof Error && (error.name === 'ValidationError' || error.name === 'CastError')) {
         return NextResponse.json({ message: 'Données invalides.', errorDetails: errorMessage }, { status: 400 });
     }
@@ -176,12 +233,12 @@ export async function GET(
           },
           { path: 'seller', model: UserModel, select: 'name username _id' }
       ])
-      .lean<IProductBase | null>();
+      .lean<PopulatedOffer | null>();
 
     if (!offer) {
       return NextResponse.json({ message: 'Offre non trouvée.' }, { status: 404 });
     }
-    return NextResponse.json(offer, { status: 200 });
+    return NextResponse.json(toSafeOfferDTO(offer), { status: 200 });
   } catch (error) {
     // console.error(`[GET /api/offers/${offerid}]`, error); // Log serveur optionnel
     const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue.';
@@ -194,7 +251,7 @@ export async function GET(
  * /api/offers/{id}:
  *   delete:
  *     summary: Supprime une offre.
- *     description: Permet à un vendeur de supprimer son offre (si elle n'est pas vendue/expédiée) ou à un admin de la supprimer.
+ *     description: Permet à un vendeur de supprimer son offre (si elle n'est pas vendue).
  *     tags:
  *       - Offers
  *     parameters:
@@ -203,14 +260,14 @@ export async function GET(
  *         required: true
  *         schema:
  *           type: string
- *         description: L'ID MongoDB de l'offre à supprimer.
+ *         description: L'ID de l'offre à supprimer.
  *     responses:
  *       200:
  *         description: Offre supprimée avec succès.
  *       401:
  *         description: Non autorisé.
  *       403:
- *         description: Interdit (ex: l'utilisateur n'est pas le propriétaire ou l'offre ne peut être supprimée).
+ *         description: Interdit (l'utilisateur n'est pas le propriétaire ou l'offre ne peut être supprimée).
  *       404:
  *         description: Offre non trouvée.
  *       500:
@@ -238,32 +295,21 @@ export async function DELETE(
     if (!offer) {
       return NextResponse.json({ message: 'Offre non trouvée.' }, { status: 404 });
     }
+
     if (offer.seller.toString() !== userId) {
-      return NextResponse.json({ message: "Action non autorisée sur cette offre." }, { status: 403 });
-    }
-    if (offer.listingStatus === 'inactive') {
-      return NextResponse.json({ message: 'L\'offre est déjà désactivée.' }, { status: 400 });
-    }
-    if (offer.transactionStatus === 'sold' || offer.transactionStatus === 'shipped') {
-      return NextResponse.json({ message: 'Impossible de désactiver une offre vendue ou expédiée.' }, { status: 403 });
+      return NextResponse.json({ message: 'Action non autorisée sur cette offre.' }, { status: 403 });
     }
 
-    const deactivatedOffer = await ProductOfferModel.findByIdAndUpdate(
-        offerid,
-        { $set: { listingStatus: 'inactive', transactionStatus: 'cancelled' } }, 
-        { new: true }
-    );
-
-    if (!deactivatedOffer) {
-        // Ce cas ne devrait pas arriver si l'offre a été trouvée initialement
-        return NextResponse.json({ message: "Erreur lors de la désactivation de l'offre." }, { status: 500 });
+    if (offer.transactionStatus !== 'available') {
+        return NextResponse.json({ message: 'Cette offre ne peut être supprimée car elle n\'est plus disponible.' }, { status: 403 });
     }
 
-    return NextResponse.json({ message: 'Offre désactivée avec succès.', offerId: offerid }, { status: 200 });
+    await ProductOfferModel.findByIdAndDelete(offerid);
+
+    return NextResponse.json({ message: 'Offre supprimée avec succès.' }, { status: 200 });
 
   } catch (error) {
-    // console.error(`[DELETE /api/offers/${offerid}]`, error); // Log serveur optionnel
     const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue.';
-    return NextResponse.json({ message: "Erreur serveur lors de la désactivation.", errorDetails: errorMessage }, { status: 500 });
+    return NextResponse.json({ message: "Erreur serveur lors de la suppression.", errorDetails: errorMessage }, { status: 500 });
   }
 }

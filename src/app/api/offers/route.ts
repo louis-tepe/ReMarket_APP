@@ -10,6 +10,8 @@ import ProductModel from '@/lib/mongodb/models/ScrapingProduct';
 import User from '@/lib/mongodb/models/User';
 import { analyzeImageCondition, ImagePart } from '@/services/ai/geminiService';
 import { getProductOfferDiscriminator } from '@/lib/mongodb/models/discriminators';
+import { OfferCreationSchema } from '@/lib/validators/offer';
+import { ZodError } from 'zod';
 
 // Importer les modèles discriminateurs pour s'assurer qu'ils sont enregistrés auprès de Mongoose
 // Commenté car discriminators.ts devrait gérer l'enregistrement via ses imports.
@@ -124,18 +126,6 @@ import { getProductOfferDiscriminator } from '@/lib/mongodb/models/discriminator
  *           format: date-time
  */
 
-interface OfferCreationBody {
-  productModelId: string;
-  images: string[];
-  price: number;
-  condition: 'new' | 'like-new' | 'good' | 'fair' | 'poor';
-  description: string;
-  kind: string; // Slug de la catégorie, utilisé comme discriminateur 'kind'
-  currency?: string;
-  stockQuantity?: number;
-  [key: string]: unknown; // Pour les champs dynamiques spécifiques à la catégorie
-}
-
 export async function POST(request: NextRequest) {
   try {
     await dbConnect();
@@ -150,18 +140,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Vendeur non trouvé." }, { status: 404 });
     }
 
-    const body: OfferCreationBody = await request.json();
-    const { productModelId, images, price, condition, description, kind, stockQuantity = 1, ...specificFields } = body;
-
-    const requiredFields: (keyof Omit<OfferCreationBody, 'currency' | 'stockQuantity' | 'specificFields'>)[] = 
-        ['productModelId', 'images', 'price', 'condition', 'description', 'kind'];
-    const missingFields = requiredFields.filter(field => 
-        field === 'images' ? (!body[field] || body[field].length === 0) : !body[field]
-    );
-
-    if (missingFields.length > 0) {
-      return NextResponse.json({ success: false, message: `Champs requis manquants: ${missingFields.join(', ')}.` }, { status: 400 });
-    }
+    const body = await request.json();
+    const { productModelId, images, price, condition, kind, stockQuantity, currency, ...specificFields } = OfferCreationSchema.parse(body);
 
     const categoryDoc = await CategoryModel.findOne({ slug: kind }).lean<ICategory | null>();
     if (!categoryDoc || !categoryDoc.isLeafNode) {
@@ -214,9 +194,8 @@ export async function POST(request: NextRequest) {
       category: productModelDoc.category as Types.ObjectId, // Utiliser la catégorie du ProductModel
       kind: categoryDoc.slug, // kind est le slug de la catégorie feuille
       price,
-      currency: body.currency || 'EUR',
+      currency,
       condition,
-      description,
       images,
       stockQuantity,
       listingStatus: 'active',
@@ -233,6 +212,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, message: "Offre créée avec succès.", data: newOffer.toObject() }, { status: 201 });
 
   } catch (error: unknown) {
+    if (error instanceof ZodError) {
+        return NextResponse.json({ success: false, message: error.errors.map(e => e.message).join(', ') }, { status: 400 });
+    }
     // console.error("[API_OFFERS_POST] Erreur création offre:", error); // Log serveur optionnel
     if (error instanceof Error && error.name === 'ValidationError') {
         interface ValidationError {
@@ -265,18 +247,12 @@ export async function GET(request: NextRequest) {
         queryParams.seller = searchParams.get('sellerId');
     }
 
-    const offers = await ProductOfferModel.find(queryParams)
-      // .populate('productModel', 'title slug') // Ajuster populate au besoin
-      // .populate('seller', 'name username')
-      .sort({ createdAt: -1 })
-      // .limit(10) // Ajouter pagination si nécessaire
-      .lean();
+    const offers = await ProductOfferModel.find(queryParams).lean();
 
     return NextResponse.json({ success: true, data: offers }, { status: 200 });
 
-  } catch (error: unknown) {
-    // console.error("[API_OFFERS_GET] Erreur listage offres:", error); // Log serveur optionnel
-    const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
-    return NextResponse.json({ success: false, message: "Erreur serveur lors de la récupération des offres.", errorDetails: errorMessage }, { status: 500 });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Erreur serveur inconnue.";
+    return NextResponse.json({ success: false, message: "Erreur lors de la récupération des offres.", errorDetails: errorMessage }, { status: 500 });
   }
 } 

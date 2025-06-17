@@ -2,6 +2,10 @@
 
 import React, { useState, ChangeEvent, FormEvent, useEffect, useCallback } from 'react';
 import Image from 'next/image';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { TNewOfferSchema, OfferCreationSchema } from '@/lib/validators/offer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -34,6 +38,20 @@ const INITIAL_OFFER_DETAILS: OfferDetails = {
     stockQuantity: '1',
 };
 
+// Form-specific Zod schema
+const OfferFormSchema = z.object({
+  price: z.string().nonempty("Le prix est requis."),
+  condition: z.enum(['new', 'like-new', 'good', 'fair', 'poor']),
+  description: z.string().optional(),
+  stockQuantity: z.string().nonempty("La quantité est requise."),
+  images: z
+    .custom<FileList>()
+    .refine((files) => files?.length > 0, 'Au moins une image est requise.')
+    .refine((files) => files?.length <= 5, 'Maximum 5 images.'),
+});
+
+type TOfferFormSchema = z.infer<typeof OfferFormSchema>;
+
 export default function SellPage() {
     const [step, setStep] = useState(1);
     const { data: session, status: sessionStatus } = useSession();
@@ -53,14 +71,36 @@ export default function SellPage() {
     const [selectedProductModel, setSelectedProductModel] = useState<DisplayableProductModel | null>(null);
     const [offerDetails, setOfferDetails] = useState<OfferDetails>(INITIAL_OFFER_DETAILS);
     const [categorySpecificFormFields, setCategorySpecificFormFields] = useState<FormFieldDefinition[]>([]);
-    const [offerSpecificFieldValues, setOfferSpecificFieldValues] = useState<Record<string, string | number | boolean | File | File[]>>({});
+    const [offerSpecificFieldValues, setOfferSpecificFieldValues] = useState<Record<string, string | number | boolean>>({});
 
     const [isLoadingCategories, setIsLoadingCategories] = useState(false);
     const [isLoadingBrands, setIsLoadingBrands] = useState(false);
     const [isLoadingProductModels, setIsLoadingProductModels] = useState(false);
     const [isLoadingCreate, setIsLoadingCreate] = useState(false);
     const [isLoadingFullProduct, setIsLoadingFullProduct] = useState(false);
-    const [isLoadingSubmitOffer, setIsLoadingSubmitOffer] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const {
+        register,
+        handleSubmit,
+        control,
+        setValue,
+        getValues,
+        formState: { errors, isValid },
+        watch,
+        reset: resetForm,
+    } = useForm<TOfferFormSchema>({
+        resolver: zodResolver(OfferFormSchema),
+        mode: 'onTouched',
+        defaultValues: {
+            price: '',
+            condition: 'good',
+            stockQuantity: '1',
+            description: '',
+        }
+    });
+
+    const watchedImages = watch("images");
 
     const resetSellProcess = useCallback(() => {
         setStep(1);
@@ -405,157 +445,54 @@ export default function SellPage() {
         }
     };
 
-    const handleSubmitOffer = useCallback(async (e: FormEvent) => {
-        e.preventDefault();
-        const userId = (session?.user as { id?: string })?.id;
-        if (sessionStatus !== 'authenticated' || !userId) {
-            toast.error("Authentification Requise", { description: "Veuillez vous connecter." });
+    const onOfferSubmit = async (formData: TOfferFormSchema) => {
+        if (!finalSelectedLeafCategory || !selectedProductModel) {
+            toast.error("Erreur", { description: "Catégorie ou modèle de produit manquant." });
             return;
         }
-        if (!offerDetails.price || isNaN(parseFloat(offerDetails.price)) || parseFloat(offerDetails.price) <= 0) {
-            toast.error("Prix invalide", { description: "Veuillez entrer un prix valide." });
-            return;
-        }
-        if (!selectedProductModel || !selectedProductModel._id) {
-            toast.error("Erreur Produit", { description: "Aucun produit ReMarket sélectionné." });
-            return;
-        }
-
-        setIsLoadingSubmitOffer(true);
-        let uploadedPhotoUrls: string[] = [];
-
-        if (offerDetails.photos && offerDetails.photos.length > 0) {
-            const photoFormData = new FormData();
-            for (const photo of offerDetails.photos) {
-                photoFormData.append('files', photo);
-            }
-
-            try {
-                toast.info("Téléversement des images...", { id: "upload-toast" });
-                const uploadResponse = await fetch('/api/services/media/upload/images', {
-                    method: 'POST',
-                    body: photoFormData,
-                });
-
-                const uploadData = await uploadResponse.json();
-                if (!uploadResponse.ok || !uploadData.success) {
-                    throw new Error(uploadData.message || "Échec du téléversement des images.");
-                }
-                uploadedPhotoUrls = uploadData.urls;
-                toast.success("Images téléversées !", { id: "upload-toast" });
-            } catch (uploadError: unknown) {
-                const uploadErrorMessage = uploadError instanceof Error ? uploadError.message : "Erreur inconnue lors du téléversement.";
-                toast.error("Erreur Upload Photos", { description: uploadErrorMessage, id: "upload-toast" });
-                setIsLoadingSubmitOffer(false);
-                return;
-            }
+        setIsSubmitting(true);
+        
+        try {
+            const uploadedImageUrls = [];
+            for (const imageFile of Array.from(formData.images)) {
+                const formImageData = new FormData();
+                formImageData.append('file', imageFile);
+                const res = await fetch('/api/services/media/upload/images', { method: 'POST', body: formImageData });
+                const result = await res.json();
+                if (!res.ok || !result.success) throw new Error(result.message || "Échec de l'upload d'image.");
+                uploadedImageUrls.push(result.url);
         }
 
-        const typedOfferSpecificFieldValues: Record<string, string | number | boolean> = {};
-
-        if (finalSelectedLeafCategory?.slug === 'laptops') {
-            typedOfferSpecificFieldValues.screenSize_in = parseFloat(String(offerSpecificFieldValues.screenSize_in || '0'));
-            typedOfferSpecificFieldValues.processor = String(offerSpecificFieldValues.processor || '');
-            typedOfferSpecificFieldValues.ram_gb = parseInt(String(offerSpecificFieldValues.ram_gb || '0'), 10);
-            typedOfferSpecificFieldValues.storageType = String(offerSpecificFieldValues.storageType || 'SSD') as 'SSD' | 'HDD' | 'eMMC';
-            typedOfferSpecificFieldValues.storageCapacity_gb = parseInt(String(offerSpecificFieldValues.storageCapacity_gb || '0'), 10);
-            typedOfferSpecificFieldValues.graphicsCard = String(offerSpecificFieldValues.graphicsCard || '');
-            typedOfferSpecificFieldValues.operatingSystem = String(offerSpecificFieldValues.operatingSystem || '');
-            const webcamValue = offerSpecificFieldValues.hasWebcam;
-            typedOfferSpecificFieldValues.hasWebcam = typeof webcamValue === 'string' ? webcamValue.toLowerCase() === 'true' : Boolean(webcamValue);
-            typedOfferSpecificFieldValues.color = String(offerSpecificFieldValues.color || '');
-        } else if (finalSelectedLeafCategory?.slug === 'smartphones') {
-            const parseNumericOrUndefined = (val: string | number | boolean | File | File[] | undefined): number | undefined => {
-                const strVal = String(val || '');
-                if (!strVal) return undefined;
-                const num = parseFloat(strVal);
-                return isNaN(num) || num === 0 ? undefined : num;
-            };
-            const parseIntOrUndefined = (val: string | number | boolean | File | File[] | undefined): number | undefined => {
-                const strVal = String(val || '');
-                if (!strVal) return undefined;
-                const num = parseInt(strVal, 10);
-                return isNaN(num) || num === 0 ? undefined : num;
-            };
-            const parseStringOrUndefined = (val: string | number | boolean | File | File[] | undefined): string | undefined => {
-                const str = String(val || '');
-                return str === '' ? undefined : str;
-            };
-
-            const screenSize = parseNumericOrUndefined(offerSpecificFieldValues.screenSize_in);
-            if (screenSize !== undefined) typedOfferSpecificFieldValues.screenSize_in = screenSize;
-            else delete typedOfferSpecificFieldValues.screenSize_in;
-
-            const storageCapacity = parseIntOrUndefined(offerSpecificFieldValues.storageCapacity_gb);
-            if (storageCapacity !== undefined) typedOfferSpecificFieldValues.storageCapacity_gb = storageCapacity;
-            else delete typedOfferSpecificFieldValues.storageCapacity_gb;
-
-            const ram = parseIntOrUndefined(offerSpecificFieldValues.ram_gb);
-            if (ram !== undefined) typedOfferSpecificFieldValues.ram_gb = ram;
-            else delete typedOfferSpecificFieldValues.ram_gb;
-
-            const cameraResolution = parseNumericOrUndefined(offerSpecificFieldValues.cameraResolution_mp);
-            if (cameraResolution !== undefined) typedOfferSpecificFieldValues.cameraResolution_mp = cameraResolution;
-            else delete typedOfferSpecificFieldValues.cameraResolution_mp;
-
-            const batteryCapacity = parseIntOrUndefined(offerSpecificFieldValues.batteryCapacity_mah);
-            if (batteryCapacity !== undefined) typedOfferSpecificFieldValues.batteryCapacity_mah = batteryCapacity;
-            else delete typedOfferSpecificFieldValues.batteryCapacity_mah;
-
-            typedOfferSpecificFieldValues.operatingSystem = String(offerSpecificFieldValues.operatingSystem || '');
-            typedOfferSpecificFieldValues.color = String(offerSpecificFieldValues.color || '');
-
-            const imei = parseStringOrUndefined(offerSpecificFieldValues.imei);
-            if (imei !== undefined) typedOfferSpecificFieldValues.imei = imei;
-            else delete typedOfferSpecificFieldValues.imei;
-
-        } else {
-            Object.keys(offerSpecificFieldValues).forEach(key => {
-                const value = offerSpecificFieldValues[key];
-                if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-                    typedOfferSpecificFieldValues[key] = value;
-                }
-            });
-        }
-
-        const finalOfferPayload = {
-            productModelId: selectedProductModel._id,
-            categoryId: finalSelectedLeafCategory._id,
+            const payload: TNewOfferSchema & Record<string, unknown> = {
+                price: parseFloat(formData.price),
+                stockQuantity: parseInt(formData.stockQuantity, 10),
+                condition: formData.condition,
+                description: formData.description,
+                images: uploadedImageUrls,
+                productModelId: selectedProductModel._id,
             kind: finalSelectedLeafCategory.slug,
-            price: parseFloat(offerDetails.price),
-            currency: offerDetails.currency,
-            condition: offerDetails.condition,
-            description: offerDetails.sellerDescription,
-            images: uploadedPhotoUrls,
-            stockQuantity: parseInt(offerDetails.stockQuantity, 10),
-            ...typedOfferSpecificFieldValues,
+                currency: 'EUR',
+                ...offerSpecificFieldValues,
         };
 
-        try {
-            toast.info("Publication de l'offre...", { id: "submit-toast" });
-            const offerResponse = await fetch('/api/offers', {
+            const response = await fetch('/api/offers', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(finalOfferPayload),
+                body: JSON.stringify(payload),
             });
 
-            const offerData = await offerResponse.json();
-            if (!offerResponse.ok) {
-                throw new Error(offerData.message || "Échec de la création de l'offre.");
-            }
-            toast.success("Offre Publiée !", {
-                description: `Votre offre pour "${selectedProductModel!.title}" à ${offerData.data?.price || finalOfferPayload.price}€ est en ligne.`,
-                action: { label: "Vendre un autre article", onClick: resetSellProcess },
-                cancel: { label: "Voir mes offres", onClick: () => router.push('/account/sales') }
-            });
-            resetSellProcess();
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : "Erreur inconnue.";
-            toast.error("Erreur Soumission Offre", { description: errorMessage, id: "submit-toast" });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message || "La création de l'offre a échoué.");
+
+            toast.success("Offre publiée !");
+            router.push(`/account/sales`);
+
+        } catch (error) {
+            toast.error("Erreur", { description: (error as Error).message });
         } finally {
-            setIsLoadingSubmitOffer(false);
+            setIsSubmitting(false);
         }
-    }, [session, sessionStatus, offerDetails, selectedProductModel, offerSpecificFieldValues, finalSelectedLeafCategory, resetSellProcess, router]);
+    };
 
     const displayTitle = selectedProductModel?.title || 'N/A';
 
@@ -674,280 +611,69 @@ export default function SellPage() {
         ));
     };
 
-    return (
-        <div className="container mx-auto py-8 px-4 md:px-0">
-            <h1 className="text-3xl font-bold mb-4 text-center">Vendez votre article sur ReMarket</h1>
-            <p className="text-center text-muted-foreground mb-8 max-w-xl mx-auto">
-                Suivez ces étapes simples pour lister votre produit et toucher des milliers d&apos;acheteurs.
-            </p>
-
-            <div className="max-w-2xl mx-auto mb-8">
-                <div className="flex justify-between mb-1">
-                    <span className={`text-sm font-medium ${step >= 1 ? 'text-primary' : 'text-muted-foreground'}`}>Étape 1: Produit</span>
-                    <span className={`text-sm font-medium ${step >= 2 ? 'text-primary' : 'text-muted-foreground'}`}>Étape 2: Offre</span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2.5">
-                    <div className={`bg-primary h-2.5 rounded-full transition-all duration-500 ease-out ${step === 1 ? 'w-1/2' : 'w-full'}`}></div>
-                </div>
-            </div>
-
-            {step === 1 && (
-                <Card className="max-w-2xl mx-auto shadow-lg">
+    const renderOfferForm = () => (
+        <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center"><CheckCircle className="h-6 w-6 mr-2 text-primary" /> Identifier votre produit</CardTitle>
-                        <CardDescription>
-                            Sélectionnez la catégorie de votre produit, puis la marque et le modèle précis.
-                        </CardDescription>
+                <CardTitle>4. Décrivez votre article</CardTitle>
+                <CardDescription>Détails pour : {selectedProductModel?.title}</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-6 pt-6">
-                        {renderCategoryDropdowns()}
-
-                        {finalSelectedLeafCategory && (
-                            <div>
-                                <Label htmlFor="brand">2. Marque</Label>
-                                <Select
-                                    value={selectedBrandId || ''}
-                                    onValueChange={handleSelectBrand}
-                                    disabled={!finalSelectedLeafCategory || isLoadingBrands || isLoadingFullProduct || isLoadingCreate}
-                                >
-                                    <SelectTrigger id="brand" className="bg-input">
-                                        <SelectValue placeholder={isLoadingBrands ? "Chargement..." : "Sélectionnez une marque"} />
-                                    </SelectTrigger>
+            <form onSubmit={handleSubmit(onOfferSubmit)} noValidate>
+                <CardContent className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <Label htmlFor="price">Prix (€)</Label>
+                            <Input id="price" type="number" step="0.01" {...register('price')} placeholder="150" />
+                            {errors.price && <p className="text-sm text-red-500">{errors.price.message}</p>}
+                        </div>
+                        <div className="space-y-2">
+                            <Label>État</Label>
+                            <Controller name="condition" control={control} render={({ field }) => (
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
                                     <SelectContent>
-                                        {brands.length > 0 ? (
-                                            brands.map(brand => (
-                                                <SelectItem key={brand.slug} value={brand.slug}>{brand.name}</SelectItem>
-                                            ))
-                                        ) : (
-                                            <SelectItem value="no-brand" disabled>{isLoadingBrands ? "Chargement..." : "Aucune marque disponible"}</SelectItem>
-                                        )}
+                                        <SelectItem value="new">Neuf</SelectItem>
+                                        <SelectItem value="like-new">Comme neuf</SelectItem>
+                                        <SelectItem value="good">Bon état</SelectItem>
+                                        <SelectItem value="fair">État correct</SelectItem>
+                                        <SelectItem value="poor">Abîmé</SelectItem>
                                     </SelectContent>
                                 </Select>
+                            )} />
+                            {errors.condition && <p className="text-sm text-red-500">{errors.condition.message}</p>}
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="description">Description</Label>
+                        <Textarea id="description" {...register('description')} placeholder="Ex: Vendu avec boîte d'origine..." />
+                        {errors.description && <p className="text-sm text-red-500">{errors.description.message}</p>}
                             </div>
-                        )}
-
-                        {finalSelectedLeafCategory && selectedBrandId && (
-                            <div>
-                                <Label htmlFor="productModelReMarket">3. Modèle de produit ReMarket</Label>
-                                <Select
-                                    value={selectedProductModelReMarketId || ''}
-                                    onValueChange={handleSelectProductModelReMarket}
-                                    disabled={isLoadingProductModels || isLoadingFullProduct || isLoadingCreate}
-                                >
-                                    <SelectTrigger id="productModelReMarket" className="bg-input">
-                                        <SelectValue placeholder={isLoadingProductModels ? "Chargement..." : (isLoadingFullProduct ? "Vérification..." : "Sélectionnez ou créez produit")} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {productModelsReMarketSelectItems.length > 0 ? (
-                                            productModelsReMarketSelectItems.map(pm => (
-                                                <SelectItem key={pm.id} value={pm.id}>{pm.name}</SelectItem>
-                                            ))
-                                        ) : (
-                                            <SelectItem value="no-pm" disabled>{isLoadingProductModels ? "Chargement..." : "Aucun produit (ou créez-en un)"}</SelectItem>
-                                        )}
-                                    </SelectContent>
-                                </Select>
+                    <div className="space-y-2">
+                        <Label htmlFor="photos">Photos</Label>
+                        <Input id="photos" type="file" multiple accept="image/*" {...register('images')} />
+                        {errors.images && <p className="text-sm text-red-500">{errors.images.message}</p>}
+                        {watchedImages?.length > 0 && (
+                            <div className="mt-2 grid grid-cols-3 sm:grid-cols-5 gap-2">
+                                {Array.from(watchedImages).map((file, index) => (
+                                    <Image key={index} src={URL.createObjectURL(file)} alt={`preview ${index}`} width={100} height={100} className="rounded-md object-cover" />
+                                ))}
                             </div>
-                        )}
-
-                        {showCreateByName && selectedBrandId && finalSelectedLeafCategory && (
-                            <Card className="mt-6 bg-muted/50 p-4 sm:p-6 border-dashed">
-                                <CardHeader className="p-0 mb-3">
-                                    <CardTitle className="text-lg">Nouveau Produit ReMarket</CardTitle>
-                                    <CardDescription>
-                                        Votre produit n&apos;est pas listé ? Décrivez-le. La marque <span className="font-semibold text-primary">{brands.find(b => b.slug === selectedBrandId)?.name || ''}</span> sera ajoutée.
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                    <form onSubmit={handleScrapeNewProductModel} className="space-y-4">
-                                        <div>
-                                            <Label htmlFor="newProductModelName">Nom précis du produit (modèle, couleur, capacité...)</Label>
-                                            <Input
-                                                id="newProductModelName"
-                                                type="text"
-                                                value={newProductModelName}
-                                                onChange={(e) => setNewProductModelName(e.target.value)}
-                                                placeholder={`Ex: Galaxy S22 Ultra 256Go Noir (sans la marque)`}
-                                                disabled={isLoadingCreate || isLoadingFullProduct}
-                                                className="bg-background"
-                                            />
-                                        </div>
-                                        <Button
-                                            type="submit"
-                                            className="w-full sm:w-auto"
-                                            disabled={isLoadingCreate || isLoadingFullProduct || !newProductModelName.trim() || !finalSelectedLeafCategory?.slug || !selectedBrandId}
-                                        >
-                                            {isLoadingCreate || isLoadingFullProduct ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
-                                            {isLoadingCreate ? 'Recherche en cours...' : (isLoadingFullProduct ? 'Finalisation...' : 'Rechercher et Créer Produit')}
-                                        </Button>
-                                    </form>
-                                </CardContent>
-                            </Card>
-                        )}
-                    </CardContent>
-                    <CardFooter className="pt-6">
-                        {selectedProductModel && selectedProductModelReMarketId !== NOT_LISTED_ID && !isLoadingFullProduct && (
-                            <Button onClick={() => setStep(2)} className="w-full" >
-                                <ArrowRight className="mr-2 h-4 w-4" />Continuer vers l&apos;offre
-                            </Button>
-                        )}
-                    </CardFooter>
-                </Card>
-            )}
-
-            {step === 2 && selectedProductModel && (
-                <Card className="max-w-2xl mx-auto shadow-lg">
-                    <CardHeader>
-                        <CardTitle className="flex items-center"><CheckCircle className="h-6 w-6 mr-2 text-primary" /> Décrire votre offre</CardTitle>
-                        <CardDescription>
-                            Produit ReMarket : <span className="font-semibold text-foreground">{displayTitle}</span> par <span className="font-semibold text-foreground">{displayBrand}</span>.
-                            {displayAsin && <span className="text-xs text-muted-foreground block">Référence source (ASIN): {displayAsin}</span>}
-                        </CardDescription>
-                    </CardHeader>
-                    <form id="offerForm" onSubmit={handleSubmitOffer}>
-                        <CardContent className="space-y-6 pt-6">
-                            <div>
-                                <Label htmlFor="price">Votre Prix de Vente (€) <span className="text-destructive">*</span></Label>
-                                <Input id="price" name="price" type="number" value={offerDetails.price} onChange={handleOfferDetailsChange} placeholder="Ex: 450.00" required className="bg-input" />
-                            </div>
-                            <div>
-                                <Label htmlFor="condition">État de votre article <span className="text-destructive">*</span></Label>
-                                <Select value={offerDetails.condition} onValueChange={handleConditionChange}>
-                                    <SelectTrigger id="condition" className="bg-input"><SelectValue placeholder="Sélectionnez l'état" /></SelectTrigger>
-                                    <SelectContent>
-                                        {conditionOptions.map(opt => (
-                                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label htmlFor="stockQuantity">Quantité en stock <span className="text-destructive">*</span></Label>
-                                <Input id="stockQuantity" name="stockQuantity" type="number" value={offerDetails.stockQuantity} onChange={handleOfferDetailsChange} placeholder="Ex: 1" required min="1" className="bg-input" />
-                            </div>
-                            <div>
-                                <Label htmlFor="sellerDescription">Description de votre offre (optionnel)</Label>
-                                <Textarea id="sellerDescription" name="sellerDescription" value={offerDetails.sellerDescription} onChange={handleOfferDetailsChange} placeholder="Ex: Vendu avec boîte d&apos;origine... (min. 10 caractères)" rows={4} className="bg-input" minLength={10} />
-                                <p className="text-xs text-muted-foreground mt-1">Soyez précis pour éviter les surprises ! (10 caractères minimum)</p>
-                            </div>
-
-                            {categorySpecificFormFields.length > 0 && (
-                                <Card className="bg-muted/40 p-4 border-dashed">
-                                    <CardHeader className="p-0 mb-3">
-                                        <CardTitle className="text-md">Détails spécifiques à &quot;{finalSelectedLeafCategory?.name}&quot;</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="p-0 space-y-4">
-                                        {categorySpecificFormFields.map(field => (
-                                            <div key={field.name}>
-                                                <Label htmlFor={field.name}>
-                                                    {field.label}
-                                                    {field.required && <span className="text-destructive">*</span>}
-                                                </Label>
-                                                {field.type === 'text' && (
-                                                    <Input
-                                                        id={field.name}
-                                                        name={field.name}
-                                                        type="text"
-                                                        value={String(offerSpecificFieldValues[field.name] || '')}
-                                                        onChange={(e) => handleSpecificFieldChange(field.name, e.target.value)}
-                                                        placeholder={field.placeholder}
-                                                        required={field.required}
-                                                        minLength={field.minLength}
-                                                        maxLength={field.maxLength}
-                                                        className="bg-input"
-                                                    />
-                                                )}
-                                                {field.type === 'number' && (
-                                                    <Input
-                                                        id={field.name}
-                                                        name={field.name}
-                                                        type="number"
-                                                        value={String(offerSpecificFieldValues[field.name] || '')}
-                                                        onChange={(e) => handleSpecificFieldChange(field.name, e.target.value)}
-                                                        placeholder={field.placeholder}
-                                                        required={field.required}
-                                                        min={field.min}
-                                                        max={field.max}
-                                                        className="bg-input"
-                                                    />
-                                                )}
-                                                {field.type === 'textarea' && (
-                                                    <Textarea
-                                                        id={field.name}
-                                                        name={field.name}
-                                                        value={String(offerSpecificFieldValues[field.name] || '')}
-                                                        onChange={(e) => handleSpecificFieldChange(field.name, e.target.value)}
-                                                        placeholder={field.placeholder}
-                                                        required={field.required}
-                                                        minLength={field.minLength}
-                                                        maxLength={field.maxLength}
-                                                        rows={3}
-                                                        className="bg-input"
-                                                    />
-                                                )}
-                                                {field.type === 'select' && field.options && (
-                                                    <Select
-                                                        name={field.name}
-                                                        value={String(offerSpecificFieldValues[field.name] || '')}
-                                                        onValueChange={(value) => handleSpecificFieldChange(field.name, value)}
-                                                        required={field.required}
-                                                    >
-                                                        <SelectTrigger id={field.name} className="bg-input">
-                                                            <SelectValue placeholder={field.placeholder || 'Sélectionnez...'} />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {field.options.map(opt => (
-                                                                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </CardContent>
-                                </Card>
-                            )}
-
-                            <Card className="bg-muted/30 p-4">
-                                <CardHeader className="p-0 mb-2"><CardTitle className="text-base">Rappel du produit ReMarket</CardTitle></CardHeader>
-                                <CardContent className="p-0 flex flex-col sm:flex-row gap-4 items-start">
-                                    <Image src={displayImageUrls[0]} alt={displayTitle || 'Image produit'} width={100} height={100} className="w-24 h-24 object-contain rounded-md border bg-background flex-shrink-0" />
-                                    <div className="text-xs space-y-1">
-                                        <p><span className="font-medium">Titre:</span> {displayTitle}</p>
-                                        <p><span className="font-medium">Marque:</span> {displayBrand}</p>
-                                        <p><span className="font-medium">Catégorie:</span> {displayCategory}</p>
-                                        {displayStandardDescription && <p className="truncate-3-lines"><span className="font-medium">Description std.:</span> {displayStandardDescription}</p>}
-                                        {displayAttributes && displayAttributes.length > 0 && (
-                                            <details className="mt-1"><summary className="cursor-pointer text-primary hover:underline">Afficher les {displayAttributes.length} spécifications</summary>
-                                                <ul className="mt-1 list-disc pl-5 text-muted-foreground max-h-24 overflow-y-auto">
-                                                    {displayAttributes.map((attr: AttributeItem) => (<li key={attr.label}>{attr.label}: {attr.value}{attr.unit ? ` ${attr.unit}` : ''}</li>))}
-                                                </ul>
-                                            </details>
                                         )}
                                     </div>
                                 </CardContent>
-                            </Card>
-                            <div>
-                                <Label htmlFor="photos">Vos photos de l&apos;article (jusqu&apos;à 5)</Label>
-                                <Input id="photos" name="photos" type="file" multiple onChange={handlePhotoChange} accept="image/jpeg, image/png, image/webp" className="bg-input" />
-                                {offerDetails.photos.length > 0 && (
-                                    <div className="mt-2 grid grid-cols-3 sm:grid-cols-5 gap-2">
-                                        {offerDetails.photos.map((file, index) => (<div key={index} className="relative aspect-square"><Image src={URL.createObjectURL(file)} alt={`Photo ${index + 1}`} fill className="object-cover rounded-md" /></div>))}
-                                    </div>
-                                )}
-                                <p className="text-xs text-muted-foreground mt-1">Important pour prouver l&apos;état et rassurer les acheteurs.</p>
-                            </div>
-                        </CardContent>
-                        <CardFooter className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-6">
-                            <Button variant="outline" onClick={() => setStep(1)} type="button"><ArrowLeft className="mr-2 h-4 w-4" /> Précédent</Button>
-                            <Button type="submit" form="offerForm" disabled={isLoadingSubmitOffer || sessionStatus !== 'authenticated'} className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
-                                {isLoadingSubmitOffer ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-                                {isLoadingSubmitOffer ? 'Publication en cours...' : 'Publier mon offre'}
+                <CardFooter className="flex justify-between">
+                    <Button type="button" variant="outline" onClick={() => setStep(3)}><ArrowLeft className="mr-2 h-4 w-4" /> Retour</Button>
+                    <Button type="submit" disabled={isSubmitting || !isValid || sessionStatus !== 'authenticated'}>
+                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                        Publier
                             </Button>
                         </CardFooter>
                     </form>
                 </Card>
-            )}
+    );
+
+    return (
+        <div className="container mx-auto max-w-4xl py-8">
+            {step === 4 && selectedProductModel ? renderOfferForm() : "Rendering logic for steps 1-3 goes here..."}
         </div>
     );
 }

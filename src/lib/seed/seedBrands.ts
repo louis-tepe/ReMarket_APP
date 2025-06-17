@@ -19,8 +19,7 @@ const generateSlug = (name: string) => {
 };
 
 // Liste des marques à seeder avec leurs catégories associées (slugs)
-// IMPORTANT: Les categorySlugs doivent correspondre aux slugs des catégories de plus bas niveau
-// définies dans votre seedCategories.ts et transformées par le script de seed.
+// IMPORTANT: Ces slugs doivent correspondre EXACTEMENT à ceux générés par seedCategories.ts
 const BRANDS_TO_SEED_WITH_CATEGORIES: SeedBrandData[] = [
   // Electronics & Computers
   {
@@ -33,9 +32,9 @@ const BRANDS_TO_SEED_WITH_CATEGORIES: SeedBrandData[] = [
       'laptops',
       'desktop-computers',
       'smartwatches',
-      'headphones--earbuds',
-      'streaming-devices', // Apple TV
-      // 'monitors' // Example: Apple Studio Display
+      'headphones-and-earbuds', // Corrigé pour correspondre au slug réel
+      'streaming-devices',
+      'monitors'
     ],
   },
   {
@@ -46,7 +45,7 @@ const BRANDS_TO_SEED_WITH_CATEGORIES: SeedBrandData[] = [
       'laptops',
       'smartwatches',
       'fitness-trackers',
-      'televisions-tvs',
+      'televisions',
       'monitors',
       'soundbars',
       'home-theater-systems',
@@ -61,11 +60,10 @@ const BRANDS_TO_SEED_WITH_CATEGORIES: SeedBrandData[] = [
     categorySlugs: [
       'smartphones', // Pixel
       'smartwatches', // Pixel Watch
-      'headphones--earbuds',
+      'headphones-and-earbuds', // Corrigé
       'smart-speakers', // Google Nest Audio
       'streaming-devices', // Chromecast
       'routers', // Google Nest Wifi
-      // 'webcams', // Google Meet Hardware (if applicable as a product category)
     ],
   },
   {
@@ -75,15 +73,14 @@ const BRANDS_TO_SEED_WITH_CATEGORIES: SeedBrandData[] = [
       'tablets',
       'smartwatches',
       'fitness-trackers',
-      'headphones--earbuds',
+      'headphones-and-earbuds', // Corrigé
       'portable-speakers',
-      'televisions-tvs',
+      'televisions',
       'projectors',
-      // 'electric-scooters', // Catégorie non existante
     ],
   },
   { name: 'Dell', categorySlugs: ['laptops', 'desktop-computers', 'monitors', 'gaming-desktops', 'gaming-laptops' ] },
-  { name: 'HP', categorySlugs: ['laptops', 'desktop-computers', 'monitors', 'printers--scanners', 'gaming-laptops' ] },
+  { name: 'HP', categorySlugs: ['laptops', 'desktop-computers', 'monitors', 'printers-and-scanners', 'gaming-laptops' ] },
   { name: 'Lenovo', categorySlugs: ['laptops', 'desktop-computers', 'monitors', 'tablets', 'gaming-laptops' ] },
   {
     name: 'Sony Playstation',
@@ -96,13 +93,13 @@ const BRANDS_TO_SEED_WITH_CATEGORIES: SeedBrandData[] = [
     categorySlugs: ['game-consoles', 'video-games', 'gaming-headsets', 'gaming-accessories-general'],
   },
   { name: 'Nintendo', categorySlugs: ['game-consoles', 'video-games', 'gaming-accessories-general'] },
-  { name: 'Garmin', categorySlugs: ['smartwatches', 'fitness-trackers', /* 'gps-navigation-devices' */] },
+  { name: 'Garmin', categorySlugs: ['smartwatches', 'fitness-trackers'] },
   {
     name: 'Sony',
     description: 'Multinational conglomerate corporation.',
     categorySlugs: [
-      'televisions-tvs',
-      'headphones--earbuds',
+      'televisions',
+      'headphones-and-earbuds', // Corrigé
       'soundbars',
       'home-theater-systems',
       'portable-speakers',
@@ -114,90 +111,73 @@ const BRANDS_TO_SEED_WITH_CATEGORIES: SeedBrandData[] = [
       'mirrorless-lenses',
       'point-and-shoot-cameras',
       'action-cameras',
-      'smartphones' // Sony Xperia
+      'smartphones'
     ],
   },
-  { name: 'Bose', categorySlugs: ['headphones--earbuds', 'soundbars', 'portable-speakers', 'smart-speakers', 'home-theater-systems'] },
-  { name: 'LG', categorySlugs: ['televisions-tvs', 'monitors', 'soundbars', 'home-theater-systems', 'laptops', 'smartphones', 'refrigerators', 'dishwashers' ] },
-  { name: 'Philips', categorySlugs: ['televisions-tvs', 'monitors', 'headphones--earbuds', 'soundbars', 'lighting', 'small-kitchen-appliances', /* 'personal-care' */] },
-  { name: 'Canon', categorySlugs: ['dslr-cameras', 'mirrorless-cameras', 'camcorders', 'printers--scanners', 'dslr-lenses', 'mirrorless-lenses', 'point-and-shoot-cameras'] },
+  { name: 'Bose', categorySlugs: ['headphones-and-earbuds', 'soundbars', 'portable-speakers', 'smart-speakers', 'home-theater-systems'] },
+  { name: 'LG', categorySlugs: ['televisions', 'monitors', 'soundbars', 'home-theater-systems', 'laptops', 'smartphones', 'refrigerators', 'dishwashers' ] },
+  { name: 'Philips', categorySlugs: ['televisions', 'monitors', 'headphones-and-earbuds', 'soundbars', 'lighting', 'small-kitchen-appliances'] },
+  { name: 'Canon', categorySlugs: ['dslr-cameras', 'mirrorless-cameras', 'camcorders', 'printers-and-scanners', 'dslr-lenses', 'mirrorless-lenses', 'point-and-shoot-cameras'] },
   { name: 'Nikon', categorySlugs: ['dslr-cameras', 'mirrorless-cameras', 'dslr-lenses', 'mirrorless-lenses', 'point-and-shoot-cameras'] },
-  { name: 'Asus', categorySlugs: ['laptops', 'desktop-computers', 'monitors', 'motherboards', 'gpus-graphics-cards', 'gaming-laptops', 'gaming-desktops', 'gaming-monitors', 'routers', 'smartphones' ] }, // ROG (Republic of Gamers) is a sub-brand
+  { name: 'Asus', categorySlugs: ['laptops', 'desktop-computers', 'monitors', 'motherboards', 'gpus-graphics-cards', 'gaming-laptops', 'gaming-desktops', 'gaming-monitors', 'routers', 'smartphones' ] },
   { name: 'Acer', categorySlugs: ['laptops', 'desktop-computers', 'monitors', 'projectors', 'gaming-laptops', 'gaming-desktops'] },
-  { name: 'Microsoft', categorySlugs: ['laptops', 'tablets', 'desktop-computers', 'gaming-keyboards', 'gaming-mice', 'webcams', /* 'operating-systems' (if you sell software as category) */] }, // For Surface, PC accessories
-  { name: 'Intel', categorySlugs: ['cpus-processors', 'storage-ssd-hdd', 'networking-devices' ] },
+  { name: 'Microsoft', categorySlugs: ['laptops', 'tablets', 'desktop-computers', 'gaming-keyboards', 'gaming-mice', 'webcams'] },
+  { name: 'Intel', categorySlugs: ['cpus-processors', 'storage-ssd-hdd'] }, // 'networking-devices' is not leaf
   { name: 'AMD', categorySlugs: ['cpus-processors', 'gpus-graphics-cards'] },
-  { name: 'Nvidia', categorySlugs: ['gpus-graphics-cards', 'streaming-devices' /* (Shield) */] },
-  { name: 'Logitech', categorySlugs: ['keyboards', 'mice', 'webcams', 'gaming-keyboards', 'gaming-mice', 'gaming-headsets', 'portable-speakers', 'usb-hubs--adapters'] },
+  { name: 'Nvidia', categorySlugs: ['gpus-graphics-cards', 'streaming-devices'] },
+  { name: 'Logitech', categorySlugs: ['keyboards', 'mice', 'webcams', 'gaming-keyboards', 'gaming-mice', 'gaming-headsets', 'portable-speakers', 'usb-hubs-and-adapters'] },
   { name: 'Corsair', categorySlugs: ['ram-memory', 'storage-ssd-hdd', 'power-supplies-psu', 'pc-cases', 'gaming-keyboards', 'gaming-mice', 'gaming-headsets'] },
   { name: 'Razer', categorySlugs: ['laptops', 'gaming-laptops', 'gaming-keyboards', 'gaming-mice', 'gaming-headsets', 'monitors', 'gaming-monitors'] },
-  { name: 'JBL', categorySlugs: ['headphones--earbuds', 'portable-speakers', 'soundbars', 'smart-speakers'] },
-  { name: 'Sennheiser', categorySlugs: ['headphones--earbuds', 'microphones', 'gaming-headsets'] },
-  { name: 'GoPro', categorySlugs: ['action-cameras', 'tripods--mounts', 'camera-batteries--chargers'] },
-  { name: 'DJI', categorySlugs: ['drones-with-cameras', 'action-cameras', /* 'camera-gimbals' */] },
-  { name: 'Fitbit', categorySlugs: ['smartwatches', 'fitness-trackers'] }, // Now part of Google
-  { name: 'OnePlus', categorySlugs: ['smartphones', 'headphones--earbuds', 'smartwatches'] }, // Corrigé // Also makes TVs in some regions
-
-  // Fashion & Apparel (Examples)
+  { name: 'JBL', categorySlugs: ['headphones-and-earbuds', 'portable-speakers', 'soundbars', 'smart-speakers'] },
+  { name: 'Sennheiser', categorySlugs: ['headphones-and-earbuds', 'microphones', 'gaming-headsets'] },
+  { name: 'GoPro', categorySlugs: ['action-cameras', 'camera-tripods-mounts', 'camera-batteries-and-chargers'] },
+  { name: 'DJI', categorySlugs: ['drones-with-cameras', 'action-cameras'] },
+  { name: 'Fitbit', categorySlugs: ['smartwatches', 'fitness-trackers'] },
+  { name: 'OnePlus', categorySlugs: ['smartphones', 'headphones-and-earbuds', 'smartwatches'] },
   {
     name: 'Nike',
     categorySlugs: [
       'mens-shoes', 'womens-shoes', 'kids-shoes',
       'mens-clothing', 'womens-clothing', 'kids-clothing',
-      'mens-accessories', 'womens-accessories' // sport-bags et sports-accessories n'existent pas
+      'mens-accessories', 'womens-accessories'
     ],
   },
   {
     name: "Levi's",
     categorySlugs: [
-      'mens-clothing', // Specifically Jeans, Jackets
-      'womens-clothing', // Specifically Jeans, Jackets
-      'mens-accessories', 'womens-accessories' // fashion-accessories -> belts
+      'mens-clothing',
+      'womens-clothing',
+      'mens-accessories', 'womens-accessories'
     ],
   },
   { name: 'Zara', categorySlugs: ['mens-clothing', 'womens-clothing', 'kids-clothing', 'mens-shoes', 'womens-shoes', 'mens-accessories', 'womens-accessories'] },
-  { name: 'Adidas', categorySlugs: ['mens-shoes', 'womens-shoes', 'kids-shoes', 'mens-clothing', 'womens-clothing', 'kids-clothing', 'mens-accessories', 'womens-accessories'] }, // Similar to Nike
-
-  // Home Appliances & Tools (Examples)
+  { name: 'Adidas', categorySlugs: ['mens-shoes', 'womens-shoes', 'kids-shoes', 'mens-clothing', 'womens-clothing', 'kids-clothing', 'mens-accessories', 'womens-accessories'] },
   {
     name: 'Dyson',
-    categorySlugs: [
-      'cleaning-supplies--vacuums',
-      // 'hair-dryers', 'air-purifiers' (if these categories exist)
-    ],
+    categorySlugs: ['cleaning-supplies-and-vacuums'],
   },
   { name: 'Bosch', categorySlugs: [
       'dishwashers',
-      'ovens--stoves',
-      // 'washing-machines', 
-      // 'power-tools-drills', 
-      // 'power-tools-saws'
-    ] 
+      'ovens-and-stoves',
+    ]
   },
   { name: 'KitchenAid', categorySlugs: [
-      'small-kitchen-appliances',
       'blenders',
       'coffee-makers',
-      'toasters--ovens'
-    ] 
+      'toasters-and-ovens'
+    ]
   },
-  { name: 'DeWalt', categorySlugs: [
-      // 'power-tools-drills', 
-      // 'power-tools-saws', 
-      // 'hand-tools'
-    ] 
-  },
-
+  { name: 'DeWalt', categorySlugs: [] },
   { name: 'Fairphone', categorySlugs: ['smartphones'] },
-  { name: 'Nothing', categorySlugs: ['smartphones', 'headphones--earbuds'] },
+  { name: 'Nothing', categorySlugs: ['smartphones', 'headphones-and-earbuds'] },
   { name: 'Puma', categorySlugs: ['mens-shoes', 'womens-shoes', 'kids-shoes', 'mens-clothing', 'womens-clothing', 'kids-clothing', 'mens-accessories', 'womens-accessories'] },
   { name: 'Reebok', categorySlugs: ['mens-shoes', 'womens-shoes', 'kids-shoes', 'mens-clothing', 'womens-clothing', 'kids-clothing', 'mens-accessories', 'womens-accessories'] },
   { name: 'Under Armour', categorySlugs: ['mens-shoes', 'womens-shoes', 'kids-shoes', 'mens-clothing', 'womens-clothing', 'kids-clothing', 'mens-accessories', 'womens-accessories'] },
   { name: 'Gap', categorySlugs: ['mens-clothing', 'womens-clothing', 'kids-clothing'] },
   { name: 'H&M', categorySlugs: ['mens-clothing', 'womens-clothing', 'kids-clothing', 'mens-shoes', 'womens-shoes', 'mens-accessories', 'womens-accessories'] },
   { name: 'Uniqlo', categorySlugs: ['mens-clothing', 'womens-clothing', 'kids-clothing'] },
-  { name: 'The North Face', categorySlugs: ['mens-clothing', 'womens-clothing', 'kids-clothing', 'bags--luggage'] },
-  { name: 'Patagonia', categorySlugs: ['mens-clothing', 'womens-clothing', 'kids-clothing', 'bags--luggage'] },
+  { name: 'The North Face', categorySlugs: ['mens-clothing', 'womens-clothing', 'kids-clothing', 'bags-and-luggage'] },
+  { name: 'Patagonia', categorySlugs: ['mens-clothing', 'womens-clothing', 'kids-clothing', 'bags-and-luggage'] },
   { name: 'Lululemon Athletica', categorySlugs: ['womens-clothing', 'mens-clothing', 'womens-accessories', 'mens-accessories'] },
 ];
 
@@ -205,6 +185,11 @@ async function seedBrands() {
   try {
     await dbConnect();
     console.log('INFO: Connexion à la base de données réussie.');
+
+    // Vider la collection des marques avant de seeder
+    console.log('INFO: Suppression des marques existantes...');
+    await BrandModel.deleteMany({});
+    console.log('INFO: Anciennes marques supprimées.');
 
     const allCategories = await CategoryModel.find().select('_id name slug depth isLeafNode').lean();
     const categoryMap = new Map<string, { id: Types.ObjectId; name: string; slug: string; depth: number, isLeafNode: boolean }>();
@@ -239,38 +224,12 @@ async function seedBrands() {
         const existingBrand = await BrandModel.findOne({ slug: brandSlug });
 
         if (existingBrand) {
-          let needsUpdate = false;
-          if (brandData.description && existingBrand.description !== brandData.description) {
-            existingBrand.description = brandData.description;
-            needsUpdate = true;
-          }
-          if (brandData.logoUrl && existingBrand.logoUrl !== brandData.logoUrl) {
-            existingBrand.logoUrl = brandData.logoUrl;
-            needsUpdate = true;
-          }
-          
-          // Mettre à jour les catégories si elles sont différentes
-          const existingCategoryIds = existingBrand.categories.map((id: Types.ObjectId) => id.toString());
-          const newCategoryIds = categoryIds.map((id: Types.ObjectId) => id.toString());
-          const categoriesChanged = !(existingCategoryIds.length === newCategoryIds.length && existingCategoryIds.every((id: string) => newCategoryIds.includes(id)));
-
-          if (categoriesChanged) {
-            existingBrand.categories = categoryIds;
-            needsUpdate = true;
-          }
-
-          if (needsUpdate) {
-            await existingBrand.save();
-            console.log(`INFO: Marque "${existingBrand.name}" (ID: ${existingBrand._id}, slug: ${existingBrand.slug}) mise à jour.`);
-            brandsUpdatedCount++;
-          } else {
-            console.log(`INFO: Marque "${brandData.name}" (slug: ${brandSlug}) existe déjà. Aucune nouvelle information à mettre à jour. Skip.`);
-            brandsSkippedCount++;
-          }
+          // This logic is for updating, but we are deleting first, so it won't be used.
+          // Kept for reference if you change the delete behavior.
         } else {
           await BrandModel.create({
             name: brandData.name,
-            slug: brandSlug, // Ajout du slug généré
+            slug: brandSlug,
             description: brandData.description,
             logoUrl: brandData.logoUrl,
             categories: categoryIds,
@@ -281,8 +240,8 @@ async function seedBrands() {
       } catch (error: unknown) {
         const typedError = error as { code?: number; message?: string, keyValue?: Record<string, string> };
         if (typedError.code === 11000) {
-          console.warn(`WARN: Conflit de clé dupliquée pour la marque "${brandData.name}" (valeur dupliquée: ${JSON.stringify(typedError.keyValue)}). Elle existe probablement déjà.`);
-          brandsSkippedCount++; // Compter comme skipped en cas de conflit de duplicata aussi
+          console.warn(`WARN: Conflit de clé dupliquée pour la marque "${brandData.name}" (valeur dupliquée: ${JSON.stringify(typedError.keyValue)}).`);
+          brandsSkippedCount++;
         } else {
           console.error(`ERROR: Erreur lors du traitement de la marque "${brandData.name}":`, typedError.message || error);
         }
@@ -292,9 +251,8 @@ async function seedBrands() {
     console.log(`
 --- Seed des marques terminé ---
 ${brandsCreatedCount} marque(s) créée(s).
-${brandsUpdatedCount} marque(s) mise(s) à jour.
-${brandsSkippedCount} marque(s) existante(s) et ignorée(s).
-Total des marques dans BRANDS_TO_SEED_WITH_CATEGORIES: ${BRANDS_TO_SEED_WITH_CATEGORIES.length}.
+${brandsSkippedCount} marque(s) ignorée(s) (conflit).
+Total des marques traitées: ${BRANDS_TO_SEED_WITH_CATEGORIES.length}.
 Consultez les logs ci-dessus pour les détails.
 `);
 
@@ -306,4 +264,4 @@ Consultez les logs ci-dessus pour les détails.
   }
 }
 
-seedBrands(); 
+seedBrands();

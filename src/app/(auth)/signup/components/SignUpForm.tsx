@@ -1,14 +1,17 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { SignUpSchema, TSignUpSchema } from '@/lib/validators/auth';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 interface SignUpFormProps {
-    onSuccess?: () => void; // Callback optionnel en cas de succès
+    onSuccess?: () => void;
 }
 
 /**
@@ -19,106 +22,93 @@ interface SignUpFormProps {
  */
 export function SignUpForm({ onSuccess }: SignUpFormProps) {
     const router = useRouter();
-    const [name, setName] = useState('');
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
+    const {
+        register,
+        handleSubmit,
+        formState: { errors },
+    } = useForm<TSignUpSchema>({
+        resolver: zodResolver(SignUpSchema),
+    });
+
+    const onSubmit = async (data: TSignUpSchema) => {
         setIsLoading(true);
 
-        // Validation de la longueur du mot de passe
-        if (password.length < 6) {
-            toast.error("Mot de passe trop court", { description: "Le mot de passe doit contenir au moins 6 caractères." });
-            setIsLoading(false);
-            return;
-        }
-
         try {
-            // Appel à l'API pour enregistrer le nouvel utilisateur
-            const response = await fetch('/api/auth/register', { // Assurez-vous que cette route existe et est correcte
+            const response = await fetch('/api/auth/signup', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ name, email, password }),
+                body: JSON.stringify(data),
             });
 
-            const data = await response.json();
+            const responseData = await response.json();
 
             if (!response.ok) {
-                // Gestion des erreurs retournées par l'API
-                toast.error("Erreur d'inscription", { description: data.message || 'Une erreur est survenue lors de l\'inscription.' });
+                toast.error("Erreur d'inscription", { description: responseData.message || 'Une erreur est survenue.' });
             } else {
-                // Succès de l'inscription
-                toast.success("Inscription réussie !", { description: data.message || 'Vous allez être redirigé vers la page de connexion.' });
+                toast.success("Inscription réussie !", { description: 'Vous allez être redirigé.' });
                 if (onSuccess) {
-                    onSuccess(); // Exécute le callback de succès
+                    onSuccess();
                 } else {
-                    // Redirection par défaut après un délai
                     setTimeout(() => {
                         router.push('/signin');
                     }, 2000);
                 }
             }
         } catch (err) {
-            // Gestion des erreurs serveur ou réseau
             console.error("Erreur lors de la tentative d'inscription:", err);
-            toast.error("Erreur Serveur", { description: "Une erreur serveur est survenue lors de l\'inscription." });
+            toast.error("Erreur Serveur", { description: "Une erreur serveur est survenue." });
         } finally {
-            setIsLoading(false); // S'assurer que isLoading est réinitialisé dans tous les cas
+            setIsLoading(false);
         }
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-                <Label htmlFor="name-signup">Nom complet (optionnel)</Label>
+                <Label htmlFor="name">Nom complet (optionnel)</Label>
                 <Input
-                    id="name-signup" // ID unique
-                    name="name"
+                    id="name"
                     type="text"
                     autoComplete="name"
                     placeholder="Votre nom et prénom"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    {...register('name')}
                     disabled={isLoading}
                     className="bg-input"
                 />
+                {errors.name && <p className="text-sm text-red-500">{errors.name.message}</p>}
             </div>
             <div className="space-y-2">
-                <Label htmlFor="email-signup">Adresse email</Label>
+                <Label htmlFor="email">Adresse email</Label>
                 <Input
-                    id="email-signup" // ID unique
-                    name="email"
+                    id="email"
                     type="email"
                     autoComplete="email"
                     placeholder="votre@email.com"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    {...register('email')}
                     disabled={isLoading}
                     className="bg-input"
                 />
+                {errors.email && <p className="text-sm text-red-500">{errors.email.message}</p>}
             </div>
             <div className="space-y-2">
-                <Label htmlFor="password-signup">Mot de passe</Label>
+                <Label htmlFor="password">Mot de passe</Label>
                 <Input
-                    id="password-signup" // ID unique
-                    name="password"
+                    id="password"
                     type="password"
                     autoComplete="new-password"
-                    placeholder="Choisissez un mot de passe (min. 6 caractères)"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Choisissez un mot de passe"
+                    {...register('password')}
                     disabled={isLoading}
                     className="bg-input"
                 />
+                {errors.password && <p className="text-sm text-red-500">{errors.password.message}</p>}
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? 'Inscription en cours...' : 'S\'inscrire'}
+                {isLoading ? 'Inscription en cours...' : "S'inscrire"}
             </Button>
         </form>
     );

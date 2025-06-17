@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import dbConnect from "@/lib/mongodb/dbConnect";
 import CategoryModel from "@/lib/mongodb/models/CategoryModel";
 import { LeanCategory } from "@/types/category";
@@ -10,7 +11,15 @@ interface GetAllCategoriesOptions {
     activeSlug?: string;
 }
 
-const getCategoriesByParent = cache(async (parentId: Types.ObjectId | null = null): Promise<LeanCategory[]> => {
+const GetAllCategoriesOptionsSchema = z.object({
+    activeSlug: z.string().optional(),
+});
+
+export const getCategoriesByParent = cache(async (parentId: Types.ObjectId | null = null): Promise<LeanCategory[]> => {
+    if (parentId && !Types.ObjectId.isValid(parentId)) {
+        console.error("Invalid parentId:", parentId);
+        return [];
+    }
     await dbConnect();
     const categories = await CategoryModel.find({ parent: parentId })
         .sort({ name: 1 })
@@ -28,7 +37,18 @@ export async function getAllCategories(options: GetAllCategoriesOptions = {}): P
     };
     message?: string;
 }> {
-    const { activeSlug } = options;
+    const validatedOptions = GetAllCategoriesOptionsSchema.safeParse(options);
+
+    if (!validatedOptions.success) {
+        // Handle validation error, maybe return a specific error response
+        return {
+            success: false,
+            data: { allRootCategories: [], currentCategory: null, currentCategoryChildren: [], breadcrumbs: [] },
+            message: "Invalid options provided.",
+        };
+    }
+
+    const { activeSlug } = validatedOptions.data;
     const fallbackData = { allRootCategories: [], currentCategory: null, currentCategoryChildren: [], breadcrumbs: [] };
 
     try {

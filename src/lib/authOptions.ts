@@ -10,6 +10,7 @@ import dbConnect from "@/lib/mongodb/dbConnect";
 type SessionUserWithId = { id?: string; email?: string | null; name?: string | null; image?: string | null };
 
 const authorizeCredentials = async (credentials: Record<"email" | "password", string> | undefined) => {
+  await dbConnect();
   if (!credentials?.email || !credentials?.password) {
     throw new Error("Email et mot de passe requis.");
   }
@@ -43,7 +44,10 @@ export const authOptions: NextAuthOptions = {
       }
     })
   ],
-  session: { strategy: "jwt" },
+  session: { 
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 jours
+  },
   pages: { signIn: "/auth/connexion" },
   callbacks: {
     async jwt({ token, user, account }) {
@@ -59,5 +63,35 @@ export const authOptions: NextAuthOptions = {
       return session;
     }
   },
+  cookies: {
+    sessionToken: {
+      name: `__Secure-next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 30 * 24 * 60 * 60, // 30 jours
+      }
+    },
+    callbackUrl: {
+      name: `__Secure-next-auth.callback-url`,
+      options: {
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      }
+    },
+    csrfToken: {
+      name: `__Host-next-auth.csrf-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      }
+    }
+  },
+  secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === "development"
 }; 

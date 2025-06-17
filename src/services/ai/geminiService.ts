@@ -44,11 +44,11 @@ export type PromptItem = string | ImagePart;
  * @throws Error si la clé API n'est pas trouvée.
  */
 const getApiKey = (optionsApiKey?: string): string => {
-  // Priorité : clé dans les options, puis NEXT_PUBLIC_GEMINI_API_KEY, puis GEMINI_API_KEY
-  const apiKey = optionsApiKey || process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+  // Priorité : clé dans les options, puis variable d'environnement serveur
+  const apiKey = optionsApiKey || process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error(
-      "Clé API Gemini non trouvée. Veuillez la définir dans vos variables d'environnement (GEMINI_API_KEY ou NEXT_PUBLIC_GEMINI_API_KEY) ou la passer en option."
+      "Clé API Gemini non trouvée. Veuillez la définir dans vos variables d'environnement (GEMINI_API_KEY) ou la passer en option."
     );
   }
   return apiKey;

@@ -1,8 +1,20 @@
 "use server";
 
+import { z } from "zod";
 import { LeanProduct } from "@/types/product";
 import { searchProducts } from "../core/product-service";
 import { SearchFilters } from "@/types/product";
+
+const SearchFiltersSchema = z.object({
+    searchQuery: z.string().optional(),
+    categorySlug: z.string().optional(),
+    brandSlugs: z.array(z.string()).optional(),
+    sort: z.enum(['relevance', 'price-asc', 'price-desc']).optional(),
+    limit: z.number().int().positive().optional(),
+    page: z.number().int().positive().optional(),
+    includeOffers: z.boolean().optional(),
+    isFeatured: z.boolean().optional(),
+});
 
 interface ProductActionResult {
     success: boolean;
@@ -16,8 +28,16 @@ interface ProductActionResult {
 
 export async function getProducts(filters: SearchFilters): Promise<ProductActionResult> {
     try {
-        const { products, totalProducts } = await searchProducts(filters);
-        const limit = filters.limit || 12;
+        const validatedFilters = SearchFiltersSchema.safeParse(filters);
+        if (!validatedFilters.success) {
+            return {
+                success: false,
+                message: "Invalid filter options.",
+            };
+        }
+
+        const { products, totalProducts } = await searchProducts(validatedFilters.data);
+        const limit = validatedFilters.data.limit || 12;
         return {
             success: true,
             data: {
