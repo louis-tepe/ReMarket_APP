@@ -2,6 +2,13 @@ import { Schema, model, models, Document, Types, Model as MongooseModel } from '
 import { ICategory } from './CategoryModel';
 import CategoryModel from './CategoryModel'; // Import direct pour la validation
 
+// Interface pour les informations d'expédition
+export interface IShippingInfo {
+  trackingNumber?: string;
+  labelUrl?: string;
+  servicePointId?: number; // ID du point relais de destination
+}
+
 // Interface de base pour toutes les offres de produits
 export interface IProductBase extends Document {
   category: Types.ObjectId | ICategory; // Réf. à Category (doit être une feuille)
@@ -27,12 +34,19 @@ export interface IProductBase extends Document {
   // Informations post-vente (si applicable)
   soldTo?: Types.ObjectId;               // Réf. à User (acheteur)
   orderId?: Types.ObjectId;              // Réf. à Order (commande associée)
+  shippingInfo?: IShippingInfo;          // Informations d'expédition
 
   kind: string; // Clé de discriminateur (slug de la catégorie feuille)
 
   createdAt: Date;
   updatedAt: Date;
 }
+
+const ShippingInfoSchema = new Schema<IShippingInfo>({
+  trackingNumber: { type: String, trim: true },
+  labelUrl: { type: String, trim: true },
+  servicePointId: { type: Number },
+}, { _id: false });
 
 const ProductBaseSchema = new Schema<IProductBase>(
   {
@@ -128,6 +142,10 @@ const ProductBaseSchema = new Schema<IProductBase>(
         ref: 'Order', 
         required: false 
     },
+    shippingInfo: {
+      type: ShippingInfoSchema,
+      required: false,
+    }
   },
   {
     timestamps: true,

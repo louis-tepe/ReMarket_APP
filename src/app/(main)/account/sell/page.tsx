@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, ChangeEvent, FormEvent, useEffect, useCallback } from 'react';
+import React, { useState, FormEvent, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { TNewOfferSchema, OfferCreationSchema } from '@/lib/validators/offer';
+import { TNewOfferSchema } from '@/lib/validators/offer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -17,11 +17,9 @@ import { useSession } from "next-auth/react";
 import {
     FrontendCategory,
     CategoryDropdownLevel,
-    OfferDetails,
     ProductModelReMarketSelectItem,
     DisplayableProductModel,
     FormFieldDefinition,
-    AttributeItem,
     Specifications,
     IBrand
 } from './types';
@@ -29,16 +27,6 @@ import { NOT_LISTED_ID } from './types';
 import { Loader2, CheckCircle, ArrowRight, RefreshCcw, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-const INITIAL_OFFER_DETAILS: OfferDetails = {
-    price: '',
-    currency: 'EUR',
-    condition: 'good',
-    sellerDescription: '',
-    photos: [],
-    stockQuantity: '1',
-};
-
-// Form-specific Zod schema
 const OfferFormSchema = z.object({
   price: z.string().nonempty("Le prix est requis."),
   condition: z.enum(['new', 'like-new', 'good', 'fair', 'poor']),
@@ -54,7 +42,7 @@ type TOfferFormSchema = z.infer<typeof OfferFormSchema>;
 
 export default function SellPage() {
     const [step, setStep] = useState(1);
-    const { data: session, status: sessionStatus } = useSession();
+    const { status: sessionStatus } = useSession();
     const router = useRouter();
 
     const [allCategories, setAllCategories] = useState<FrontendCategory[]>([]);
@@ -69,8 +57,6 @@ export default function SellPage() {
     const [showCreateByName, setShowCreateByName] = useState(false);
     const [newProductModelName, setNewProductModelName] = useState('');
     const [selectedProductModel, setSelectedProductModel] = useState<DisplayableProductModel | null>(null);
-    const [offerDetails, setOfferDetails] = useState<OfferDetails>(INITIAL_OFFER_DETAILS);
-    const [categorySpecificFormFields, setCategorySpecificFormFields] = useState<FormFieldDefinition[]>([]);
     const [offerSpecificFieldValues, setOfferSpecificFieldValues] = useState<Record<string, string | number | boolean>>({});
 
     const [isLoadingCategories, setIsLoadingCategories] = useState(false);
@@ -84,8 +70,6 @@ export default function SellPage() {
         register,
         handleSubmit,
         control,
-        setValue,
-        getValues,
         formState: { errors, isValid },
         watch,
         reset: resetForm,
@@ -113,9 +97,8 @@ export default function SellPage() {
         setSelectedProductModel(null);
         setShowCreateByName(false);
         setNewProductModelName('');
-        setOfferDetails(INITIAL_OFFER_DETAILS);
         setOfferSpecificFieldValues({});
-        setCategorySpecificFormFields([]);
+        resetForm();
         if (allCategories.length > 0) {
             setCategoryDropdowns([
                 {
@@ -127,7 +110,7 @@ export default function SellPage() {
                 }
             ]);
         }
-    }, [allCategories]);
+    }, [allCategories, resetForm]);
 
     useEffect(() => {
         setIsLoadingCategories(true);
@@ -180,7 +163,6 @@ export default function SellPage() {
         setSelectedProductModelReMarketId(null);
         setShowCreateByName(false);
         setOfferSpecificFieldValues({});
-        setCategorySpecificFormFields([]);
 
         if (selectedCategory.isLeafNode) {
             setFinalSelectedLeafCategory(selectedCategory);
@@ -217,7 +199,6 @@ export default function SellPage() {
             }
             const formFieldsData = await response.json();
             if (formFieldsData && formFieldsData.success && Array.isArray(formFieldsData.formFields)) {
-                setCategorySpecificFormFields(formFieldsData.formFields);
                 const initialSpecificValues: Record<string, string | number | boolean> = {};
                 formFieldsData.formFields.forEach((field: FormFieldDefinition) => {
                     if (field.defaultValue !== undefined) {
@@ -231,12 +212,10 @@ export default function SellPage() {
                 setOfferSpecificFieldValues(initialSpecificValues);
 
             } else {
-                setCategorySpecificFormFields([]);
                 setOfferSpecificFieldValues({});
                 toast.error("Formulaire Dynamique", { description: formFieldsData.message || "Format de données de formulaire incorrect." });
             }
         } catch (error) {
-            setCategorySpecificFormFields([]);
             setOfferSpecificFieldValues({});
             const typedError = error as Error;
             toast.error("Erreur Formulaire", { description: typedError.message || "Impossible de charger les champs du formulaire pour cette catégorie." });
@@ -246,7 +225,6 @@ export default function SellPage() {
     useEffect(() => {
         if (finalSelectedLeafCategory && finalSelectedLeafCategory.isLeafNode) {
         } else {
-            setCategorySpecificFormFields([]);
             setOfferSpecificFieldValues({});
         }
     }, [finalSelectedLeafCategory]);
@@ -424,27 +402,6 @@ export default function SellPage() {
         }
     }, [newProductModelName, brands, selectedBrandId, finalSelectedLeafCategory]);
 
-    const handleOfferDetailsChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        setOfferDetails(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    };
-
-    const handleSpecificFieldChange = (name: string, value: string | number | boolean /*, type?: string */) => {
-        // const isCheckbox = type === 'checkbox';
-        // const processedValue = isCheckbox ? (e.target as HTMLInputElement).checked : value;
-        setOfferSpecificFieldValues(prev => ({ ...prev, [name]: value }));
-    };
-
-    const handleConditionChange = (value: string) => {
-        setOfferDetails({ ...offerDetails, condition: value as OfferDetails['condition'] });
-    };
-
-    const handlePhotoChange = (e: ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            const filesArray = Array.from(e.target.files).slice(0, 5);
-            setOfferDetails({ ...offerDetails, photos: filesArray });
-        }
-    };
-
     const onOfferSubmit = async (formData: TOfferFormSchema) => {
         if (!finalSelectedLeafCategory || !selectedProductModel) {
             toast.error("Erreur", { description: "Catégorie ou modèle de produit manquant." });
@@ -454,26 +411,38 @@ export default function SellPage() {
         
         try {
             const uploadedImageUrls = [];
-            for (const imageFile of Array.from(formData.images)) {
-                const formImageData = new FormData();
-                formImageData.append('file', imageFile);
-                const res = await fetch('/api/services/media/upload/images', { method: 'POST', body: formImageData });
-                const result = await res.json();
-                if (!res.ok || !result.success) throw new Error(result.message || "Échec de l'upload d'image.");
-                uploadedImageUrls.push(result.url);
-        }
+            if (formData.images) {
+                for (const imageFile of Array.from(formData.images)) {
+                    const formImageData = new FormData();
+                    formImageData.append('file', imageFile);
+                    const res = await fetch('/api/services/media/upload/images', { method: 'POST', body: formImageData });
+                    const result = await res.json();
+                    if (!res.ok || !result.success) throw new Error(result.message || "Échec de l'upload d'image.");
+                    uploadedImageUrls.push(result.url);
+                }
+            }
 
-            const payload: TNewOfferSchema & Record<string, unknown> = {
+            const specificFieldsPayload: Record<string, unknown> = {};
+            Object.entries(offerSpecificFieldValues).forEach(([key, value]) => {
+                if (value !== '') {
+                    specificFieldsPayload[key] = value;
+                }
+            });
+
+            const payload: Partial<TNewOfferSchema> & Record<string, unknown> = {
                 price: parseFloat(formData.price),
                 stockQuantity: parseInt(formData.stockQuantity, 10),
                 condition: formData.condition,
-                description: formData.description,
                 images: uploadedImageUrls,
                 productModelId: selectedProductModel._id,
-            kind: finalSelectedLeafCategory.slug,
+                kind: finalSelectedLeafCategory.slug,
                 currency: 'EUR',
-                ...offerSpecificFieldValues,
-        };
+                ...specificFieldsPayload,
+            };
+
+            if (formData.description && formData.description.trim().length > 0) {
+                payload.description = formData.description;
+            }
 
             const response = await fetch('/api/offers', {
                 method: 'POST',
@@ -481,8 +450,8 @@ export default function SellPage() {
                 body: JSON.stringify(payload),
             });
 
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.message || "La création de l'offre a échoué.");
+            const creationResult = await response.json();
+            if (!response.ok) throw new Error(creationResult.message || "La création de l'offre a échoué.");
 
             toast.success("Offre publiée !");
             router.push(`/account/sales`);
@@ -493,8 +462,6 @@ export default function SellPage() {
             setIsSubmitting(false);
         }
     };
-
-    const displayTitle = selectedProductModel?.title || 'N/A';
 
     const getDisplayString = (value: string | number | null | undefined | { name?: string; title?: string; toString?: () => string; }): string => {
         if (value === null || value === undefined) return 'N/A';
@@ -511,79 +478,71 @@ export default function SellPage() {
         return 'N/A';
     };
 
-    const displayBrand = selectedProductModel?.brand ? getDisplayString(selectedProductModel.brand) : 'N/A';
-
-    let displayCategoryName: string | undefined = finalSelectedLeafCategory?.name;
-    if (!displayCategoryName && selectedProductModel?.category) {
-        const categoryData = selectedProductModel.category;
-        if (typeof categoryData === 'object' && categoryData !== null && 'name' in categoryData && typeof categoryData.name === 'string') {
-            displayCategoryName = categoryData.name;
-        } else if (typeof categoryData === 'string' && categoryData) {
-            displayCategoryName = categoryData;
-        } else if (selectedProductModel.rawCategoryName) {
-            displayCategoryName = selectedProductModel.rawCategoryName;
-        } else if (categoryData && typeof categoryData.toString === 'function' && categoryData.constructor.name !== 'Object') {
-            // Attempt toString() only if it's likely a Mongoose ObjectId or similar, not a plain object
-            const categoryString = categoryData.toString();
-            if (categoryString !== '[object Object]' && categoryString) {
-                displayCategoryName = categoryString;
-            }
-        }
-    }
-    const displayCategory = displayCategoryName || 'N/A';
-
-    const displayAsin = selectedProductModel?.rawAsin;
-
-    let displayStandardDescription: string | undefined = 'N/A';
-    if (selectedProductModel) {
-        if (selectedProductModel.standardDescription) {
-            displayStandardDescription = selectedProductModel.standardDescription;
-        } else if (selectedProductModel.rawDescription) {
-            displayStandardDescription = selectedProductModel.rawDescription + " (Description brute)";
-        }
-    }
-
-    let displayImageUrls: string[] = ['/images/placeholder-product.png'];
-    if (selectedProductModel) {
-        const urls = (selectedProductModel.standardImageUrls && selectedProductModel.standardImageUrls.length > 0)
-            ? selectedProductModel.standardImageUrls
-            : (selectedProductModel.rawImageUrls && selectedProductModel.rawImageUrls.length > 0
-                ? selectedProductModel.rawImageUrls
-                : null);
-        if (urls) displayImageUrls = urls;
-    }
-
     const prepareDisplayData = () => {
         let displayAttributes: Specifications = [];
+        let displayTitle = 'N/A';
+        let displayBrand = 'N/A';
+        let displayCategory = 'N/A';
+        let displayAsin: string | undefined = undefined;
+        let displayStandardDescription: string | undefined = 'N/A';
+        let displayImageUrls: string[] = ['/images/placeholder-product.png'];
+
         if (selectedProductModel) {
+            displayTitle = selectedProductModel.title || 'N/A';
+            displayBrand = selectedProductModel.brand ? getDisplayString(selectedProductModel.brand) : 'N/A';
+            displayAsin = selectedProductModel.rawAsin;
+            
+            let displayCategoryName: string | undefined = finalSelectedLeafCategory?.name;
+            if (!displayCategoryName && selectedProductModel.category) {
+                const categoryData = selectedProductModel.category;
+                if (typeof categoryData === 'object' && categoryData !== null && 'name' in categoryData && typeof categoryData.name === 'string') {
+                    displayCategoryName = categoryData.name;
+                } else if (typeof categoryData === 'string' && categoryData) {
+                    displayCategoryName = categoryData;
+                } else if (selectedProductModel.rawCategoryName) {
+                    displayCategoryName = selectedProductModel.rawCategoryName;
+                } else if (categoryData && typeof categoryData.toString === 'function' && categoryData.constructor.name !== 'Object') {
+                    const categoryString = categoryData.toString();
+                    if (categoryString !== '[object Object]' && categoryString) {
+                        displayCategoryName = categoryString;
+                    }
+                }
+            }
+            displayCategory = displayCategoryName || 'N/A';
+            
+            if (selectedProductModel.standardDescription) {
+                displayStandardDescription = selectedProductModel.standardDescription;
+            } else if (selectedProductModel.rawDescription) {
+                displayStandardDescription = selectedProductModel.rawDescription + " (Description brute)";
+            }
+
+            const urls = (selectedProductModel.standardImageUrls && selectedProductModel.standardImageUrls.length > 0)
+                ? selectedProductModel.standardImageUrls
+                : (selectedProductModel.rawImageUrls && selectedProductModel.rawImageUrls.length > 0
+                    ? selectedProductModel.rawImageUrls
+                    : null);
+            if (urls) displayImageUrls = urls;
+
             if (selectedProductModel.specifications && selectedProductModel.specifications.length > 0) {
-                displayAttributes = selectedProductModel.specifications.map(spec => ({
+                displayAttributes = selectedProductModel.specifications.map((spec: {label: string, value: string, unit?: string}) => ({
                     label: spec.label,
                     value: spec.value,
                     unit: spec.unit
                 }));
             } else if (selectedProductModel.rawAttributes && selectedProductModel.rawAttributes.length > 0) {
-                displayAttributes = selectedProductModel.rawAttributes.map(attr => ({
+                displayAttributes = selectedProductModel.rawAttributes.map((attr: {label: string, value: string}) => ({
                     label: attr.label,
                     value: attr.value,
                 }));
             }
         }
-        return { displayAttributes };
+        return { displayAttributes, displayTitle, displayBrand, displayCategory, displayAsin, displayStandardDescription, displayImageUrls };
     };
-    const { displayAttributes } = prepareDisplayData();
-    const conditionOptions = [
-        { value: "new", label: "Neuf (jamais utilisé, emballage d'origine)" },
-        { value: "like-new", label: "Comme neuf (utilisé quelques fois, aucune trace)" },
-        { value: "good", label: "Bon état (traces d'usure légères)" },
-        { value: "fair", label: "État correct (traces d'usure visibles, fonctionnel)" },
-        { value: "poor", label: "Mauvais état (endommagé mais peut-être fonctionnel/pour pièces)" }
-    ];
 
     const renderCategoryDropdowns = () => {
         return categoryDropdowns.map((dropdown, index) => (
             <div key={`cat-level-${index}`} className="mb-4">
-                <Label htmlFor={`category-level-${index}`}>{dropdown.level === 0 ? "1. Catégorie Principale" : `Sous-catégorie (Niv. ${dropdown.level + 1})`}</Label>
+                <Label htmlFor={`category-level-${index}`}>{dropdown.level === 0 ? "1. Catégorie" : `Sous-catégorie`}</Label>
                 <Select
                     value={dropdown.selectedId || ''}
                     onValueChange={(value) => handleCategoryLevelSelect(dropdown.level, value)}
@@ -614,7 +573,7 @@ export default function SellPage() {
     const renderOfferForm = () => (
         <Card>
                     <CardHeader>
-                <CardTitle>4. Décrivez votre article</CardTitle>
+                <CardTitle>Étape 3: Décrivez votre article</CardTitle>
                 <CardDescription>Détails pour : {selectedProductModel?.title}</CardDescription>
                     </CardHeader>
             <form onSubmit={handleSubmit(onOfferSubmit)} noValidate>
@@ -642,38 +601,183 @@ export default function SellPage() {
                             {errors.condition && <p className="text-sm text-red-500">{errors.condition.message}</p>}
                         </div>
                     </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <Label htmlFor="stockQuantity">Quantité</Label>
+                            <Input id="stockQuantity" type="number" step="1" {...register('stockQuantity')} placeholder="1" />
+                            {errors.stockQuantity && <p className="text-sm text-red-500">{errors.stockQuantity.message}</p>}
+                        </div>
+                    </div>
                     <div className="space-y-2">
                         <Label htmlFor="description">Description</Label>
                         <Textarea id="description" {...register('description')} placeholder="Ex: Vendu avec boîte d'origine..." />
                         {errors.description && <p className="text-sm text-red-500">{errors.description.message}</p>}
-                            </div>
+                    </div>
                     <div className="space-y-2">
-                        <Label htmlFor="photos">Photos</Label>
+                        <Label htmlFor="photos">Photos (jusqu&apos;à 5)</Label>
                         <Input id="photos" type="file" multiple accept="image/*" {...register('images')} />
                         {errors.images && <p className="text-sm text-red-500">{errors.images.message}</p>}
                         {watchedImages?.length > 0 && (
                             <div className="mt-2 grid grid-cols-3 sm:grid-cols-5 gap-2">
                                 {Array.from(watchedImages).map((file, index) => (
-                                    <Image key={index} src={URL.createObjectURL(file)} alt={`preview ${index}`} width={100} height={100} className="rounded-md object-cover" />
+                                    <div key={index} className="relative w-24 h-24">
+                                        <Image src={URL.createObjectURL(file)} alt={`preview ${index}`} fill className="rounded-md object-cover" />
+                                    </div>
                                 ))}
                             </div>
-                                        )}
-                                    </div>
-                                </CardContent>
+                        )}
+                    </div>
+                </CardContent>
                 <CardFooter className="flex justify-between">
-                    <Button type="button" variant="outline" onClick={() => setStep(3)}><ArrowLeft className="mr-2 h-4 w-4" /> Retour</Button>
+                    <Button type="button" variant="outline" onClick={() => setStep(2)}><ArrowLeft className="mr-2 h-4 w-4" /> Retour</Button>
                     <Button type="submit" disabled={isSubmitting || !isValid || sessionStatus !== 'authenticated'}>
                         {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-                        Publier
-                            </Button>
-                        </CardFooter>
-                    </form>
-                </Card>
+                        Publier l&apos;offre
+                    </Button>
+                </CardFooter>
+            </form>
+        </Card>
     );
+
+    const renderStep1_Selection = () => (
+        <Card>
+            <CardHeader>
+                <CardTitle>Étape 1: Identifiez votre produit</CardTitle>
+                <CardDescription>Sélectionnez la catégorie, la marque et le modèle de votre produit.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {renderCategoryDropdowns()}
+                {finalSelectedLeafCategory && (
+                    <React.Fragment key={finalSelectedLeafCategory._id}>
+                        <div className="mb-4">
+                            <Label htmlFor="brand-select">2. Marque</Label>
+                            <Select
+                                value={selectedBrandId || ''}
+                                onValueChange={handleSelectBrand}
+                                disabled={isLoadingBrands || isLoadingFullProduct || isLoadingCreate}
+                            >
+                                <SelectTrigger id="brand-select" className="bg-input">
+                                    <SelectValue placeholder={isLoadingBrands ? "Chargement des marques..." : "Sélectionnez une marque"} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {brands.length > 0 ? brands.map(brand => (
+                                        <SelectItem key={brand._id} value={brand.slug}>{brand.name}</SelectItem>
+                                    )) : <SelectItem value="no-brands" disabled>Aucune marque trouvée</SelectItem>}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {selectedBrandId && (
+                            <div>
+                                <Label htmlFor="product-model-select">3. Modèle du produit</Label>
+                                <Select
+                                    value={selectedProductModelReMarketId || ''}
+                                    onValueChange={(value) => {
+                                        if (typeof value === 'string') {
+                                            handleSelectProductModelReMarket(value)
+                                        }
+                                    }}
+                                    disabled={isLoadingProductModels || isLoadingFullProduct || isLoadingCreate}
+                                >
+                                    <SelectTrigger id="product-model-select" className="bg-input">
+                                        <SelectValue placeholder={isLoadingProductModels ? "Chargement des modèles..." : "Sélectionnez un modèle"} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {productModelsReMarketSelectItems.map(pm => (
+                                            <SelectItem key={pm.id} value={pm.id}>{pm.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                {showCreateByName && (
+                                    <form onSubmit={handleScrapeNewProductModel} className="mt-4 p-4 border rounded-lg bg-muted/50 space-y-3">
+                                        <p className="text-sm font-medium">Créer un nouveau modèle de produit</p>
+                                        <Input
+                                            type="text"
+                                            value={newProductModelName}
+                                            onChange={(e) => setNewProductModelName(e.target.value)}
+                                            placeholder="Ex: iPhone 15 Pro Max 256GB"
+                                            disabled={isLoadingCreate}
+                                        />
+                                        <Button type="submit" disabled={isLoadingCreate || !newProductModelName.trim()}>
+                                            {isLoadingCreate ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
+                                            Rechercher et créer
+                                        </Button>
+                                    </form>
+                                )}
+                            </div>
+                        )}
+                    </React.Fragment>
+                )}
+            </CardContent>
+             <CardFooter className="flex justify-end">
+                <Button onClick={resetSellProcess} variant="ghost" >
+                    <RefreshCcw className="mr-2 h-4 w-4" /> Recommencer
+                </Button>
+            </CardFooter>
+        </Card>
+    );
+
+    const renderStep2_ProductConfirmation = () => {
+        if (!selectedProductModel) return null;
+        const { displayAttributes, displayTitle, displayBrand, displayCategory, displayAsin, displayStandardDescription, displayImageUrls } = prepareDisplayData();
+
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Étape 2: Confirmez votre produit</CardTitle>
+                    <CardDescription>Vérifiez les informations ci-dessous. Est-ce bien le produit que vous vendez ?</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="flex flex-col md:flex-row gap-6">
+                        <div className="md:w-1/3">
+                            <Image src={displayImageUrls[0]} alt={displayTitle} width={200} height={200} className="rounded-lg object-contain mx-auto" />
+                        </div>
+                        <div className="md:w-2/3 space-y-2">
+                            <h2 className="text-2xl font-bold">{displayTitle}</h2>
+                            <p><span className="font-semibold">Marque:</span> {displayBrand}</p>
+                            <p><span className="font-semibold">Catégorie:</span> {displayCategory}</p>
+                            {displayAsin && <p><span className="font-semibold">ASIN:</span> {displayAsin}</p>}
+                            <p className="text-sm text-muted-foreground pt-2">{displayStandardDescription}</p>
+                        </div>
+                    </div>
+                    {displayAttributes.length > 0 && (
+                        <div>
+                            <h3 className="text-lg font-semibold border-b pb-2 mb-2">Spécifications</h3>
+                            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                                {displayAttributes.map((attr, index) => (
+                                    <li key={index}><span className="font-medium">{attr.label}:</span> {attr.value} {attr.unit || ''}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                </CardContent>
+                <CardFooter className="flex justify-between">
+                    <Button type="button" variant="outline" onClick={() => setStep(1)}><ArrowLeft className="mr-2 h-4 w-4" /> Précédent</Button>
+                    <Button type="button" onClick={() => setStep(3)}>
+                        Oui, c&apos;est mon produit <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                </CardFooter>
+            </Card>
+        );
+    };
+
+    const renderCurrentStep = () => {
+        switch (step) {
+            case 1:
+                return renderStep1_Selection();
+            case 2:
+                return renderStep2_ProductConfirmation();
+            case 3:
+                return renderOfferForm();
+            default:
+                return <p>Étape inconnue.</p>;
+        }
+    }
 
     return (
         <div className="container mx-auto max-w-4xl py-8">
-            {step === 4 && selectedProductModel ? renderOfferForm() : "Rendering logic for steps 1-3 goes here..."}
+            {renderCurrentStep()}
         </div>
     );
 }

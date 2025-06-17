@@ -28,14 +28,25 @@ export default function ProductOffersList({
         offer => offer.transactionStatus === 'available' && offer.stockQuantity > 0
     );
 
+    // Grouper les offres par condition et sélectionner la meilleure (la moins chère)
+    const bestOffersByCondition = availableOffers.reduce((acc, offer) => {
+        const existingOffer = acc[offer.condition];
+        if (!existingOffer || offer.price < existingOffer.price) {
+            acc[offer.condition] = offer;
+        }
+        return acc;
+    }, {} as Record<Offer['condition'], Offer>);
+
+    const bestOffers = Object.values(bestOffersByCondition).sort((a, b) => a.price - b.price);
+
     return (
         <div className="mb-8">
             <h2 className="text-2xl font-semibold mb-4 flex items-center">
                 <Tag className="h-6 w-6 mr-2 text-primary" /> Choisir une offre ReMarket
             </h2>
-            {availableOffers.length > 0 ? (
+            {bestOffers.length > 0 ? (
                 <div className="space-y-4">
-                    {availableOffers.map((offer, index) => (
+                    {bestOffers.map((offer, index) => (
                         <SellerOfferCard
                             key={offer._id || index}
                             offer={offer}

@@ -37,4 +37,24 @@ export interface CartActionPayload {
     productModelId?: string; // For adding an item
     cartItemId?: string; // For removing or updating an item
     quantity?: number; // For adding or updating quantity
+}
+
+export interface Offer {
+    _id: string;
+    price: number;
+    seller: {
+        _id: string;
+        name?: string;
+        username?: string;
+    };
+    images?: string[];
+    stockQuantity: number;
+    condition: 'new' | 'like-new' | 'good' | 'fair' | 'poor';
+}
+
+export interface ProductModel {
+    _id: string;
+    title: string;
+    standardImageUrls?: string[];
+    slug?: string;
 } 

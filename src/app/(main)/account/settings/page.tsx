@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
+import ShippingAddressForm from "./components/ShippingAddressForm";
+import { IUser } from "@/lib/mongodb/models/User";
 
 /**
  * SettingsPage: Allows users to manage their profile information and notification preferences.
@@ -16,19 +18,28 @@ import { Switch } from "@/components/ui/switch";
  */
 export default function SettingsPage() {
     const { data: session, status: sessionStatus } = useSession();
-    const [name, setName] = useState('');
-    const [email, setEmail] = useState('');
+    const [userData, setUserData] = useState<IUser | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
+    const fetchUserData = async (userId: string) => {
+        try {
+            const response = await fetch(`/api/users/${userId}`);
+            if (!response.ok) throw new Error("Failed to fetch user data.");
+            const data = await response.json();
+            setUserData(data);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Could not fetch user data.");
+        }
+    };
+
     useEffect(() => {
-        if (session?.user) {
-            setName(session.user.name ?? '');
-            setEmail(session.user.email ?? '');
+        if (session?.user?.id) {
+            fetchUserData(session.user.id);
         }
     }, [session]);
 
     // Handle loading state for the session
-    if (sessionStatus === "loading") {
+    if (sessionStatus === "loading" || (sessionStatus === "authenticated" && !userData)) {
         return <div className="container mx-auto py-8"><p>Chargement des paramètres...</p></div>;
     }
 
@@ -44,20 +55,20 @@ export default function SettingsPage() {
         e.preventDefault();
         setIsLoading(true);
 
-        if (!session?.user?.id) {
+        if (!userData?._id) {
             toast.error("Erreur: ID utilisateur non trouvé.");
             setIsLoading(false);
             return;
         }
 
         try {
-            const response = await fetch(`/api/users/${session.user.id}`,
+            const response = await fetch(`/api/users/${userData._id}`,
                 {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ name, email }),
+                    body: JSON.stringify({ name: userData.name, email: userData.email }),
                 }
             );
 
@@ -96,8 +107,8 @@ export default function SettingsPage() {
                             <Label htmlFor="name">Nom</Label>
                             <Input
                                 id="name"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
+                                value={userData.name || ''}
+                                onChange={(e) => setUserData(prev => prev ? {...prev, name: e.target.value} : null)}
                                 placeholder="Votre nom"
                             />
                         </div>
@@ -106,8 +117,8 @@ export default function SettingsPage() {
                             <Input
                                 id="email"
                                 type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                value={userData.email || ''}
+                                onChange={(e) => setUserData(prev => prev ? {...prev, email: e.target.value} : null)}
                                 placeholder="Votre email"
                             />
                         </div>
@@ -117,6 +128,10 @@ export default function SettingsPage() {
                     </form>
                 </CardContent>
             </Card>
+
+            {userData.role === 'seller' && (
+              <ShippingAddressForm initialData={userData.shippingAddress} />
+            )}
 
             <Card className="mt-6">
                 <CardHeader>

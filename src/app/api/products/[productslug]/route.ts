@@ -116,6 +116,7 @@ export async function GET(
                     currency: offer.currency,
                     stockQuantity: offer.stockQuantity,
                     condition: offer.condition,
+                    transactionStatus: offer.transactionStatus,
                     description: offer.description,
                     images: offer.images,
                 };

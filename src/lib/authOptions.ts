@@ -6,6 +6,8 @@ import bcrypt from "bcryptjs";
 import User, { IUser } from "@/lib/mongodb/models/User";
 import dbConnect from "@/lib/mongodb/dbConnect";
 
+const isProduction = process.env.NODE_ENV === "production";
+
 // Type pour éviter `any` dans le callback session
 type SessionUserWithId = { id?: string; email?: string | null; name?: string | null; image?: string | null };
 
@@ -48,7 +50,7 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 jours
   },
-  pages: { signIn: "/auth/connexion" },
+  pages: { signIn: "/signin" },
   callbacks: {
     async jwt({ token, user, account }) {
       if (account && user) {
@@ -65,30 +67,30 @@ export const authOptions: NextAuthOptions = {
   },
   cookies: {
     sessionToken: {
-      name: `__Secure-next-auth.session-token`,
+      name: isProduction ? `__Secure-next-auth.session-token` : `next-auth.session-token`,
       options: {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        secure: process.env.NODE_ENV === 'production',
+        secure: isProduction,
         maxAge: 30 * 24 * 60 * 60, // 30 jours
       }
     },
     callbackUrl: {
-      name: `__Secure-next-auth.callback-url`,
+      name: isProduction ? `__Secure-next-auth.callback-url` : `next-auth.callback-url`,
       options: {
         sameSite: 'lax',
         path: '/',
-        secure: process.env.NODE_ENV === 'production',
+        secure: isProduction,
       }
     },
     csrfToken: {
-      name: `__Host-next-auth.csrf-token`,
+      name: isProduction ? `__Host-next-auth.csrf-token` : `next-auth.csrf-token`,
       options: {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        secure: process.env.NODE_ENV === 'production',
+        secure: isProduction,
       }
     }
   },

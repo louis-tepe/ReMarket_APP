@@ -1,0 +1,470 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Cours Complet : Intégration de l'API Sendcloud pour Développeurs #
+
+Bienvenue dans ce guide complet pour l'intégration de Sendcloud via son API RESTful. Que vous ayez une boutique en ligne sur mesure, un ERP ou un WMS, ce cours vous donnera les clés pour automatiser entièrement votre processus d'expédition.
+
+## 1\. Introduction à l'API Sendcloud
+
+Sendcloud est une plateforme tout-en-un qui simplifie le processus d'expédition pour les e-commerçants. Alors que de nombreuses plateformes e-commerce peuvent se connecter via des plugins "plug-and-play", l'**API Sendcloud** offre une flexibilité maximale pour une intégration personnalisée.
+
+### **Pourquoi utiliser l'API ?**
+
+  * **Flexibilité Totale** : Concevez votre propre flux de travail logistique, de la création des commandes à l'impression des étiquettes.
+  * **Intégration sur Mesure** : Intégrez les fonctionnalités de Sendcloud directement dans votre système existant (ERP, WMS, application custom).
+  * **Accès Modulaire** : Utilisez uniquement les briques dont vous avez besoin. Vous pouvez gérer les colis via l'API tout en utilisant l'interface (le "Panel") Sendcloud pour la configuration.
+
+### **Les différentes APIs Sendcloud**
+
+L'écosystème Sendcloud se compose de plusieurs APIs spécialisées :
+
+  * **Shipping API** : Le cœur du système. Créez des étiquettes, comparez les tarifs, et générez des documents douaniers.
+  * **Service Points API** : Intégrez une carte de sélection de points relais dans votre checkout.
+  * **Returns API** : Permettez à vos clients de générer leurs propres étiquettes de retour.
+  * **Tracking API** : Récupérez l'historique de suivi détaillé d'un colis.
+  * **Dynamic Checkout API** : Proposez des options de livraison précises (lendemain, jour-même) directement sur votre page de paiement.
+
+-----
+
+## 2\. Démarrage et Authentification
+
+Avant de pouvoir effectuer votre premier appel API, une configuration initiale est nécessaire.
+
+### **Prérequis**
+
+1.  **Créez un compte Sendcloud** : Suivez les étapes de base pour configurer votre compte.
+2.  **Configurez vos adresses** : Ajoutez au moins une adresse d'expéditeur et de retour.
+3.  **Activez des transporteurs** : Dans votre Panel, allez dans `Paramètres > Transporteurs & Tarifs` pour activer les transporteurs que vous souhaitez utiliser.
+4.  **Configurez une méthode de paiement** : Indispensable pour la création d'étiquettes payantes.
+
+### **Obtenir vos Clés API (Authentification)**
+
+Sendcloud utilise une **Authentification Basique (Basic Authentication)**. Vous aurez besoin d'une clé publique et d'une clé secrète.
+
+**Étapes pour générer vos clés :**
+
+1.  Connectez-vous à votre compte Sendcloud.
+2.  Allez dans `Paramètres > Intégrations`.
+3.  Trouvez **"Sendcloud API"** dans la liste et cliquez sur `Connecter`.
+4.  Donnez un nom à votre intégration (ex: "Mon ERP") et sauvegardez.
+5.  Vos clés **Publique (Public Key)** et **Secrète (Secret Key)** seront générées.
+
+\<br\>
+🚨 **Important** : Copiez et conservez votre clé secrète en lieu sûr. Elle n'est visible qu'une seule fois. Si vous la perdez, vous devrez en générer une nouvelle, ce qui invalidera l'ancienne.
+
+### **Comment s'authentifier**
+
+Chaque requête API doit contenir un en-tête `Authorization`. La valeur de cet en-tête est le mot `Basic` suivi d'un jeton encodé en Base64. Ce jeton est la concaténation de votre clé publique, deux-points (`:`), et votre clé secrète.
+
+**Format** : `PublicKey:SecretKey`
+
+**Exemple en cURL :**
+La commande `curl` gère l'encodage pour vous avec l'option `--user`.
+
+```bash
+curl "https://panel.sendcloud.sc/api/v2/parcels" \
+  --user "VOTRE_CLE_PUBLIQUE:VOTRE_CLE_SECRETE"
+```
+
+**Exemple en Python avec la bibliothèque `requests`:**
+La bibliothèque `requests` gère également l'encodage automatiquement.
+
+```python
+import requests
+
+public_key = "VOTRE_CLE_PUBLIQUE"
+private_key = "VOTRE_CLE_SECRETE"
+
+response = requests.get(
+    'https://panel.sendcloud.sc/api/v2/parcels',
+    auth=(public_key, private_key)
+)
+
+print(response.json())
+```
+
+*Note : Sendcloud déploie également l'authentification OAuth2, qui est actuellement en phase bêta.*
+
+-----
+
+## 3\. Le Coeur de l'API : Créer un Colis et une Étiquette
+
+Le flux le plus courant est la création d'un colis (`parcel`) et de son étiquette (`label`).
+
+### **Étape 1 : Créer un objet "Parcel" (sans étiquette)**
+
+Cette première étape enregistre le colis dans Sendcloud sans encore le déclarer au transporteur. Cela vous laisse le temps de le modifier ou de choisir la méthode d'envoi.
+
+On utilise le point de terminaison `POST /api/v2/parcels` avec le paramètre **`request_label` à `false`**.
+
+**Exemple de requête (corps JSON) :**
+
+```json
+{
+    "parcel": {
+        "name": "John Doe",
+        "company_name": "Ma Boutique",
+        "address": "Rue de la République",
+        "house_number": "10",
+        "city": "Paris",
+        "postal_code": "75001",
+        "country": "FR",
+        "email": "client@example.com",
+        "telephone": "+33612345678",
+        "weight": "1.5",
+        "parcel_items": [
+            {
+                "description": "T-Shirt Bleu",
+                "quantity": 1,
+                "weight": "0.5",
+                "value": "25.00",
+                "sku": "TS-BL-M",
+                "hs_code": "610910",
+                "origin_country": "PT"
+            }
+        ],
+        "request_label": false,
+        "apply_shipping_rules": true
+    }
+}
+```
+
+*Notez le `hs_code` (code douanier) et `origin_country`, qui sont cruciaux pour l'international.*
+
+**Réponse de l'API :**
+Si la requête réussit, vous recevrez un statut `HTTP 200` et une réponse contenant l'objet `parcel` créé, avec son **`id` unique**. Le statut du colis sera `"No label"`.
+
+### **Étape 2 : Mettre à jour le colis pour créer l'étiquette**
+
+Une fois que vous êtes prêt à expédier, vous mettez à jour le colis pour demander la création de l'étiquette.
+
+On utilise le point de terminaison `PUT /api/v2/parcels` en fournissant l'**`id` du colis** et en passant **`request_label` à `true`**. Vous pouvez aussi en profiter pour spécifier ou changer la méthode d'envoi (`shipment`).
+
+**Exemple de requête (corps JSON) :**
+
+```json
+{
+    "parcel": {
+        "id": 189169249, // L'ID obtenu à l'étape 1
+        "request_label": true,
+        "shipment": {
+            "id": 8 // ID de la méthode "Unstamped letter" pour les tests
+        }
+    }
+}
+```
+
+**Réponse de l'API :**
+La réponse contiendra l'objet `parcel` mis à jour. Son statut sera passé à `"Ready to send"` et un **numéro de suivi (`tracking_number`)** aura été assigné. Plus important encore, l'objet `label` contiendra les URLs pour télécharger votre étiquette.
+
+### **Étape 3 : Télécharger l'étiquette**
+
+L'objet `label` dans la réponse contient des liens pour télécharger le PDF, généralement au format A6 (pour imprimantes à étiquettes) et A4.
+
+```json
+"label": {
+    "normal_printer": [
+        "https://panel.sendcloud.sc/api/v2/labels/normal_printer/189169249?start_from=0"
+    ],
+    "label_printer": "https://panel.sendcloud.sc/api/v2/labels/label_printer/189169249"
+}
+```
+
+Pour télécharger le fichier, effectuez une requête `GET` sur l'URL de votre choix, en utilisant la même authentification que pour les autres appels.
+
+-----
+
+## 4\. Gérer les Scénarios d'Expédition Spécifiques
+
+### **Expédition Internationale**
+
+Pour les envois hors UE, des documents douaniers sont obligatoires. Sendcloud les génère automatiquement si vous fournissez les bonnes informations lors de la création du colis.
+
+**Champs obligatoires dans `parcel_items` :**
+
+  * `description`: Description claire du produit.
+  * `quantity`: Quantité.
+  * `weight`: Poids en kg.
+  * `value`: Valeur de l'article.
+  * **`hs_code`**: Le code du Système Harmonisé (code douanier) à 6-8 chiffres.
+  * **`origin_country`**: Le pays d'origine du produit (code ISO 2, ex: "FR", "CN").
+
+La réponse pour un envoi international réussi inclura un objet `documents` contenant les liens vers l'étiquette (`label`) et la facture commerciale (`commercial-invoice`).
+
+### **Expéditions Multicolis (Multicollo)**
+
+Pour envoyer plusieurs colis dans un seul envoi, vous avez deux options principales :
+
+1.  **Avec l'API Parcels v2 (plus simple)** :
+    Lors de la création du colis, utilisez le champ `quantity` pour spécifier le nombre de colis. Sendcloud créera autant d'étiquettes avec le même numéro de commande.
+
+    ```json
+    "parcel": {
+        // ... autres champs
+        "quantity": 3,
+        "request_label": true
+    }
+    ```
+
+2.  **Avec l'API Shipments v3 (plus flexible et recommandée)** :
+    Cette API plus récente permet de spécifier les dimensions, le poids et le contenu pour *chaque colis* individuellement dans un tableau `parcels`, ce qui est plus précis et peut réduire les surcoûts.
+
+-----
+
+## 5\. Tester et Automatiser votre Workflow
+
+### **Créer des Étiquettes de Test**
+
+Pour tester votre intégration sans être facturé, utilisez la méthode d'envoi **"Unstamped letter"** (Lettre non affranchie). Son `id` est généralement `8`.
+
+  * Récupérez la liste des méthodes d'envoi (`GET /api/v2/shipping_methods`) pour vous assurer de l'ID.
+  * Utilisez cet ID lors de la création de l'étiquette.
+
+### **Annuler une Étiquette**
+
+Vous pouvez annuler une étiquette (si le transporteur le permet) avant une certaine heure limite (généralement 23:59 le jour de la création).
+
+  * **Endpoint** : `POST /api/v2/parcels/{id}/cancel`
+  * **Réponse** : `{ "status": "cancelled" }`
+
+Si vous annulez une étiquette après la date limite mais qu'elle n'est pas utilisée, le coût vous sera généralement remboursé sur votre facture suivante.
+
+### **Gérer les Limites de Taux (Rate Limiting)**
+
+Pour assurer la stabilité de la plateforme, l'API Sendcloud impose des limites sur le nombre de requêtes :
+
+  * **Requêtes "sûres" (GET)** : 1000 requêtes / minute.
+  * **Requêtes "non sûres" (POST, PUT, DELETE)** : 100 requêtes / minute.
+
+Si vous dépassez ces limites, l'API répondra avec un code d'erreur `HTTP 429 Too Many Requests`. Assurez-vous de gérer cette erreur dans votre code, par exemple en implémentant un mécanisme de pause et de nouvelle tentative (`retry-after`).
+
+-----
+
+## 6\. Glossaire des Termes Clés
+
+  * **Parcel (Colis)** : Un objet de données contenant toutes les informations nécessaires pour une livraison (adresses, poids, contenu). C'est l'entité de base pour créer une étiquette.
+  * **Shipment (Expédition)** : Un objet de données qui représente une commande importée d'une intégration (comme Shopify). Un *shipment* peut être transformé en *parcel*.
+  * **Label (Étiquette)** : Le document généré pour le transporteur, contenant les adresses, le code-barres de suivi, etc.
+  * **Multicollo** : Un envoi composé de plusieurs colis distincts, tous liés et annoncés en même temps.
+  * **HS Code (Code SH)** : Code douanier international utilisé pour classifier les produits lors des expéditions internationales.
+
+
+
+## 7. Récupérer les Méthodes d'Envoi et les Tarifs
+
+Pour créer une étiquette, vous devez spécifier la méthode d'envoi. Plutôt que de coder en dur des identifiants, il est essentiel de les récupérer dynamiquement via l'API.
+
+🚨 **Important** : Les ID des méthodes d'envoi (`shipping_method_id`) sont volatils. Ne les mettez jamais en cache pour plus d'une heure.
+
+### **Obtenir la Liste des Méthodes d'Envoi**
+
+Pour obtenir la liste des méthodes d'envoi disponibles en fonction des transporteurs que vous avez activés et de votre adresse d'expéditeur, utilisez le point de terminaison `GET /api/v2/shipping_methods`.
+
+**Facteurs influençant la réponse :**
+* Les transporteurs activés dans votre compte.
+* Vos contrats transporteurs directs (si vous en avez).
+* L'adresse d'expéditeur (`sender_address`). Si non spécifiée, l'adresse par défaut est utilisée.
+
+**Exemple de requête (pour une adresse d'expéditeur en France) :**
+```bash
+curl --location --request GET 'https://panel.sendcloud.sc/api/v2/shipping_methods?sender_address=ID_ADRESSE_FRANCE' \
+--user "VOTRE_CLE_PUBLIQUE:VOTRE_CLE_SECRETE"
+```
+
+**Réponse (extrait) :**
+```json
+{
+    "shipping_methods": [
+        {
+            "id": 1490,
+            "name": "Chrono Classic 23-24kg",
+            "carrier": "chronopost",
+            "min_weight": "23.001",
+            "max_weight": "24.001",
+            "price": 0, // Le prix de base, consulter l'objet 'countries' pour le détail
+            "countries": [
+                {
+                    "id": 1,
+                    "name": "Belgium",
+                    "price": 40.0,
+                    "iso_2": "BE"
+                }
+            ]
+        }
+    ]
+}
+```
+Vous utiliserez l'**`id`** (ici, `1490`) dans vos requêtes de création de colis.
+
+### **Filtrer les Méthodes d'Envoi**
+
+* **Pour les retours** : Ajoutez le paramètre `is_return=true`.
+* **Pour la livraison en point relais** : Ajoutez le paramètre `service_point_id={id_du_point_relais}`.
+
+### **Obtenir les Tarifs d'Expédition**
+
+Pour connaître le prix d'un envoi spécifique sans créer de colis, utilisez le point de terminaison `GET /api/v2/shipping-price`.
+
+**Paramètres requis :**
+* `shipping_method_id` : L'ID de la méthode.
+* `from_country` : Pays d'expédition.
+* `to_country` : Pays de destination.
+* `weight` : Poids du colis.
+* `weight_unit` : `kilogram` ou `gram`.
+
+**Exemple de requête :**
+```bash
+curl "https://panel.sendcloud.sc/api/v2/shipping-price?shipping_method_id=3&from_country=NL&to_country=FR&weight=2&weight_unit=kilogram" \
+--user "VOTRE_CLE_PUBLIQUE:VOTRE_CLE_SECRETE"
+```
+
+**Réponse :**
+```json
+[
+    {
+        "price": "12.00",
+        "currency": "EUR",
+        "to_country": "FR"
+    }
+]
+```
+
+---
+
+## 8. Automatiser et Optimiser Votre Workflow
+
+### **Les Règles d'Expédition (Shipping Rules)**
+
+Les règles d'expédition, configurées dans le Panel Sendcloud, sont un puissant outil d'automatisation. Elles permettent d'appliquer des actions (ex: "expédier avec Colissimo", "assurer pour 100€") en fonction de conditions (ex: "si le pays est l'Espagne", "si le poids est > 5kg").
+
+Vous pouvez déclencher ces règles via l'API en passant le paramètre **`apply_shipping_rules` à `true`** lors de la création d'un colis.
+
+**Comment ça marche :**
+1.  Créez une règle dans votre Panel. Par exemple : `SI [Pays de destination] est [Pays-Bas], ALORS [Expédier avec] [PostNL Standard]`.
+2.  Lors de la création du colis via l'API, envoyez la requête avec `apply_shipping_rules: true`.
+3.  Même si vous spécifiez une autre méthode d'envoi dans la requête, la règle aura la priorité et appliquera `PostNL Standard`.
+
+C'est une excellente façon de centraliser votre logique métier dans le Panel Sendcloud tout en utilisant l'API pour pousser les commandes.
+
+### **Planifier des Enlèvements (Pickups)**
+
+Si vous avez besoin qu'un transporteur vienne collecter vos colis, vous pouvez planifier un enlèvement ponctuel via `POST /api/v3/pickups`.
+
+**Exemple de requête pour un enlèvement :**
+```json
+{
+    "address": {
+        "name": "John Doe",
+        "company_name": "Mon Entreprise",
+        "country_code": "FR",
+        "city": "Paris",
+        "address_line_1": "10 Rue du Faubourg Saint-Honoré",
+        "postal_code": "75008",
+        "phone_number": "+33123456789"
+    },
+    "time_slots": [
+        {
+            "start_at": "2025-06-18T12:00:00Z",
+            "end_at": "2025-06-18T17:00:00Z"
+        }
+    ],
+    "items": [
+        {
+            "quantity": 20,
+            "container_type": "parcel",
+            "total_weight": { "value": "15.00", "unit": "kg" }
+        }
+    ],
+    "carrier_code": "dhl_express"
+}
+```
+
+### **Utiliser Pack & Go**
+
+Pour les entrepôts à haut volume, vous pouvez utiliser l'API pour créer des centaines de colis avec `request_label: false`. Ces colis apparaîtront dans l'interface "Pack & Go" du Panel Sendcloud, où les opérateurs pourront simplement scanner les bons de préparation pour imprimer les étiquettes en masse.
+
+---
+
+## 9. Gérer les Retours
+
+Une bonne gestion des retours est cruciale. Sendcloud propose plusieurs façons de les automatiser via l'API. La plus complète est l'**API du Portail de Retour**.
+
+### **Le Flux de l'API du Portail de Retour**
+
+Cette API est conçue pour que vous puissiez construire votre propre page de retour personnalisée. Elle utilise une authentification **JWT** temporaire, car elle peut être exposée à vos clients finaux.
+
+1.  **Rechercher le colis sortant** : Le client saisit son code postal et son numéro de suivi (ou de commande) sur votre portail. Vous utilisez ces informations pour appeler `GET /api/v2/brand/{brand_domain}/return-portal/outgoing`.
+2.  **Obtenir un jeton d'accès** : Si la recherche est fructueuse, l'API retourne les détails du colis original ainsi que deux jetons : `access_token` (pour créer le retour) et `service_points_token` (pour chercher des points de dépôt).
+3.  **Créer le retour** : Utilisez l'`access_token` pour appeler `POST /brand/{brand_domain}/return-portal/incoming`. Dans cette requête, vous spécifiez la raison du retour et la méthode choisie par le client.
+4.  **Télécharger l'étiquette de retour** : La réponse contient une URL de "polling". Vous devez interroger cette URL jusqu'à ce qu'elle retourne un statut `200 OK` avec le fichier PDF de l'étiquette.
+
+### **Les Différentes Méthodes de Retour**
+
+Dans la requête de création de retour, vous pouvez spécifier la `delivery_option` :
+* `"drop_off_point"`: Le client dépose le colis dans un point relais.
+* `"pickup"`: Un transporteur vient chercher le colis chez le client.
+* `"in_store"`: Le client retourne l'article dans un de vos magasins physiques (pas d'étiquette générée).
+* `"drop_off_labelless"`: Le client reçoit un QR code à présenter au point de dépôt, sans avoir besoin d'imprimer l'étiquette.
+
+---
+
+## 10. Intégrer les Points Relais (Service Points)
+
+Offrir la livraison en point relais améliore la satisfaction client. Voici comment l'intégrer.
+
+1.  **Activer les points relais** : Dans les paramètres de votre intégration API dans le Panel Sendcloud, cochez la case "Activer les points relais" et sélectionnez les transporteurs concernés.
+2.  **Rechercher des points relais** : Utilisez `GET /api/v2/service-points` pour trouver les points relais proches d'une adresse ou d'un code postal.
+    ```bash
+    curl "https://servicepoints.sendcloud.sc/api/v2/service-points?country=FR&postal_code=75001&radius=2000"
+    ```
+3.  **Obtenir les méthodes d'envoi compatibles** : La réponse vous donne une liste de points relais, chacun avec un `id` unique. Utilisez cet `id` pour trouver les méthodes d'envoi qui peuvent livrer à ce point spécifique.
+    ```bash
+    curl "https://panel.sendcloud.sc/api/v2/shipping_methods/?service_point_id=10659026"
+    ```
+4.  **Créer le colis** : Effectuez votre appel `POST /api/v2/parcels` en incluant :
+    * L'ID du point relais dans le champ `to_service_point`.
+    * L'ID de la méthode d'envoi compatible dans l'objet `shipment`.
+
+---
+
+## 11. Suivre Vos Colis (Tracking)
+
+Avec l'API Tracking, vous pouvez récupérer l'historique complet d'un colis et l'afficher dans votre propre interface.
+
+* **Endpoint** : `GET /api/v2/tracking/{tracking_number}`
+* **Réponse** : Vous recevrez un objet JSON contenant les informations du colis et un tableau `statuses` avec chaque étape du suivi, de l'annonce (`announcing`) à la livraison (`delivered`). Le champ `parent_status` standardise les statuts des différents transporteurs.
+
+En alternative, vous pouvez simplement utiliser le lien `sendcloud_tracking_url` fourni dans la réponse, qui redirige vers la page de suivi personnalisable de Sendcloud.
+
+---
+
+## 12. Pour les Marketplaces : Quel Modèle d'Intégration Choisir ?
+
+Sendcloud propose des modèles spécifiques si vous êtes une marketplace.
+
+* **Modèle Centralisé**
+    * **Qui ?** La marketplace possède un seul compte Sendcloud.
+    * **Comment ?** Elle crée les étiquettes pour le compte de ses vendeurs via l'API, en utilisant les champs `from_address_*` pour spécifier l'adresse du vendeur.
+    * **Avantages :** Contrôle total, branding unifié, facturation centralisée. Idéal pour les marketplaces C2C.
+
+* **Modèle Décentralisé**
+    * **Qui ?** Chaque vendeur a son propre compte Sendcloud.
+    * **Comment ?** La marketplace se connecte à l'API de chaque vendeur (via leurs clés API) pour simplement pousser les commandes dans leur compte Sendcloud (`request_label: false`). Le vendeur gère ensuite ses envois depuis son propre Panel.
+    * **Avantages :** Très scalable, moins de support pour la marketplace, les vendeurs peuvent utiliser leurs propres contrats transporteurs. Idéal pour les marketplaces B2B/B2C avec des vendeurs à fort volume.
+
+* **Modèle Hybride**
+    * Un mélange des deux. Offre la simplicité du modèle centralisé pour les petits vendeurs et la flexibilité du modèle décentralisé pour les gros vendeurs. C'est la solution la plus complète mais aussi la plus complexe à développer.
+
+---
+
+## 13. API v3 et le Futur : l'API Orders
+
+Sendcloud développe activement sa **V3 de l'API**, qui est plus structurée et sépare mieux les concepts. Le flux principal devient :
+
+1.  **Créer une Commande** : D'abord, vous créez une entité "Commande" avec toutes ses informations (produits, adresses, etc.) via `POST /api/v3/orders`.
+2.  **Expédier la Commande** : Ensuite, vous appelez un point de terminaison dédié pour créer l'étiquette pour cette commande existante, soit de manière asynchrone (pour les lots), soit synchrone (pour une seule étiquette).
+
+Ce modèle est plus robuste et est la direction que prend Sendcloud pour le futur.

@@ -22,6 +22,8 @@ import {
     Search,
     ShoppingCart,
     MessageCircle,
+    User,
+    Tag,
 } from "lucide-react";
 import Image from "next/image";
 import { useCategoriesNavigation } from "@/hooks/useCategoriesNavigation";
@@ -67,7 +69,7 @@ export default function Header() {
             return (
                 <Button asChild>
                     <Link href="/signin">
-                        <LogIn className="mr-2 h-4 w-4" /> Se connecter
+                        <LogIn className="mr-2 h-4 w-4" /> Connexion
                     </Link>
                 </Button>
             );
@@ -76,17 +78,16 @@ export default function Header() {
             return (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="rounded-full h-9 w-9 p-0">
+                        <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                             {session.user.image ? (
                                 <Image
                                     src={session.user.image}
                                     alt={session.user.name || "Avatar utilisateur"}
-                                    width={36}
-                                    height={36}
-                                    className="rounded-full"
+                                    fill
+                                    className="rounded-full object-cover"
                                 />
                             ) : (
-                                <UserCircle className="h-7 w-7 text-muted-foreground" />
+                                <User className="h-6 w-6" />
                             )}
                         </Button>
                     </DropdownMenuTrigger>
@@ -146,6 +147,11 @@ export default function Header() {
                     <Button variant="ghost" size="icon" asChild>
                         <Link href="/account/cart" aria-label="Panier">
                             <ShoppingCart className="h-5 w-5" />
+                        </Link>
+                    </Button>
+                    <Button variant="ghost" size="icon" asChild>
+                        <Link href="/account/sell" aria-label="Vendre un article">
+                            <Tag className="h-5 w-5" />
                         </Link>
                     </Button>
                     <Button variant="ghost" size="icon" asChild>

@@ -13,8 +13,8 @@ export interface ProductCardProps {
     slug: string;
     name: string;
     imageUrl?: string;
-    price: number;
-    offerCount?: number; // Nombre d'offres pour ce modèle de produit
+    price?: number; // Rendu optionnel
+    minPrice?: number; // Ajout de minPrice
     className?: string;
     initialIsFavorite?: boolean; // Nouvel état initial
     onFavoriteToggle?: (productId: string, isFavorite: boolean) => void;
@@ -43,7 +43,7 @@ export default function ProductCard({
     name,
     imageUrl,
     price,
-    offerCount,
+    minPrice, // Récupération de minPrice
     className,
     initialIsFavorite = false,
     onFavoriteToggle
@@ -68,6 +68,8 @@ export default function ProductCard({
         event.stopPropagation();
         await toggleFavorite();
     };
+
+    const displayPrice = price ?? minPrice;
 
     let correctedImageUrl = imageUrl;
     if (correctedImageUrl?.startsWith('https//')) {
@@ -140,22 +142,11 @@ export default function ProductCard({
                     {name || "Produit non disponible"}
                 </h3>
 
-                {/* OPTIMISATION: Affichage optimisé du nombre d'offres */}
-                {offerCount !== undefined && (
-                    <p className={cn(
-                        "text-xs mt-0.5 sm:mt-1 transition-colors",
-                        offerCount > 0 ? "text-muted-foreground" : "text-red-500"
-                    )}>
-                        {offerCount > 0
-                            ? `${offerCount} offre${offerCount > 1 ? 's' : ''} disponible${offerCount > 1 ? 's' : ''}`
-                            : "Aucune offre pour le moment"
-                        }
-                    </p>
-                )}
-
                 <div className="mt-auto pt-2 sm:pt-3 flex justify-between items-center">
                     <p className="text-lg sm:text-xl font-bold text-primary">
-                        {price > 0 ? `${price.toLocaleString('fr-FR')} €` : 'Sur devis'}
+                        {displayPrice && displayPrice > 0 
+                            ? `À partir de ${displayPrice.toLocaleString('fr-FR')} €` 
+                            : 'Prix non disponible'}
                     </p>
                 </div>
             </div>

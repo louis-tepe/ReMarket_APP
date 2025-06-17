@@ -32,7 +32,7 @@ interface InitialProduct {
     slug: string;
     title: string;
     standardImageUrls?: string[];
-    sellerOffers?: { price: number }[];
+    minPrice?: number;
 }
 
 interface CategoryClientPageProps {
@@ -80,18 +80,13 @@ export default function CategoryClientPage({
     });
 
     const products = useMemo(() =>
-        initialProducts.map((product) => {
-            const offers = product.sellerOffers || [];
-            const cheapestOffer = offers.length > 0 ? offers.reduce((min, p) => p.price < min.price ? p : min, offers[0]) : null;
-            return {
-                id: product._id.toString(),
-                slug: product.slug || product._id.toString(),
-                name: product.title,
-                imageUrl: product.standardImageUrls?.[0],
-                price: cheapestOffer?.price || 0,
-                offerCount: offers.length,
-            };
-        }), [initialProducts]);
+        initialProducts.map((product) => ({
+            id: product._id.toString(),
+            slug: product.slug || product._id.toString(),
+            name: product.title,
+            imageUrl: product.standardImageUrls?.[0],
+            minPrice: product.minPrice,
+        })), [initialProducts]);
         
     const [favoriteProductIds, setFavoriteProductIds] = useState<string[]>([]);
     const [fetchError, setFetchError] = useState<string | null>(null);

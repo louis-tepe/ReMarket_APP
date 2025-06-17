@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';
 import dbConnect from '@/lib/mongodb/dbConnect';
-import CartModel from '@/lib/mongodb/models/CartModel';
+
+// Forcer l'enregistrement des schémas avant toute utilisation
+import '@/lib/mongodb/models/User';
+import '@/lib/mongodb/models/CategoryModel';
+import ProductModel from '@/lib/mongodb/models/ScrapingProduct';
 import ProductOfferModel from '@/lib/mongodb/models/SellerProduct';
+import CartModel from '@/lib/mongodb/models/CartModel';
+
 import { LeanCart as GlobalLeanCart, LeanCartItem } from "@/types/cart";
 import { Types } from 'mongoose';
 
@@ -73,23 +79,37 @@ export async function GET() {
     try {
         await dbConnect();
         const cart = await CartModel.findOne({ user: userId })
-            .populate<{ items: { offer: PopulatedOfferForCartItem, productModel: PopulatedProductModelForCartItem }[] }>([
+            .populate([
                 {
                     path: 'items.offer',
                     model: ProductOfferModel,
-                    select: '_id price seller',
-                    populate: { path: 'seller', select: '_id name username' }
-                },
-                { path: 'items.productModel', select: '_id title standardImageUrls slug' }
+                    select: '_id price seller images productModel stockQuantity condition',
+                    populate: [
+                        { path: 'seller', select: '_id name username' },
+                        {
+                            path: 'productModel',
+                            model: ProductModel,
+                            select: '_id title standardImageUrls slug'
+                        }
+                    ]
+                }
             ])
-            .lean<LeanCart | null>();
+            .lean<any>(); // Utiliser 'any' pour la transformation
 
         if (!cart || !cart.items) {
             return NextResponse.json({ success: true, data: { items: [], count: 0, total: 0 } });
         }
 
-        const { total, count } = calculateCartTotals(cart.items);
-        return NextResponse.json({ success: true, data: { ...cart, count, total } });
+        const transformedItems = cart.items.map((item: any) => ({
+            ...item,
+            productModel: item.offer.productModel,
+        }));
+
+        const { total, count } = calculateCartTotals(transformedItems);
+        
+        const finalData = { ...cart, items: transformedItems, count, total };
+
+        return NextResponse.json({ success: true, data: finalData });
 
     } catch (error) {
         console.error('[API_CART_GET]', error);
@@ -155,12 +175,7 @@ export async function POST(request: NextRequest) {
                 if (!cartItemId || !Types.ObjectId.isValid(cartItemId)) {
                     return NextResponse.json({ success: false, message: 'ID d\'article invalide.' }, { status: 400 });
                 }
-                // S'assurer que cart n'est pas null ici, ce qui est géré par la vérification initiale
-                const itemToRemove = cart!.items.find(item => item._id.equals(cartItemId)); 
-                if (!itemToRemove) {
-                    return NextResponse.json({ success: false, message: 'Article non trouvé.' }, { status: 404 });
-                }
-                await cart!.removeItem(cartItemId);
+                await cart.removeItem(cartItemId);
                 message = 'Article supprimé.';
                 break;
 
@@ -168,23 +183,8 @@ export async function POST(request: NextRequest) {
                 if (!cartItemId || !Types.ObjectId.isValid(cartItemId) || typeof quantity !== 'number' || quantity <= 0) {
                     return NextResponse.json({ success: false, message: "Données invalides pour la mise à jour." }, { status: 400 });
                 }
-                // S'assurer que cart n'est pas null
-                const itemToUpdate = cart!.items.find(item => item._id.equals(cartItemId));
-                if (!itemToUpdate) {
-                    return NextResponse.json({ success: false, message: 'Article non trouvé pour mise à jour.' }, { status: 404 });
-                }
                 
-                // Check stock for update
-                const offerForUpdate = await ProductOfferModel.findById(itemToUpdate.offer)
-                    .select('stockQuantity transactionStatus')
-                    .lean<{ stockQuantity: number, transactionStatus: string } | null>();
-
-                if (!offerForUpdate || offerForUpdate.transactionStatus !== 'available' || offerForUpdate.stockQuantity < quantity) {
-                    return NextResponse.json({ success: false, message: 'Stock insuffisant ou offre non disponible.' }, { status: 400 });
-                }
-                
-                itemToUpdate.quantity = quantity;
-                await cart!.save();
+                await cart.updateItemQuantity(cartItemId, quantity);
                 message = 'Quantité mise à jour.';
                 break;
 
@@ -200,23 +200,34 @@ export async function POST(request: NextRequest) {
         
         // Récupérer l'état final du panier pour la réponse
         const finalCartState = await CartModel.findOne({ user: userId })
-            .populate<{ items: { offer: PopulatedOfferForCartItem, productModel: PopulatedProductModelForCartItem }[] }>([
-                { 
-                    path: 'items.offer', 
-                    model: ProductOfferModel, 
-                    select: '_id price seller', 
-                    populate: { path: 'seller', select: '_id name username' } 
+            .populate([
+                {
+                    path: 'items.offer',
+                    model: ProductOfferModel,
+                    select: '_id price seller images productModel stockQuantity condition',
+                    populate: [
+                        { path: 'seller', select: '_id name username' },
+                        {
+                            path: 'productModel',
+                            model: ProductModel,
+                            select: '_id title standardImageUrls slug'
+                        }
+                    ]
                 },
-                { path: 'items.productModel', select: '_id title standardImageUrls slug' }
             ])
-            .lean<LeanCart | null>();
+            .lean<any>();
             
-        const { total, count } = calculateCartTotals(finalCartState?.items || []);
+        const transformedItems = finalCartState?.items.map((item: any) => ({
+            ...item,
+            productModel: item.offer.productModel,
+        }));
+
+        const { total, count } = calculateCartTotals(transformedItems || []);
 
         return NextResponse.json({ 
             success: true, 
             message: message, 
-            data: { items: finalCartState?.items || [], count, total } 
+            data: { items: transformedItems || [], count, total } 
         }, { status: 200 });
 
     } catch (error) {

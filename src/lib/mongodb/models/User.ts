@@ -1,5 +1,17 @@
 import mongoose, { Schema, Document, models, Model as MongooseModel, Types } from 'mongoose';
 
+// Interface pour l'adresse de livraison/expédition
+export interface IShippingAddress {
+  companyName?: string;
+  name: string;
+  address: string;
+  houseNumber: string;
+  city: string;
+  postalCode: string;
+  country: string; // ISO 2 Code, e.g., 'FR'
+  telephone?: string;
+}
+
 // Interface pour le document User
 export interface IUser extends Document {
   _id: Types.ObjectId; // ID unique de l'utilisateur
@@ -10,9 +22,22 @@ export interface IUser extends Document {
   emailVerified?: Date | null; // Date de vérification de l'email
   role: 'user' | 'seller' | 'admin'; // Rôle de l'utilisateur sur la plateforme
   favorites: Types.ObjectId[]; // IDs des ProductModels favoris
+  shippingAddress?: IShippingAddress; // Adresse d'expédition du vendeur
+  sendcloudSenderId?: number; // ID de l'adresse d'expéditeur chez Sendcloud
   createdAt: Date;
   updatedAt: Date;
 }
+
+const ShippingAddressSchema: Schema<IShippingAddress> = new Schema({
+  companyName: { type: String, trim: true },
+  name: { type: String, required: true, trim: true },
+  address: { type: String, required: true, trim: true },
+  houseNumber: { type: String, required: true, trim: true },
+  city: { type: String, required: true, trim: true },
+  postalCode: { type: String, required: true, trim: true },
+  country: { type: String, required: true, trim: true },
+  telephone: { type: String, trim: true },
+}, { _id: false });
 
 const UserSchema: Schema<IUser> = new Schema(
   {
@@ -57,6 +82,14 @@ const UserSchema: Schema<IUser> = new Schema(
         ref: 'ProductModel', // Réf. à ProductModel
       },
     ],
+    shippingAddress: {
+      type: ShippingAddressSchema,
+      required: false,
+    },
+    sendcloudSenderId: {
+      type: Number,
+      required: false,
+    }
   },
   {
     timestamps: true, 

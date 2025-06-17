@@ -150,6 +150,7 @@ export async function searchProducts(filters: SearchFilters): Promise<ProductSea
         minPrice: { $ifNull: [{ $min: "$sellerOffers.price" }, null] },
       },
     },
+    { $match: { minPrice: { $ne: null } } },
     {
       $project: {
         _id: 1,
