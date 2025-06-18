@@ -9,15 +9,32 @@ import CategoryModel, { ICategory } from '@/lib/mongodb/models/CategoryModel';
 import ProductModel from '@/lib/mongodb/models/ScrapingProduct';
 import User from '@/lib/mongodb/models/User';
 import { analyzeImageCondition, ImagePart } from '@/services/ai/geminiService';
-import { getProductOfferDiscriminator } from '@/lib/mongodb/models/discriminators';
 import { OfferCreationSchema } from '@/lib/validators/offer';
 import { ZodError } from 'zod';
+import mongoose from 'mongoose';
 
 // Importer les modèles discriminateurs pour s'assurer qu'ils sont enregistrés auprès de Mongoose
-// Commenté car discriminators.ts devrait gérer l'enregistrement via ses imports.
-// import '@/models/discriminators/SmartphoneModel';
-// import '@/models/discriminators/LaptopModel';
-// Ajoutez d'autres imports de discriminateurs ici au fur et à mesure de leur création
+import '@/lib/mongodb/models/discriminators/CasesCoversModel';
+import '@/lib/mongodb/models/discriminators/ChargersCablesModel';
+import '@/lib/mongodb/models/discriminators/CpuModel';
+import '@/lib/mongodb/models/discriminators/DesktopComputerModel';
+import '@/lib/mongodb/models/discriminators/FeaturePhoneModel';
+import '@/lib/mongodb/models/discriminators/FitnessTrackerModel';
+import '@/lib/mongodb/models/discriminators/GameConsoleModel';
+import '@/lib/mongodb/models/discriminators/GpuModel';
+import '@/lib/mongodb/models/discriminators/KeyboardModel';
+import '@/lib/mongodb/models/discriminators/LaptopModel';
+import '@/lib/mongodb/models/discriminators/MonitorModel';
+import '@/lib/mongodb/models/discriminators/MotherboardModel';
+import '@/lib/mongodb/models/discriminators/PcCaseModel';
+import '@/lib/mongodb/models/discriminators/PowerBanksModel';
+import '@/lib/mongodb/models/discriminators/PsuModel';
+import '@/lib/mongodb/models/discriminators/RamModel';
+import '@/lib/mongodb/models/discriminators/ScreenProtectorsModel';
+import '@/lib/mongodb/models/discriminators/SmartphoneModel';
+import '@/lib/mongodb/models/discriminators/SmartwatchModel';
+import '@/lib/mongodb/models/discriminators/StorageModel';
+import '@/lib/mongodb/models/discriminators/TabletModel';
 
 /**
  * @swagger
@@ -148,6 +165,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Catégorie feuille invalide ou non spécifiée par 'kind'." }, { status: 400 });
     }
 
+    const DiscriminatorModel = mongoose.models[kind] || ProductOfferModel;
+    
     const productModelDoc = await ProductModel.findById(productModelId).lean(); // .lean() pour performance
     if (!productModelDoc) {
       return NextResponse.json({ success: false, message: "Modèle de produit ReMarket non trouvé." }, { status: 404 });
@@ -205,7 +224,6 @@ export async function POST(request: NextRequest) {
       ...(visualConditionRawResponse && { visualConditionRawResponse }),
     };
 
-    const DiscriminatorModel = getProductOfferDiscriminator(newOfferData.kind);
     const newOffer = new DiscriminatorModel(newOfferData);
     await newOffer.save();
 

@@ -1,8 +1,9 @@
 import React from 'react';
+import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, Loader2 } from "lucide-react";
+import { ShoppingCart, Loader2, Zap } from "lucide-react";
 import { Offer } from '../types';
 
 interface SellerOfferCardProps {
@@ -66,20 +67,27 @@ export default function SellerOfferCard({
                     <p className="text-sm text-muted-foreground leading-relaxed">{offer.description}</p>
                 </CardContent>
             )}
-            <CardFooter>
+            <CardFooter className="flex flex-col sm:flex-row gap-2">
                 <Button
-                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                    className="w-full"
+                    variant="outline"
                     onClick={() => onAddToCart(offer)}
                     disabled={!isOfferAvailable || isAddingToCart || !isUserLoggedIn || sessionLoading}
-                    aria-label={isOfferAvailable ? "Ajouter au panier" : "Offre non disponible"}
                 >
                     {isAddingToCart ? (
                         <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Ajout...</>
-                    ) : isOfferAvailable ? (
-                        <><ShoppingCart className="mr-2 h-5 w-5" /> Ajouter au panier</>
                     ) : (
-                        <>Indisponible</>
+                        <><ShoppingCart className="mr-2 h-5 w-5" /> Ajouter au panier</>
                     )}
+                </Button>
+                <Button
+                    asChild
+                    className="w-full"
+                    disabled={!isOfferAvailable || !isUserLoggedIn || sessionLoading}
+                >
+                    <Link href={`/checkout?amount=${offer.price}&offerId=${offer._id}`}>
+                        <Zap className="mr-2 h-5 w-5" /> Acheter maintenant
+                    </Link>
                 </Button>
             </CardFooter>
         </Card>

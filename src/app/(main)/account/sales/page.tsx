@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import Link from 'next/link';
 import Image from 'next/image';
-import { Edit3, Trash2, PlusCircle, AlertTriangle, Info, Package, Loader2 } from 'lucide-react';
+import { Edit3, Trash2, PlusCircle, AlertTriangle, Info, Package, Loader2, Download } from 'lucide-react';
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from 'sonner';
 import type { SellerOffer } from './types';
@@ -44,6 +44,7 @@ const getStatusBadgeVariant = (status: SellerOffer['status']): 'default' | 'dest
     switch (status) {
         case 'available': return 'default';
         case 'sold': return 'destructive';
+        case 'shipped': return 'secondary';
         case 'pending_shipment': return 'outline';
         case 'archived': return 'secondary';
         default: return 'default';
@@ -270,19 +271,20 @@ export default function SellerDashboardPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="hidden sm:table-cell w-[64px] px-2">Image</TableHead>
+                                    <TableHead className="hidden sm:table-cell w-[80px]">Image</TableHead>
                                     <TableHead>Produit</TableHead>
-                                    <TableHead className="text-right hidden md:table-cell">Prix</TableHead>
+                                    <TableHead className="hidden md:table-cell">Prix</TableHead>
                                     <TableHead className="hidden md:table-cell">État</TableHead>
                                     <TableHead>Statut</TableHead>
                                     <TableHead className="hidden lg:table-cell">Mise en vente</TableHead>
-                                    <TableHead className="text-right px-2">Actions</TableHead>
+                                    <TableHead>Actions d'expédition</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {offers.map((offer) => (
+                                {offers.filter(offer => offer && offer.id).map((offer) => (
                                     <TableRow key={offer.id}>
-                                        <TableCell className="hidden sm:table-cell px-2">
+                                        <TableCell className="hidden sm:table-cell">
                                             {offer.productModel.imageUrl ? (
                                                 <Image src={offer.productModel.imageUrl} alt={offer.productModel.name} width={48} height={48} className="h-12 w-12 object-cover rounded-md border" />
                                             ) : (
@@ -299,39 +301,55 @@ export default function SellerDashboardPage() {
                                                 {offer.price.toLocaleString('fr-FR', { style: 'currency', currency: offer.currency })} - {CONDITIONS_MAP[offer.condition] || offer.condition}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-right hidden md:table-cell">{offer.price.toLocaleString('fr-FR', { style: 'currency', currency: offer.currency })}</TableCell>
+                                        <TableCell className="hidden md:table-cell">{offer.price.toLocaleString('fr-FR', { style: 'currency', currency: offer.currency })}</TableCell>
                                         <TableCell className="hidden md:table-cell">{CONDITIONS_MAP[offer.condition] || offer.condition}</TableCell>
                                         <TableCell>
-                                            <Badge variant={getStatusBadgeVariant(offer.status)} className="capitalize text-xs whitespace-nowrap">
-                                                {STATUS_MAP[offer.status] || offer.status}
-                                            </Badge>
+                                            <Badge variant={getStatusBadgeVariant(offer.status)}>{STATUS_MAP[offer.status] || offer.status}</Badge>
                                         </TableCell>
                                         <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">{new Date(offer.createdAt).toLocaleDateString('fr-FR')}</TableCell>
-                                        <TableCell className="text-right px-2">
-                                            <div className="flex justify-end items-center space-x-1 sm:space-x-2">
-                                                {(offer.status === 'available' || offer.status === 'archived') && (
-                                                    <Button variant="ghost" size="icon" onClick={() => handleModifyOffer(offer.id)} title="Modifier l'offre">
+                                        <TableCell>
+                                            {(() => {
+                                                if (offer.status === 'pending_shipment') {
+                                                    if (offer.shippingInfo?.labelUrl) {
+                                                        return (
+                                                            <Button asChild size="sm">
+                                                                <a href={offer.shippingInfo.labelUrl} target="_blank" rel="noopener noreferrer">
+                                                                    <Download className="mr-2 h-4 w-4" />
+                                                                    Étiquette
+                                                                </a>
+                                                            </Button>
+                                                        )
+                                                    } else {
+                                                        return (
+                                                            <Badge variant="destructive" className="text-xs whitespace-nowrap">
+                                                                <AlertTriangle className="mr-1 h-3 w-3" />
+                                                                Erreur
+                                                            </Badge>
+                                                        )
+                                                    }
+                                                }
+                                                return <span className="text-muted-foreground text-xs">N/A</span>
+                                            })()}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {(offer.status === 'available' || offer.status === 'archived') ? (
+                                                <div className="flex justify-end space-x-2">
+                                                    <Button variant="outline" size="icon" onClick={() => handleModifyOffer(offer.id)} aria-label="Modifier">
                                                         <Edit3 className="h-4 w-4" />
                                                     </Button>
-                                                )}
-                                                {(offer.status === 'available' || offer.status === 'archived') && (
                                                     <Button
-                                                        variant="ghost"
+                                                        variant="destructive"
                                                         size="icon"
                                                         onClick={() => handleDeleteOffer(offer.id)}
-                                                        title="Supprimer l'offre"
-                                                        className="text-destructive hover:text-destructive/90"
                                                         disabled={deletingOffers[offer.id]}
+                                                        aria-label="Supprimer"
                                                     >
-                                                        {deletingOffers[offer.id] ? (
-                                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                                        ) : (
-                                                            <Trash2 className="h-4 w-4" />
-                                                        )}
+                                                        {deletingOffers[offer.id] ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                                                     </Button>
-                                                )}
-                                                {/* Ajouter d'autres actions si nécessaire, ex: voir l'annonce publique */}
-                                            </div>
+                                                </div>
+                                            ) : (
+                                               <span className="text-muted-foreground">-</span>
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ))}

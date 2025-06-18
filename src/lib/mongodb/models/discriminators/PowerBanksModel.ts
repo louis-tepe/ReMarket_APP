@@ -1,49 +1,38 @@
 import { Schema, models, Model } from 'mongoose';
 import ProductOfferModel, { IProductBase } from '../SellerProduct';
+import { KINDS } from '@/config/discriminatorMapping';
 
-export interface IPowerBankOffer extends IProductBase {
+export interface IPowerBanksOffer extends IProductBase {
   capacity_mah: number;
-  outputPorts?: number; // Nombre de ports de sortie
-  inputPorts?: string; // Type de port d'entrée (ex: USB-C, Micro-USB)
-  weight_g?: number;
+  outputPorts: string[]; // Ex: ["USB-A", "USB-C"]
+  features?: ('Fast-Charging' | 'Wireless-Charging')[];
   color?: string;
 }
 
-const PowerBankSchema = new Schema<IPowerBankOffer>(
-  {
-    capacity_mah: {
-      type: Number,
-      required: [true, "La capacité de la batterie externe est obligatoire."],
-      min: [0, "La capacité doit être positive."],
-    },
-    outputPorts: {
-      type: Number,
-      min: [1, "Il doit y avoir au moins un port de sortie."],
-    },
-    inputPorts: {
-      type: String,
-      trim: true,
-    },
-    weight_g: {
-      type: Number,
-      min: [0, "Le poids doit être positif."],
-    },
-    color: {
-      type: String,
-      trim: true,
-    },
-  }
-);
+const PowerBanksSchema = new Schema<IPowerBanksOffer>({
+  capacity_mah: {
+    type: Number,
+    required: [true, "La capacité est obligatoire."],
+    min: [0, "La capacité doit être une valeur positive."],
+  },
+  outputPorts: {
+    type: [String],
+    required: [true, "Au moins un port de sortie est requis."],
+  },
+  features: {
+    type: [String],
+    enum: ['Fast-Charging', 'Wireless-Charging'],
+  },
+  color: {
+    type: String,
+    trim: true,
+  },
+});
 
-let PowerBankOfferModel;
-const discriminatorKey = 'power-banks'; // Correspond au KINDS.POWER_BANKS
+const PowerBanksOfferModel = (models[KINDS.POWER_BANKS] as Model<IPowerBanksOffer>) ||
+  ProductOfferModel.discriminator<IPowerBanksOffer>(
+    KINDS.POWER_BANKS,
+    PowerBanksSchema
+  );
 
-if (models.ProductOffer && models.ProductOffer.discriminators && models.ProductOffer.discriminators[discriminatorKey]) {
-  PowerBankOfferModel = models.ProductOffer.discriminators[discriminatorKey];
-} else if (models.ProductOffer) {
-  PowerBankOfferModel = ProductOfferModel.discriminator<IPowerBankOffer>(discriminatorKey, PowerBankSchema);
-} else {
-  console.error(`ProductOfferModel base model not found when defining ${discriminatorKey} discriminator.`);
-}
-
-export default PowerBankOfferModel as Model<IPowerBankOffer> | undefined; 
+export default PowerBanksOfferModel; 

@@ -188,18 +188,26 @@ export async function GET(
       .lean<PopulatedScrapedProduct | null>();
 
     if (!productModel) {
-      return NextResponse.json({ message: 'ProductModel non trouvé.' }, { status: 404 });
+      return NextResponse.json({ success: false, message: 'ProductModel non trouvé.' }, { status: 404 });
     }
 
-    const specifications = productModel.specifications
-      ? Object.entries(productModel.specifications).flatMap(([category, specsObject]) => {
+    let specifications;
+    if (Array.isArray(productModel.specifications)) {
+      // Nouveau format : les spécifications sont déjà un tableau plat
+      specifications = productModel.specifications;
+    } else if (typeof productModel.specifications === 'object' && productModel.specifications !== null) {
+      // Ancien format : objet imbriqué nécessitant une transformation
+      specifications = Object.entries(productModel.specifications).flatMap(([category, specsObject]) => {
           if (typeof specsObject !== 'object' || specsObject === null) return [];
           return Object.entries(specsObject).map(([label, value]) => ({
             label: `${category} > ${label}`,
             value: String(value),
           }));
         })
-      : [];
+    } else {
+      // Pas de spécifications ou format inconnu
+      specifications = [];
+    }
 
     const productData = {
       _id: productModel._id.toString(),
@@ -221,11 +229,11 @@ export async function GET(
       specifications: specifications,
     };
 
-    return NextResponse.json(productData, { status: 200 });
+    return NextResponse.json({ success: true, productModel: productData }, { status: 200 });
   } catch (error) {
     console.error(`Erreur API /api/product-models/${id}:`, error);
     const errorMessage = error instanceof Error ? error.message : 'Erreur serveur inconnue.';
-    return NextResponse.json({ message: 'Erreur serveur lors de la récupération du ProductModel.', errorDetails: errorMessage }, { status: 500 });
+    return NextResponse.json({ success: false, message: 'Erreur serveur lors de la récupération du ProductModel.', errorDetails: errorMessage }, { status: 500 });
   }
 }
 

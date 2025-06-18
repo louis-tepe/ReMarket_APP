@@ -4,6 +4,16 @@ import { IShippingAddress } from '@/lib/mongodb/models/User';
 
 const { SENDCLOUD_PUBLIC_KEY, SENDCLOUD_SECRET_KEY } = loadEnv();
 
+// Manually create the Basic Auth token
+const token = Buffer.from(
+  `${SENDCLOUD_PUBLIC_KEY}:${SENDCLOUD_SECRET_KEY}`,
+  'utf-8'
+).toString('base64');
+
+const authHeaders = {
+  Authorization: `Basic ${token}`,
+};
+
 interface SendcloudSenderAddress {
   id: number;
   company_name: string;
@@ -77,28 +87,25 @@ class SendcloudService {
   constructor() {
     this.apiClient = axios.create({
       baseURL: 'https://panel.sendcloud.sc/api/v2',
-      auth: {
-        username: SENDCLOUD_PUBLIC_KEY,
-        password: SENDCLOUD_SECRET_KEY,
-      },
+      headers: authHeaders,
     });
-
+    
     this.servicePointApiClient = axios.create({
       baseURL: 'https://servicepoints.sendcloud.sc/api/v2',
-      // No auth needed for public service point lookup
+      headers: authHeaders,
     });
   }
 
   async getServicePoints(country: string, postalCode: string): Promise<SendcloudServicePoint[]> {
     try {
-      const response = await this.servicePointApiClient.get<{ service_points: SendcloudServicePoint[] }>('/service-points', {
+      const response = await this.servicePointApiClient.get('/service-points', {
         params: {
           country,
           postal_code: postalCode,
-          carrier: 'mondial_relay,chronopost,colissimo', // Example carriers
+          carrier: 'mondial_relay,chronopost,colissimo',
         },
       });
-      return response.data.service_points || [];
+      return response.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {
         console.error('Sendcloud ServicePoint API Error:', error.response?.data);

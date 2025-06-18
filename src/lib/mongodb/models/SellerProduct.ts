@@ -87,9 +87,9 @@ const ProductBaseSchema = new Schema<IProductBase>(
     },
     description: {
       type: String,
-      required: [true, "La description de l'offre par le vendeur est obligatoire."],
+      required: false,
       trim: true,
-      minlength: [10, "La description doit comporter au moins 10 caractères."],
+      minlength: [10, "La description doit comporter au moins 10 caractères si elle est fournie."],
     },
     images: {
       type: [String],
@@ -156,25 +156,25 @@ const ProductBaseSchema = new Schema<IProductBase>(
 
 // Hook pre-save pour gérer la logique des statuts
 ProductBaseSchema.pre('save', function(this: IProductBase, next) {
-  // Si l'annonce devient active et n'est pas déjà vendue, elle devient disponible
-  if (this.isModified('listingStatus') || this.isNew) {
-    if (this.listingStatus === 'active' && this.transactionStatus !== 'sold') {
+  const postSaleStatuses = ['pending_shipment', 'shipped', 'delivered', 'sold'];
+
+  // Si l'annonce devient active et n'est pas dans un état post-vente, elle devient disponible
+  if ((this.isModified('listingStatus') || this.isNew) && this.listingStatus === 'active') {
+    if (!this.transactionStatus || !postSaleStatuses.includes(this.transactionStatus)) {
       this.transactionStatus = 'available';
     }
   }
 
-  // Si l'offre est marquée comme vendue (par l'un ou l'autre statut)
-  // ou si la quantité en stock atteint 0.
-  const markedAsSold = (this.isModified('listingStatus') && this.listingStatus === 'sold') || 
-                       (this.isModified('transactionStatus') && this.transactionStatus === 'sold');
+  // Si l'offre est marquée comme vendue ou si le stock est épuisé
+  const isMarkedAsSold = this.listingStatus === 'sold';
   const stockDepleted = this.stockQuantity === 0;
 
-  if (markedAsSold || stockDepleted) {
+  if (isMarkedAsSold || stockDepleted) {
     this.listingStatus = 'sold'; 
-    this.transactionStatus = 'sold'; 
-    if (stockDepleted && this.stockQuantity < 1 && !markedAsSold) {
-      // Cas où le stock est épuisé mais pas explicitement marqué vendu par une autre logique
-      console.log(`Offre ${this._id} marquée automatiquement comme vendue car stock épuisé.`);
+    
+    // Ne change le transactionStatus que s'il n'est pas déjà dans un état post-vente
+    if (!this.transactionStatus || !postSaleStatuses.includes(this.transactionStatus)) {
+        this.transactionStatus = 'sold';
     }
   }
   next();

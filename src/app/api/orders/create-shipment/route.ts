@@ -4,6 +4,7 @@ import dbConnect from '@/lib/mongodb/dbConnect';
 import ProductOfferModel from '@/lib/mongodb/models/SellerProduct';
 import UserModel from '@/lib/mongodb/models/User';
 import { sendcloudService } from '@/services/shipping/sendcloudService';
+import { Types } from 'mongoose';
 
 const createShipmentSchema = z.object({
   offerId: z.string(),
@@ -29,14 +30,13 @@ export async function POST(req: Request) {
     if (!offer || !offer.seller || !buyer) {
       return NextResponse.json({ message: 'Offer, Seller or Buyer not found' }, { status: 404 });
     }
-
-    // @ts-ignore
-    if (!offer.seller.sendcloudSenderId || !offer.seller.shippingAddress) {
-      return NextResponse.json({ message: 'Seller has not configured their shipping address' }, { status: 400 });
-    }
     
     // @ts-ignore
     const seller = offer.seller;
+
+    if (!seller.sendcloudSenderId || !seller.shippingAddress) {
+      return NextResponse.json({ message: 'Seller has not configured their shipping address' }, { status: 400 });
+    }
 
     const parcelPayload = {
       name: buyer.name || 'N/A',
@@ -51,16 +51,20 @@ export async function POST(req: Request) {
         id: 8, // Use "Unstamped letter" for testing to avoid costs
       },
       parcel_items: [{
-        description: offer.description.substring(0, 35),
+        description: offer.description?.substring(0, 35) || 'Product',
         quantity: 1,
         weight: "1.0", // TODO: Get weight from product model
         value: String(offer.price),
       }],
     };
 
+    // Étape 1: Créer le colis via Sendcloud
     const createdParcel = await sendcloudService.createParcel(parcelPayload);
 
+    // Étape 2: Si la création réussit, mettre à jour l'offre dans la base de données
     offer.transactionStatus = 'pending_shipment';
+    offer.listingStatus = 'sold';
+    offer.soldTo = new Types.ObjectId(buyerId);
     offer.shippingInfo = {
       trackingNumber: createdParcel.tracking_number,
       labelUrl: createdParcel.label.label_printer,
@@ -68,6 +72,7 @@ export async function POST(req: Request) {
     };
     await offer.save();
 
+    console.log(`Shipment created and offer ${offerId} updated successfully.`);
     return NextResponse.json({ success: true, trackingNumber: createdParcel.tracking_number });
 
   } catch (error) {

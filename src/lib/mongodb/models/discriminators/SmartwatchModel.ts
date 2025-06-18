@@ -1,64 +1,39 @@
 import { Schema, models, Model } from 'mongoose';
 import ProductOfferModel, { IProductBase } from '../SellerProduct';
+import { KINDS } from '@/config/discriminatorMapping';
 
 export interface ISmartwatchOffer extends IProductBase {
-  screenSize_in?: number;
-  caseMaterial?: string;
-  bandMaterial?: string;
-  operatingSystem?: string;
+  caseSize_mm: number;
+  caseMaterial?: 'Aluminum' | 'Stainless Steel' | 'Titanium' | 'Plastic';
   color: string;
-  hasGPS?: boolean;
-  hasHeartRateMonitor?: boolean;
-  waterResistance_atm?: number;
+  connectivity?: ('GPS' | 'Cellular')[];
 }
 
-const SmartwatchSchema = new Schema<ISmartwatchOffer>(
-  {
-    screenSize_in: {
-      type: Number,
-      min: [0, "La taille de l'écran doit être positive."],
-    },
-    caseMaterial: {
-      type: String,
-      trim: true,
-    },
-    bandMaterial: {
-      type: String,
-      trim: true,
-    },
-    operatingSystem: {
-      type: String,
-      trim: true,
-    },
-    color: {
-      type: String,
-      required: [true, "La couleur est obligatoire."],
-      trim: true,
-    },
-    hasGPS: {
-      type: Boolean,
-      default: false,
-    },
-    hasHeartRateMonitor: {
-      type: Boolean,
-      default: false,
-    },
-    waterResistance_atm: {
-      type: Number,
-      min: [0, "La résistance à l'eau doit être positive ou nulle."],
-    },
-  }
-);
+const SmartwatchSchema = new Schema<ISmartwatchOffer>({
+  caseSize_mm: {
+    type: Number,
+    required: [true, "La taille du boîtier est obligatoire."],
+    min: [0, "La taille du boîtier doit être positive."],
+  },
+  caseMaterial: {
+    type: String,
+    enum: ['Aluminum', 'Stainless Steel', 'Titanium', 'Plastic'],
+  },
+  color: {
+    type: String,
+    required: [true, "La couleur est obligatoire."],
+    trim: true,
+  },
+  connectivity: {
+    type: [String],
+    enum: ['GPS', 'Cellular'],
+  },
+});
 
-let SmartwatchOfferModel;
-const discriminatorKey = 'smartwatches'; // Correspond au KINDS.SMARTWATCH
+const SmartwatchOfferModel = (models[KINDS.SMARTWATCH] as Model<ISmartwatchOffer>) ||
+  ProductOfferModel.discriminator<ISmartwatchOffer>(
+    KINDS.SMARTWATCH,
+    SmartwatchSchema
+  );
 
-if (models.ProductOffer && models.ProductOffer.discriminators && models.ProductOffer.discriminators[discriminatorKey]) {
-  SmartwatchOfferModel = models.ProductOffer.discriminators[discriminatorKey];
-} else if (models.ProductOffer) {
-  SmartwatchOfferModel = ProductOfferModel.discriminator<ISmartwatchOffer>(discriminatorKey, SmartwatchSchema);
-} else {
-  console.error(`ProductOfferModel base model not found when defining ${discriminatorKey} discriminator.`);
-}
-
-export default SmartwatchOfferModel as Model<ISmartwatchOffer> | undefined; 
+export default SmartwatchOfferModel; 

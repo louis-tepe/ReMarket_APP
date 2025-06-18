@@ -24,6 +24,8 @@ import {
     MessageCircle,
     User,
     Tag,
+    Package,
+    DollarSign,
 } from "lucide-react";
 import Image from "next/image";
 import { useCategoriesNavigation } from "@/hooks/useCategoriesNavigation";
@@ -98,15 +100,27 @@ export default function Header() {
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem asChild>
+                            <Link href="/account/purchases">
+                                <Package className="mr-2 h-4 w-4" />
+                                Mes achats
+                            </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
                             <Link href="/account/sales">
-                                <LayoutDashboard className="mr-2 h-4 w-4" />
-                                Tableau de bord
+                                <DollarSign className="mr-2 h-4 w-4" />
+                                Mes ventes
                             </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
                             <Link href="/account/favorites">
                                 <Heart className="mr-2 h-4 w-4" />
                                 Mes favoris
+                            </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                            <Link href="/account/sell">
+                                <Tag className="mr-2 h-4 w-4" />
+                                Vendre un article
                             </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>

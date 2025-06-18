@@ -1,5 +1,6 @@
 import { Schema, models, Model } from 'mongoose';
-import ProductOfferModel, { IProductBase } from '../SellerProduct'; // Chemin vers le modèle de base
+import ProductOfferModel, { IProductBase } from '../SellerProduct';
+import { KINDS } from '@/config/discriminatorMapping';
 
 // Interface pour les champs spécifiques aux smartphones
 export interface ISmartphoneOffer extends IProductBase {
@@ -28,7 +29,7 @@ const SmartphoneSchema = new Schema<ISmartphoneOffer>(
     ram_gb: {
       type: Number,
       required: [true, "La RAM est obligatoire pour un smartphone."],
-      min: [0, "La RAM doit être positive."],
+      min: [1, "La RAM doit être d'au moins 1 Go."],
     },
     cameraResolution_mp: {
       type: Number,
@@ -49,12 +50,12 @@ const SmartphoneSchema = new Schema<ISmartphoneOffer>(
       trim: true,
     },
     imei: {
-        type: String,
-        trim: true,
-        // Vous pourriez ajouter une validation regex pour l'IMEI ici
-        match: [/^\d{15}$/, "L'IMEI doit être composé de 15 chiffres."],
-        required: false,
-        sparse: true,
+      type: String,
+      trim: true,
+      match: [/^\d{15}$/, "L'IMEI doit être composé de 15 chiffres."],
+      unique: true,
+      sparse: true,
+      required: false,
     }
   },
   {
@@ -63,26 +64,10 @@ const SmartphoneSchema = new Schema<ISmartphoneOffer>(
   }
 );
 
-// Création du discriminateur
-// Le nom 'SmartphoneOffer' sera utilisé comme valeur pour le champ 'kind' du ProductBaseSchema
-// et permettra à Mongoose de savoir quel schéma spécifique utiliser.
-// Il est crucial que le nom du discriminateur (ex: 'SmartphoneOffer') corresponde à une valeur que vous utiliserez
-// pour identifier ce type de produit, par exemple, basé sur le slug de la catégorie feuille.
+const SmartphoneOfferModel = (models[KINDS.SMARTPHONE] as Model<ISmartphoneOffer>) ||
+  ProductOfferModel.discriminator<ISmartphoneOffer>(
+    KINDS.SMARTPHONE,
+    SmartphoneSchema
+  );
 
-// Vérifier si le discriminateur existe déjà pour éviter les erreurs de recompilation en dév (Next.js HMR)
-let SmartphoneOfferModel;
-if (models.ProductOffer && models.ProductOffer.discriminators && models.ProductOffer.discriminators.smartphones) {
-  SmartphoneOfferModel = models.ProductOffer.discriminators.smartphones;
-} else if (models.ProductOffer) {
-  SmartphoneOfferModel = ProductOfferModel.discriminator<ISmartphoneOffer>('smartphones', SmartphoneSchema);
-} else {
-  // Ce cas est moins probable si ProductBaseModel est correctement exporté et importé,
-  // mais c'est une sécurité pour s'assurer que le modèle de base est compilé avant d'ajouter un discriminateur.
-  // Cependant, cela peut introduire des complexités avec l'ordre de chargement des modèles.
-  // Il est généralement préférable de s'assurer que le modèle de base est chargé en premier.
-  console.error("ProductOfferModel base model not found when defining SmartphoneOffer discriminator. This might lead to critical issues if not resolved.");
-  // Tentative de définition, mais peut échouer si ProductOfferModel n'est pas encore initialisé
-  // SmartphoneOfferModel = model<ISmartphoneOffer>('ProductOffer').discriminator('SmartphoneOffer', SmartphoneSchema);
-}
-
-export default SmartphoneOfferModel as Model<ISmartphoneOffer> | undefined; // Exporter avec un type qui reflète sa nature de discriminateur 
+export default SmartphoneOfferModel; 

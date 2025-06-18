@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useSession } from 'next-auth/react';
 import ProductCard, { ProductCardProps } from '@/components/shared/ProductCard';
+import { Session } from 'next-auth';
 
 interface FeaturedProductsClientWrapperProps {
     initialProducts: ProductCardProps[];
+    session: Session | null | undefined;
 }
 
 async function fetchUserFavorites(): Promise<string[]> {
@@ -33,9 +34,8 @@ function useIsClient() {
     return isClient;
 }
 
-export default function FeaturedProductsClientWrapper({ initialProducts }: FeaturedProductsClientWrapperProps) {
+export default function FeaturedProductsClientWrapper({ initialProducts, session }: FeaturedProductsClientWrapperProps) {
     const isClient = useIsClient();
-    const { data: session, status } = useSession();
     const [productsToDisplay, setProductsToDisplay] = useState<ProductCardProps[]>(initialProducts);
     const [favoriteProductIds, setFavoriteProductIds] = useState<string[]>([]);
 
@@ -45,12 +45,12 @@ export default function FeaturedProductsClientWrapper({ initialProducts }: Featu
 
     useEffect(() => {
         // Ne charger les favoris que si on est côté client et que la session est authentifiée
-        if (isClient && status === 'authenticated' && session?.user) {
+        if (isClient && session?.user) {
             fetchUserFavorites().then(setFavoriteProductIds);
-        } else if (isClient && status === 'unauthenticated') {
+        } else if (isClient && !session?.user) {
             setFavoriteProductIds([]);
         }
-    }, [isClient, session, status]);
+    }, [isClient, session]);
 
     const handleFavoriteToggle = useCallback((productId: string, isFavorite: boolean) => {
         if (!isClient) return; // Éviter les actions avant l'hydratation

@@ -32,6 +32,7 @@ export const KINDS = {
   PSU: 'power-supplies-psu',
   PC_CASE: 'pc-cases',
   KEYBOARD: 'keyboards',
+  GAME_CONSOLE: 'game-consoles',
   // Ajoutez d'autres kinds ici
 } as const; // 'as const' pour des types littéraux stricts
 
@@ -60,35 +61,11 @@ export const categorySlugToKindMap: Record<string, ProductKind> = {
   'power-supplies-psu': KINDS.PSU,
   'pc-cases': KINDS.PC_CASE,
   'keyboards': KINDS.KEYBOARD,
+  'game-consoles': KINDS.GAME_CONSOLE,
   // Ajoutez ici tous vos mappings slug de catégorie feuille vers kind.
   // Exemples de slugs précédemment présents et leurs kinds (à vérifier/conserver si toujours pertinents) :
   // 'ordinateurs-portables': KINDS.LAPTOP,
   // 'telephones-mobiles': KINDS.SMARTPHONE,
-};
-
-// Mapping inverse : kind -> nom du modèle discriminateur Mongoose
-// Utile pour des logiques côté serveur ou admin.
-export const kindToModelNameMap: Record<ProductKind, string> = {
-  [KINDS.LAPTOP]: 'LaptopOffer',
-  [KINDS.SMARTPHONE]: 'SmartphoneOffer',
-  [KINDS.FEATURE_PHONES]: 'FeaturePhoneOffer',
-  [KINDS.TABLET]: 'TabletOffer',
-  [KINDS.SMARTWATCH]: 'SmartwatchOffer',
-  [KINDS.FITNESS_TRACKER]: 'FitnessTrackerOffer',
-  [KINDS.CASES_COVERS]: 'CasesCoversOffer',
-  [KINDS.CHARGERS_CABLES]: 'ChargersCablesOffer',
-  [KINDS.POWER_BANKS]: 'PowerBanksOffer',
-  [KINDS.SCREEN_PROTECTORS]: 'ScreenProtectorsOffer',
-  [KINDS.DESKTOP_COMPUTER]: 'DesktopComputerOffer',
-  [KINDS.MONITOR]: 'MonitorOffer',
-  [KINDS.CPU]: 'CpuOffer',
-  [KINDS.GPU]: 'GpuOffer',
-  [KINDS.MOTHERBOARD]: 'MotherboardOffer',
-  [KINDS.RAM]: 'RamOffer',
-  [KINDS.STORAGE]: 'StorageOffer',
-  [KINDS.PSU]: 'PsuOffer',
-  [KINDS.PC_CASE]: 'PcCaseOffer',
-  [KINDS.KEYBOARD]: 'KeyboardOffer',
 };
 
 /**

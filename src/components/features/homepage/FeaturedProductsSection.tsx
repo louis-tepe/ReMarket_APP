@@ -1,10 +1,14 @@
+'use client';
+
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { Button } from '@/components/ui/button';
-import { fetchFeaturedProductData, FeaturedProductData } from "@/services/core/product-service";
+import { FeaturedProductData } from "@/services/core/product-service";
 import FeaturedProductsClientWrapper from '@/components/features/product-listing/FeaturedProductsClientWrapper';
 import { ProductCardProps } from '@/components/shared/ProductCard';
 import { FeaturedProductsSkeleton } from './FeaturedProductsSkeleton';
+import useSWR from 'swr';
+import { useSession } from 'next-auth/react';
 
 function mapProductDataToCardProps(products: FeaturedProductData[]): ProductCardProps[] {
   return products.map(product => ({
@@ -16,19 +20,23 @@ function mapProductDataToCardProps(products: FeaturedProductData[]): ProductCard
   }));
 }
 
-async function getFeaturedProducts(): Promise<ProductCardProps[]> {
-  try {
-    const productsData = await fetchFeaturedProductData();
-    return mapProductDataToCardProps(productsData);
-  } catch (error: unknown) {
-    console.error("Error fetching featured products for section:", error);
-    return [];
-  }
-}
+const fetcher = (url: string) => fetch(url).then(res => res.json());
 
-async function FeaturedProductsList() {
-  const products = await getFeaturedProducts();
-  return <FeaturedProductsClientWrapper initialProducts={products} />;
+function FeaturedProductsList() {
+    const { data, error } = useSWR<{ products: FeaturedProductData[] }>('/api/products/featured', fetcher);
+    const { data: session } = useSession();
+
+    if (error) {
+        console.error("Error fetching featured products:", error);
+        return <p className="text-center text-red-500">Impossible de charger les produits.</p>;
+    }
+
+    if (!data || !data.products) {
+        return <FeaturedProductsSkeleton />;
+    }
+
+    const products = mapProductDataToCardProps(data.products);
+    return <FeaturedProductsClientWrapper initialProducts={products} session={session} />;
 }
 
 export function FeaturedProductsSection() {

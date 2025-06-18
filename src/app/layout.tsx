@@ -7,17 +7,21 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
 
 export const metadata: Metadata = {
   title: "ReMarket - Votre marché de seconde main, réinventé.",
   description: "Achetez et vendez des produits d'occasion avec une expérience comme neuve.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await getServerSession(authOptions);
+
   return (
     <html
       lang="fr"
@@ -25,7 +29,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className={cn("min-h-screen bg-background font-sans antialiased")}>
-        <NextAuthProvider>
+        <NextAuthProvider session={session}>
           <Header />
           <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {children}

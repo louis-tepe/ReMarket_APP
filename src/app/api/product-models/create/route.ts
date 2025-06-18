@@ -10,32 +10,75 @@ import { Types } from 'mongoose';
 
 interface PostProductData {
   name: string;
-  categoryId: string;
-  brandId: string; // Ceci est un slug de marque
+  categoryId: string; // Ceci est un slug de catégorie
+  brandId: string; // Ceci est un ID de marque
 }
+
+const flattenSpecifications = (specs: any): { label: string; value: string; }[] => {
+    const flattened: { label: string; value: string; }[] = [];
+    if (!specs) return flattened;
+
+    const formatValue = (value: any): string => {
+        if (Array.isArray(value)) return value.join(', ');
+        if (typeof value === 'boolean') return value ? 'Oui' : 'Non';
+        if (value === null || value === undefined) return 'N/A';
+        return String(value);
+    };
+
+    // Cas 1: specs est un tableau de groupes (structure attendue par l'ancien code)
+    if (Array.isArray(specs)) {
+        for (const group of specs) {
+            if (group && Array.isArray(group.specs)) {
+                for (const spec of group.specs) {
+                    if (spec && spec.label) {
+                        flattened.push({
+                            label: spec.label,
+                            value: formatValue(spec.value)
+                        });
+                    }
+                }
+            }
+        }
+    }
+    // Cas 2: specs est un objet de groupes (structure vue dans l'exemple iPhone SE)
+    else if (typeof specs === 'object') {
+        for (const groupValue of Object.values(specs)) {
+            if (groupValue && typeof groupValue === 'object') {
+                 for (const [label, value] of Object.entries(groupValue)) {
+                    flattened.push({
+                        label: label,
+                        value: formatValue(value)
+                    });
+                }
+            }
+        }
+    }
+
+    return flattened;
+};
 
 const mapApiDataToScrapedProduct = (
   apiData: LedenicheurProductDetails,
   productNameToScrape: string,
   categoryId: Types.ObjectId,
-  brandId: Types.ObjectId
+  brandDocument: { _id: Types.ObjectId, name: string }
 ): IScrapedProduct => {
   const slug = slugify(apiData.product.title, { lower: true, strict: true });
   return {
     source_name: 'ledenicheur',
     product_search_name: productNameToScrape,
     category: categoryId,
-    brand: brandId,
+    brand: brandDocument._id,
     slug: slug,
     product: {
         title: apiData.product.title,
-        brand: apiData.product.brand,
+        brand: apiData.product.brand || brandDocument.name,
         url: apiData.product.url,
         image_url: apiData.product.image_url,
         images: apiData.product.images
     },
     options: apiData.options,
-    specifications: apiData.specifications,
+    specifications: flattenSpecifications(apiData.specifications),
     price_analysis: apiData.price_analysis
   };
 };
@@ -44,10 +87,10 @@ export async function POST(request: NextRequest) {
   try {
     await dbConnect();
     const body: PostProductData = await request.json();
-    const { name: productNameToScrape, categoryId: categorySlug, brandId: brandSlug } = body;
+    const { name: productNameToScrape, categoryId: categorySlug, brandId } = body;
 
-    if (!productNameToScrape || !categorySlug || !brandSlug) {
-      return NextResponse.json({ error: "Le nom du produit, le slug de la catégorie et le slug de la marque sont requis." }, { status: 400 });
+    if (!productNameToScrape || !categorySlug || !brandId) {
+      return NextResponse.json({ error: "Le nom du produit, le slug de la catégorie et l'ID de la marque sont requis." }, { status: 400 });
     }
     
     const categoryDoc = await CategoryModel.findOne({ slug: categorySlug }).select('_id').lean();
@@ -55,9 +98,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: `Catégorie avec le slug '${categorySlug}' non trouvée.`}, { status: 404 });
     }
 
-    const brandDoc = await BrandModel.findOne({ slug: brandSlug }).select('_id').lean();
+    const brandDoc = await BrandModel.findById(brandId).select('_id name').lean();
     if (!brandDoc) {
-        return NextResponse.json({ error: `Marque avec le slug '${brandSlug}' non trouvée.`}, { status: 404 });
+        return NextResponse.json({ error: `Marque avec l'ID '${brandId}' non trouvée.`}, { status: 404 });
     }
 
     const scrapedData = await scrapeLedenicheurProduct(productNameToScrape);
@@ -79,7 +122,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Ce produit a déjà été scrapé et est enregistré.", productModel: existingProduct }, { status: 200 });
     }
 
-    const mappedData = mapApiDataToScrapedProduct(scrapedData, productNameToScrape, categoryDoc._id, brandDoc._id);
+    const mappedData = mapApiDataToScrapedProduct(scrapedData, productNameToScrape, categoryDoc._id, brandDoc);
     
     const newScrapedProduct = new ScrapingProduct(mappedData);
     await newScrapedProduct.save();

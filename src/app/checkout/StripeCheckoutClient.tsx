@@ -8,12 +8,12 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import ServicePointSelector from './components/ServicePointSelector';
 import { Separator } from '@/components/ui/separator';
+import Link from 'next/link';
 
 const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 
 if (!publishableKey) {
-    // Cette erreur est destinée au développeur, pour signaler une mauvaise configuration.
-    throw new Error('La clé publique Stripe est manquante. Veuillez vérifier votre fichier .env.local et redémarrer le serveur.');
+    throw new Error('La clé publique Stripe est manquante. Veuillez vérifier votre fichier .env.local.');
 }
 
 const stripePromise = loadStripe(publishableKey);
@@ -65,17 +65,19 @@ function CheckoutForm({ isServicePointSelected }: { isServicePointSelected: bool
   );
 }
 
-function StripeCheckout() {
+function StripeCheckoutCore() {
     const searchParams = useSearchParams();
     const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [selectedPoint, setSelectedPoint] = useState<ServicePoint | null>(null);
-    const amountParam = searchParams.get('amount');
+    
+    // Read params inside the client component
     const offerId = searchParams.get('offerId');
-    const amount = amountParam ? Number(amountParam) : 0;
+    const cartId = searchParams.get('cartId');
+    const amount = Number(searchParams.get('amount'));
 
     useEffect(() => {
         async function fetchClientSecret() {
-            if (!selectedPoint) return; // Wait for service point selection
+            if (!selectedPoint || amount <= 0 || (!offerId && !cartId)) return;
             try {
                 const res = await fetch('/api/payment/create-intent', {
                     method: 'POST',
@@ -83,7 +85,8 @@ function StripeCheckout() {
                     body: JSON.stringify({ 
                         amount,
                         offerId,
-                        servicePointId: selectedPoint.id 
+                        cartId,
+                        servicePointId: selectedPoint.id,
                     }),
                 });
                 if (!res.ok) {
@@ -97,25 +100,15 @@ function StripeCheckout() {
                 toast.error(`Impossible d'initialiser le paiement: ${error.message}`);
             }
         }
-        if (amount > 0 && offerId && selectedPoint) {
-            fetchClientSecret();
-        }
-    }, [amount, offerId, selectedPoint]);
+        fetchClientSecret();
+    }, [amount, offerId, cartId, selectedPoint]);
 
-    const handleCreateShipment = async () => {
-        if (!offerId || !selectedPoint) {
-            toast.error("Données manquantes pour créer l'expédition.");
-            return;
-        }
-        // This would be called by the Stripe webhook after successful payment
-        console.log("Simulating shipment creation call with:", { offerId, servicePointId: selectedPoint.id });
-    };
-
-    if (amount <= 0) {
+    if (isNaN(amount) || amount <= 0 || (!offerId && !cartId)) {
         return (
             <div className="container mx-auto py-10 text-center">
-                <h1 className="text-2xl font-bold text-red-600">Montant invalide</h1>
-                <p>Le montant pour le paiement est manquant ou incorrect.</p>
+                <h1 className="text-2xl font-bold text-red-600">Données de paiement invalides</h1>
+                <p>Les informations nécessaires pour le paiement sont manquantes ou incorrectes dans l'URL.</p>
+                <Button asChild variant="link"><Link href="/cart">Retour au panier</Link></Button>
             </div>
         );
     }
@@ -144,17 +137,18 @@ function StripeCheckout() {
                       <CheckoutForm isServicePointSelected={!!selectedPoint} />
                   </Elements>
               ) : (
-                  <div className="text-center"><p>Initialisation du paiement...</p></div>
+                  <div className="text-center"><p>Veuillez sélectionner un point de livraison pour continuer.</p></div>
               )}
             </div>
         </div>
     );
 }
 
-export default function StripeCheckoutProvider() {
-  return (
-    <Suspense fallback={<div>Chargement...</div>}>
-      <StripeCheckout />
-    </Suspense>
-  )
+export default function StripeCheckoutClient() {
+    // Wrap the core logic in Suspense to handle useSearchParams
+    return (
+        <Suspense>
+            <StripeCheckoutCore />
+        </Suspense>
+    );
 } 

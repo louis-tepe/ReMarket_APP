@@ -1,5 +1,6 @@
 import { Schema, models, Model } from 'mongoose';
 import ProductOfferModel, { IProductBase } from '../SellerProduct';
+import { KINDS } from '@/config/discriminatorMapping';
 
 export interface ICpuOffer extends IProductBase {
   brand: 'Intel' | 'AMD';
@@ -59,16 +60,10 @@ const CpuSchema = new Schema<ICpuOffer>(
   }
 );
 
-let CpuOfferModel;
-// Le nom du discriminateur ici est 'cpus-processors' pour correspondre au KIND
-const discriminatorKey = 'cpus-processors'; // Correspond au KINDS.CPU
+const CpuOfferModel = (models[KINDS.CPU] as Model<ICpuOffer>) ||
+  ProductOfferModel.discriminator<ICpuOffer>(
+    KINDS.CPU,
+    CpuSchema
+  );
 
-if (models.ProductOffer && models.ProductOffer.discriminators && models.ProductOffer.discriminators[discriminatorKey]) {
-  CpuOfferModel = models.ProductOffer.discriminators[discriminatorKey];
-} else if (models.ProductOffer) {
-  CpuOfferModel = ProductOfferModel.discriminator<ICpuOffer>(discriminatorKey, CpuSchema);
-} else {
-  console.error(`ProductOfferModel base model not found when defining ${discriminatorKey} discriminator.`);
-}
-
-export default CpuOfferModel as Model<ICpuOffer> | undefined; 
+export default CpuOfferModel; 

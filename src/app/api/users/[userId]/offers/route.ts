@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import ProductOfferModel, { IProductBase } from '@/lib/mongodb/models/SellerProduct';
+import ProductOfferModel, { IProductBase, IShippingInfo } from '@/lib/mongodb/models/SellerProduct';
 import ProductModel, { IProductModel } from '@/lib/mongodb/models/ScrapingProduct';
 import dbConnect from '@/lib/mongodb/dbConnect';
 import { Types } from 'mongoose';
@@ -22,11 +22,12 @@ interface SellerOffer {
     sellerDescription?: string;
     sellerPhotos?: string[];
     createdAt: string;
+    shippingInfo?: IShippingInfo;
 }
 
 // Helper function pour mapper les données du modèle aux types de l'interface SellerOffer
 function mapToSellerOffer(offerDoc: IProductBase): SellerOffer {
-    const productModel = offerDoc.productModel as unknown as IProductModel; // Cast après population
+    const productModel = offerDoc.productModel as IProductModel;
 
     // Gestion des conditions: mapper 'like-new' vers 'used_likenew'
     let clientCondition: SellerOffer['condition'];
@@ -78,6 +79,7 @@ function mapToSellerOffer(offerDoc: IProductBase): SellerOffer {
         sellerDescription: offerDoc.description,
         sellerPhotos: offerDoc.images,
         createdAt: offerDoc.createdAt.toISOString(),
+        shippingInfo: offerDoc.shippingInfo,
     };
 }
 

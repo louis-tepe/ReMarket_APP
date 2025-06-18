@@ -1,43 +1,38 @@
 import { Schema, models, Model } from 'mongoose';
 import ProductOfferModel, { IProductBase } from '../SellerProduct';
+import { KINDS } from '@/config/discriminatorMapping';
 
-export interface IScreenProtectorOffer extends IProductBase {
-  material?: 'tempered_glass' | 'film' | 'liquid';
-  compatibleDevice?: string; // Ex: "iPhone 13 Pro", "Samsung Galaxy Tab S8"
-  features?: string[]; // Ex: ["anti-glare", "privacy", "anti-fingerprint"]
-  hardness?: string; // Ex: "9H"
+export interface IScreenProtectorsOffer extends IProductBase {
+  compatibleWith: string[];
+  material: 'Tempered Glass' | 'Film' | 'Hybrid';
+  finish?: 'Glossy' | 'Matte';
+  quantityInPack?: number;
 }
 
-const ScreenProtectorSchema = new Schema<IScreenProtectorOffer>(
-  {
-    material: {
-      type: String,
-      enum: ['tempered_glass', 'film', 'liquid'],
-    },
-    compatibleDevice: {
-      type: String,
-      trim: true,
-      // required: [true, "L'appareil compatible est obligatoire."]
-    },
-    features: {
-      type: [String],
-    },
-    hardness: {
-      type: String,
-      trim: true,
-    },
-  }
-);
+const ScreenProtectorsSchema = new Schema<IScreenProtectorsOffer>({
+  compatibleWith: {
+    type: [String],
+    required: [true, "L'appareil compatible est obligatoire."],
+  },
+  material: {
+    type: String,
+    required: [true, "Le matériau est obligatoire."],
+    enum: ['Tempered Glass', 'Film', 'Hybrid'],
+  },
+  finish: {
+    type: String,
+    enum: ['Glossy', 'Matte'],
+  },
+  quantityInPack: {
+    type: Number,
+    default: 1,
+  },
+});
 
-let ScreenProtectorOfferModel;
-const discriminatorKey = 'screen-protectors'; // Correspond au KINDS.SCREEN_PROTECTORS
+const ScreenProtectorsOfferModel = (models[KINDS.SCREEN_PROTECTORS] as Model<IScreenProtectorsOffer>) ||
+  ProductOfferModel.discriminator<IScreenProtectorsOffer>(
+    KINDS.SCREEN_PROTECTORS,
+    ScreenProtectorsSchema
+  );
 
-if (models.ProductOffer && models.ProductOffer.discriminators && models.ProductOffer.discriminators[discriminatorKey]) {
-  ScreenProtectorOfferModel = models.ProductOffer.discriminators[discriminatorKey];
-} else if (models.ProductOffer) {
-  ScreenProtectorOfferModel = ProductOfferModel.discriminator<IScreenProtectorOffer>(discriminatorKey, ScreenProtectorSchema);
-} else {
-  console.error(`ProductOfferModel base model not found when defining ${discriminatorKey} discriminator.`);
-}
-
-export default ScreenProtectorOfferModel as Model<IScreenProtectorOffer> | undefined; 
+export default ScreenProtectorsOfferModel; 

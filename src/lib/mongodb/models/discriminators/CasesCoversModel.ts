@@ -1,48 +1,37 @@
 import { Schema, models, Model } from 'mongoose';
 import ProductOfferModel, { IProductBase } from '../SellerProduct';
+import { KINDS } from '@/config/discriminatorMapping';
 
 // Pour les accessoires comme coques, housses, chargeurs etc.,
 // les champs spécifiques peuvent être moins nombreux ou plus génériques.
 
 export interface ICasesCoversOffer extends IProductBase {
-  material?: string;
-  color: string;
-  compatibleDevice?: string; // Ex: "iPhone 13 Pro", "Samsung Galaxy S22 Ultra"
-  type?: 'case' | 'cover' | 'sleeve' | 'skin'; // Type de protection
+  compatibleWith?: string[]; // Ex: ["iPhone 13", "iPhone 13 Pro"]
+  material?: string; // Ex: Silicone, Cuir, Plastique
+  color?: string;
+  features?: ('Magsafe' | 'CardHolder' | 'Kickstand')[];
 }
 
-const CasesCoversSchema = new Schema<ICasesCoversOffer>(
-  {
-    material: {
-      type: String,
-      trim: true,
-    },
-    color: {
-      type: String,
-      required: [true, "La couleur est obligatoire."],
-      trim: true,
-    },
-    compatibleDevice: {
-      type: String,
-      trim: true,
-      // required: [true, "L'appareil compatible est obligatoire."] // Peut-être optionnel si le ProductModel le gère
-    },
-    type: {
-      type: String,
-      enum: ['case', 'cover', 'sleeve', 'skin'],
-    },
-  }
-);
+const CasesCoversSchema = new Schema<ICasesCoversOffer>({
+  compatibleWith: [String],
+  material: {
+    type: String,
+    trim: true,
+  },
+  color: {
+    type: String,
+    trim: true,
+  },
+  features: {
+    type: [String],
+    enum: ['Magsafe', 'CardHolder', 'Kickstand'],
+  },
+});
 
-let CasesCoversOfferModel;
-const discriminatorKey = 'cases-covers'; // Correspond au KINDS.CASES_COVERS
+const CasesCoversOfferModel = (models[KINDS.CASES_COVERS] as Model<ICasesCoversOffer>) ||
+  ProductOfferModel.discriminator<ICasesCoversOffer>(
+    KINDS.CASES_COVERS,
+    CasesCoversSchema
+  );
 
-if (models.ProductOffer && models.ProductOffer.discriminators && models.ProductOffer.discriminators[discriminatorKey]) {
-  CasesCoversOfferModel = models.ProductOffer.discriminators[discriminatorKey];
-} else if (models.ProductOffer) {
-  CasesCoversOfferModel = ProductOfferModel.discriminator<ICasesCoversOffer>(discriminatorKey, CasesCoversSchema);
-} else {
-  console.error(`ProductOfferModel base model not found when defining ${discriminatorKey} discriminator.`);
-}
-
-export default CasesCoversOfferModel as Model<ICasesCoversOffer> | undefined; 
+export default CasesCoversOfferModel; 

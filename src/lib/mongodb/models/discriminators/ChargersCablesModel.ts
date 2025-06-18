@@ -1,49 +1,43 @@
 import { Schema, models, Model } from 'mongoose';
 import ProductOfferModel, { IProductBase } from '../SellerProduct';
+import { KINDS } from '@/config/discriminatorMapping';
 
 export interface IChargersCablesOffer extends IProductBase {
-  type: 'charger' | 'cable' | 'adapter';
+  type: 'Charger' | 'Cable' | 'Adapter';
   connectorType?: string; // Ex: USB-C, Lightning, Micro-USB
-  cableLength_m?: number;
-  wattage_w?: number; // Pour les chargeurs
+  wattage?: number; // Pour les chargeurs
+  length_cm?: number; // Pour les câbles
   color?: string;
 }
 
-const ChargersCablesSchema = new Schema<IChargersCablesOffer>(
-  {
-    type: {
-      type: String,
-      required: [true, "Le type (chargeur, câble, adaptateur) est obligatoire."],
-      enum: ['charger', 'cable', 'adapter'],
-    },
-    connectorType: {
-      type: String,
-      trim: true,
-    },
-    cableLength_m: {
-      type: Number,
-      min: [0, "La longueur du câble doit être positive."],
-    },
-    wattage_w: {
-      type: Number,
-      min: [0, "La puissance doit être positive."],
-    },
-    color: {
-      type: String,
-      trim: true,
-    },
-  }
-);
+const ChargersCablesSchema = new Schema<IChargersCablesOffer>({
+  type: {
+    type: String,
+    required: [true, "Le type (chargeur, câble, etc.) est obligatoire."],
+    enum: ['Charger', 'Cable', 'Adapter'],
+  },
+  connectorType: {
+    type: String,
+    trim: true,
+  },
+  wattage: {
+    type: Number,
+    min: [0, "La puissance doit être une valeur positive."],
+  },
+  length_cm: {
+    type: Number,
+    min: [0, "La longueur doit être une valeur positive."],
+  },
+  color: {
+    type: String,
+    trim: true,
+  },
+});
 
-let ChargersCablesOfferModel;
-const discriminatorKey = 'chargers-cables'; // Correspond au KINDS.CHARGERS_CABLES
+const ChargersCablesOfferModel = (models[KINDS.CHARGERS_CABLES] as Model<IChargersCablesOffer>) ||
+  ProductOfferModel.discriminator<IChargersCablesOffer>(
+    KINDS.CHARGERS_CABLES,
+    ChargersCablesSchema
+  );
 
-if (models.ProductOffer && models.ProductOffer.discriminators && models.ProductOffer.discriminators[discriminatorKey]) {
-  ChargersCablesOfferModel = models.ProductOffer.discriminators[discriminatorKey];
-} else if (models.ProductOffer) {
-  ChargersCablesOfferModel = ProductOfferModel.discriminator<IChargersCablesOffer>(discriminatorKey, ChargersCablesSchema);
-} else {
-  console.error(`ProductOfferModel base model not found when defining ${discriminatorKey} discriminator.`);
-}
-
-export default ChargersCablesOfferModel as Model<IChargersCablesOffer> | undefined; 
+export default ChargersCablesOfferModel; 

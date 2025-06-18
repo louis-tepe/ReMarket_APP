@@ -1,60 +1,41 @@
 import { Schema, models, Model } from 'mongoose';
 import ProductOfferModel, { IProductBase } from '../SellerProduct';
+import { KINDS } from '@/config/discriminatorMapping';
 
 export interface IGpuOffer extends IProductBase {
   brand: 'NVIDIA' | 'AMD' | 'Intel';
-  series?: string; // Ex: GeForce RTX, Radeon RX, Arc
-  modelName: string; // Ex: 3080, RX 6800XT, A770
-  memory_gb: number;
-  memoryType?: string; // Ex: GDDR6, GDDR6X
-  interface?: string; // Ex: PCIe 4.0
-  ports?: string[]; // Ex: ["HDMI 2.1", "DisplayPort 1.4a"]
+  chipset: string; // Ex: GeForce RTX 3080, Radeon RX 6800 XT
+  vram_gb: number;
+  vramType: 'GDDR6' | 'GDDR6X' | 'GDDR5' | 'HBM2';
 }
 
-const GpuSchema = new Schema<IGpuOffer>(
-  {
-    brand: {
-      type: String,
-      required: [true, "La marque de la GPU est obligatoire."],
-      enum: ['NVIDIA', 'AMD', 'Intel'],
-    },
-    series: {
-      type: String,
-      trim: true,
-    },
-    modelName: {
-      type: String,
-      required: [true, "Le nom du modèle de GPU est obligatoire."],
-      trim: true,
-    },
-    memory_gb: {
-      type: Number,
-      required: [true, "La quantité de mémoire est obligatoire."],
-      min: [0, "La mémoire doit être positive."],
-    },
-    memoryType: {
-      type: String,
-      trim: true,
-    },
-    interface: {
-      type: String,
-      trim: true,
-    },
-    ports: {
-      type: [String],
-    },
-  }
-);
+const GpuSchema = new Schema<IGpuOffer>({
+  brand: {
+    type: String,
+    required: [true, "La marque de la carte graphique est obligatoire."],
+    enum: ['NVIDIA', 'AMD', 'Intel'],
+  },
+  chipset: {
+    type: String,
+    required: [true, "Le chipset est obligatoire."],
+    trim: true,
+  },
+  vram_gb: {
+    type: Number,
+    required: [true, "La mémoire VRAM est obligatoire."],
+    min: [1, "La VRAM doit être d'au moins 1 Go."],
+  },
+  vramType: {
+    type: String,
+    required: [true, "Le type de VRAM est obligatoire."],
+    enum: ['GDDR6', 'GDDR6X', 'GDDR5', 'HBM2'],
+  },
+});
 
-let GpuOfferModel;
-const discriminatorKey = 'gpus-graphics-cards'; // Correspond au KINDS.GPU
+const GpuOfferModel = (models[KINDS.GPU] as Model<IGpuOffer>) ||
+  ProductOfferModel.discriminator<IGpuOffer>(
+    KINDS.GPU,
+    GpuSchema
+  );
 
-if (models.ProductOffer && models.ProductOffer.discriminators && models.ProductOffer.discriminators[discriminatorKey]) {
-  GpuOfferModel = models.ProductOffer.discriminators[discriminatorKey];
-} else if (models.ProductOffer) {
-  GpuOfferModel = ProductOfferModel.discriminator<IGpuOffer>(discriminatorKey, GpuSchema);
-} else {
-  console.error(`ProductOfferModel base model not found when defining ${discriminatorKey} discriminator.`);
-}
-
-export default GpuOfferModel as Model<IGpuOffer> | undefined; 
+export default GpuOfferModel; 

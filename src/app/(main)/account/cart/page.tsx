@@ -9,9 +9,10 @@ import { Loader2, ShoppingCart, Trash2, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { CartData, CartItem, OfferCondition } from './types';
 import { useSession } from 'next-auth/react';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { signIn } from 'next-auth/react';
 import { toast } from 'sonner';
+import { Separator } from '@/components/ui/separator';
 
 const PLACEHOLDER_IMAGE_URL = '/images/placeholder-product.webp';
 
@@ -256,36 +257,40 @@ export default function CartPage() {
                     ))}
                 </div>
 
-                <div className="lg:col-span-1 sticky top-24 self-start">
-                    <Card className="p-6 rounded-lg shadow-sm">
-                        <h2 className="text-xl font-semibold mb-4">Récapitulatif</h2>
-                        <div className="flex justify-between mb-2">
-                            <span>Sous-total ({cart.count || 0} article{cart.count && cart.count > 1 ? 's' : ''})</span>
-                            <span>{(totalAmount || 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</span>
-                        </div>
-                        <div className="flex justify-between mb-2 text-muted-foreground">
-                            <span>Frais de livraison</span>
-                            <span>À calculer</span>
-                        </div>
-                        <hr className="my-3" />
-                        <div className="flex justify-between font-bold text-lg mb-4">
-                            <span>Total</span>
-                            <span>{(totalAmount || 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</span>
-                        </div>
-                        <Button 
-                            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" 
-                            onClick={() => router.push(`/checkout?amount=${totalAmount}`)}
-                            disabled={isUpdating || totalAmount <= 0}
-                        >
-                            Procéder au paiement
-                        </Button>
-                        <p className="text-xs text-muted-foreground mt-2 text-center">
-                            Vous pourrez choisir votre point relais à l'étape suivante.
-                        </p>
-                        <Button variant="outline" className="w-full mt-3" asChild>
-                            <Link href="/categories"><ArrowLeft className="mr-2 h-4 w-4" />Continuer mes achats</Link>
-                        </Button>
+                <div className="lg:col-span-1">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Résumé de la commande</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex justify-between">
+                                <span>Sous-total</span>
+                                <span>{totalAmount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Livraison</span>
+                                <span>Gratuite</span>
+                            </div>
+                            <Separator />
+                            <div className="flex justify-between font-bold text-lg">
+                                <span>Total</span>
+                                <span>{totalAmount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</span>
+                            </div>
+                        </CardContent>
+                        <CardFooter>
+                            <Button asChild className="w-full" size="lg" disabled={isUpdating}>
+                                <Link href={`/checkout?amount=${totalAmount}&cartId=${cart._id}`}>
+                                    Procéder au paiement
+                                </Link>
+                            </Button>
+                        </CardFooter>
                     </Card>
+                    <div className="text-center mt-4">
+                        <Button variant="link" onClick={() => router.push('/')}>
+                            <ArrowLeft className="mr-2 h-4 w-4" />
+                            Continuer les achats
+                        </Button>
+                    </div>
                 </div>
             </div>
         </div>
