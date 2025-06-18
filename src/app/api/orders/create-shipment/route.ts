@@ -34,21 +34,52 @@ export async function POST(req: Request) {
     // @ts-ignore
     const seller = offer.seller;
 
-    if (!seller.sendcloudSenderId || !seller.shippingAddress) {
-      return NextResponse.json({ message: 'Seller has not configured their shipping address' }, { status: 400 });
+    if (!seller.shippingAddress) {
+      return NextResponse.json({ message: 'Le vendeur n\'a pas configuré son adresse d\'expédition' }, { status: 400 });
     }
+
+    if (!buyer.shippingAddress) {
+        return NextResponse.json({ message: 'L\'acheteur n\'a pas configuré son adresse de livraison' }, { status: 400 });
+    }
+
+    // Étape 1: Récupérer les méthodes d'envoi pour le point relais
+    const shippingMethods = await sendcloudService.getShippingMethodsForServicePoint(servicePointId);
+    if (!shippingMethods || shippingMethods.length === 0) {
+      return NextResponse.json({ message: 'Aucune méthode de livraison trouvée pour ce point relais' }, { status: 400 });
+    }
+    const shippingMethodId = shippingMethods[0].id; // On prend la première méthode disponible
 
     const parcelPayload = {
       name: buyer.name || 'N/A',
       email: buyer.email,
-      telephone: buyer.shippingAddress?.telephone || '',
+      telephone: buyer.shippingAddress.telephone || '',
+
+      // Recipient address is required even for service point delivery
+      address: buyer.shippingAddress.address,
+      house_number: buyer.shippingAddress.houseNumber,
+      city: buyer.shippingAddress.city,
+      postal_code: buyer.shippingAddress.postalCode,
+      country: buyer.shippingAddress.country,
+
       to_service_point: servicePointId,
-      sender_address: seller.sendcloudSenderId,
+      
+      from_address: {
+        from_name: seller.shippingAddress.name,
+        from_company_name: seller.shippingAddress.companyName || seller.shippingAddress.name,
+        from_street: seller.shippingAddress.address,
+        from_house_number: seller.shippingAddress.houseNumber,
+        from_city: seller.shippingAddress.city,
+        from_postal_code: seller.shippingAddress.postalCode,
+        from_country: seller.shippingAddress.country,
+        from_telephone: seller.shippingAddress.telephone || '',
+        from_email: seller.email,
+      },
+
       weight: "1", // TODO: Get weight from product model
       request_label: true,
-      apply_shipping_rules: true,
+      apply_shipping_rules: false, // On désactive car on choisit manuellement la méthode
       shipment: {
-        id: 8, // Use "Unstamped letter" for testing to avoid costs
+        id: shippingMethodId, 
       },
       parcel_items: [{
         description: offer.description?.substring(0, 35) || 'Product',
@@ -58,10 +89,10 @@ export async function POST(req: Request) {
       }],
     };
 
-    // Étape 1: Créer le colis via Sendcloud
+    // Étape 2: Créer le colis via Sendcloud
     const createdParcel = await sendcloudService.createParcel(parcelPayload);
 
-    // Étape 2: Si la création réussit, mettre à jour l'offre dans la base de données
+    // Étape 3: Si la création réussit, mettre à jour l'offre dans la base de données
     offer.transactionStatus = 'pending_shipment';
     offer.listingStatus = 'sold';
     offer.soldTo = new Types.ObjectId(buyerId);

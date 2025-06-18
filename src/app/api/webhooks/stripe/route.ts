@@ -40,7 +40,7 @@ async function executeTransactionWithRetry(
     }
 }
 
-async function createOrderFromCart(userId: string, cartId: string, paymentIntent: Stripe.PaymentIntent, session: ClientSession) {
+async function createOrderFromCart(userId: string, cartId: string, servicePointId: string, paymentIntent: Stripe.PaymentIntent, session: ClientSession) {
     const cart = await CartModel.findById(cartId).session(session).populate<{ items: { offer: IProductOffer }[] }>({
         path: 'items.offer',
         model: 'ProductOffer',
@@ -54,11 +54,21 @@ async function createOrderFromCart(userId: string, cartId: string, paymentIntent
         const productOffer = item.offer as IProductOffer;
         if (!productOffer || !productOffer.price) throw new Error('Invalid product data in cart.');
         
-        // Mettre à jour l'offre pour la marquer comme vendue
-        productOffer.soldTo = new Types.ObjectId(userId);
-        productOffer.listingStatus = 'sold';
-        productOffer.transactionStatus = 'pending_shipment';
-        await productOffer.save({ session });
+        const response = await fetch(`${process.env.NEXTAUTH_URL}/api/orders/create-shipment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                offerId: productOffer._id.toString(),
+                buyerId: userId,
+                servicePointId: Number(servicePointId),
+            }),
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.text();
+            throw new Error(`Failed to create shipment for offer ${productOffer._id.toString()} in cart ${cartId}: ${errorData}`);
+        }
+        console.log(`Successfully triggered shipment creation for offer ${productOffer._id.toString()} from cart.`);
         
         orderItems.push({
             _id: new Types.ObjectId(),
@@ -80,7 +90,7 @@ async function createOrderFromCart(userId: string, cartId: string, paymentIntent
         paymentIntentId: paymentIntent.id,
         paymentStatus: 'succeeded',
         paymentMethod: paymentIntent.payment_method_types[0],
-        relayPointId: 'relay_point_placeholder', 
+        relayPointId: servicePointId, 
     });
 
     await newOrder.save({ session });
@@ -135,9 +145,9 @@ export async function POST(req: Request) {
                     }
                     console.log("Successfully triggered shipment creation for offer:", offerId);
 
-                } else if (cartId && userId) {
-                    console.log(`Handling cart purchase: cartId=${cartId}, userId=${userId}`);
-                    await createOrderFromCart(userId, cartId, paymentIntent, session);
+                } else if (cartId && userId && servicePointId) {
+                    console.log(`Handling cart purchase: cartId=${cartId}, userId=${userId}, servicePointId=${servicePointId}`);
+                    await createOrderFromCart(userId, cartId, servicePointId, paymentIntent, session);
                 
                 } else {
                     console.warn('PaymentIntent succeeded but metadata was incomplete.', paymentIntent.metadata);

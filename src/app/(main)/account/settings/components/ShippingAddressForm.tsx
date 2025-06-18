@@ -78,7 +78,7 @@ export default function ShippingAddressForm({ initialData }: ShippingAddressForm
       <CardHeader>
         <CardTitle>Adresse d'Expédition</CardTitle>
         <CardDescription>
-          Cette adresse sera utilisée pour générer les étiquettes d'expédition lorsque vous vendez un article.
+          Cette adresse sera utilisée pour vos livraisons et l'expédition de vos ventes.
         </CardDescription>
       </CardHeader>
       <CardContent>

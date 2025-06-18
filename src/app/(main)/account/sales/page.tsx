@@ -13,6 +13,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from 'sonner';
 import type { SellerOffer } from './types';
 import { useRouter } from 'next/navigation';
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 
 export interface ProductModelInfo {
     id: string;
@@ -115,6 +117,11 @@ function SellerDashboardSkeleton() {
             </CardContent>
         </Card>
     );
+}
+
+function getLabelIdFromUrl(url: string): string | null {
+    const match = url.match(/label_printer\/(\d+)/);
+    return match ? match[1] : null;
 }
 
 /**
@@ -308,28 +315,13 @@ export default function SellerDashboardPage() {
                                         </TableCell>
                                         <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">{new Date(offer.createdAt).toLocaleDateString('fr-FR')}</TableCell>
                                         <TableCell>
-                                            {(() => {
-                                                if (offer.status === 'pending_shipment') {
-                                                    if (offer.shippingInfo?.labelUrl) {
-                                                        return (
-                                                            <Button asChild size="sm">
-                                                                <a href={offer.shippingInfo.labelUrl} target="_blank" rel="noopener noreferrer">
-                                                                    <Download className="mr-2 h-4 w-4" />
-                                                                    Étiquette
-                                                                </a>
-                                                            </Button>
-                                                        )
-                                                    } else {
-                                                        return (
-                                                            <Badge variant="destructive" className="text-xs whitespace-nowrap">
-                                                                <AlertTriangle className="mr-1 h-3 w-3" />
-                                                                Erreur
-                                                            </Badge>
-                                                        )
-                                                    }
-                                                }
-                                                return <span className="text-muted-foreground text-xs">N/A</span>
-                                            })()}
+                                            {offer.shippingInfo?.labelUrl && offer.status === 'pending_shipment' && (
+                                                <Button asChild>
+                                                    <a href={`/api/shipping/label/${getLabelIdFromUrl(offer.shippingInfo.labelUrl)}`} target="_blank">
+                                                        Télécharger le bordereau
+                                                    </a>
+                                                </Button>
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {(offer.status === 'available' || offer.status === 'archived') ? (

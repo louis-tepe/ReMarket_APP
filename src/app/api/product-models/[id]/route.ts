@@ -209,27 +209,27 @@ export async function GET(
       specifications = [];
     }
 
-    const productData = {
-      _id: productModel._id.toString(),
-      slug: productModel.slug,
-      title: productModel.product.title,
-      brand: {
-        _id: productModel.brand?._id,
-        name: productModel.brand?.name || productModel.product.brand,
-        slug: productModel.brand?.slug,
-      },
-      category: {
-        _id: productModel.category?._id,
-        name: productModel.category?.name,
-        slug: productModel.category?.slug,
-      },
-      standardDescription: productModel.product.description || '',
-      standardImageUrls: productModel.product.images || [],
-      keyFeatures: [],
-      specifications: specifications,
+    const response = {
+        _id: productModel._id.toString(),
+        slug: productModel.slug,
+        title: productModel.product.title,
+        brand: {
+            _id: productModel.brand?._id.toString(),
+            name: productModel.brand?.name || productModel.product.brand,
+            slug: productModel.brand?.slug,
+        },
+        category: {
+            _id: productModel.category?._id.toString(),
+            name: productModel.category?.name,
+            slug: productModel.category?.slug,
+        },
+        rawDescription: productModel.product.description,
+        standardImageUrls: productModel.product.images || [],
+        rawImageUrls: productModel.product.images || [],
+        specifications: specifications,
     };
 
-    return NextResponse.json({ success: true, productModel: productData }, { status: 200 });
+    return NextResponse.json(response, { status: 200 });
   } catch (error) {
     console.error(`Erreur API /api/product-models/${id}:`, error);
     const errorMessage = error instanceof Error ? error.message : 'Erreur serveur inconnue.';

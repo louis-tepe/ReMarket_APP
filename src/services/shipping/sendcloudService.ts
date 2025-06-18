@@ -11,7 +11,8 @@ const token = Buffer.from(
 ).toString('base64');
 
 const authHeaders = {
-  Authorization: `Basic ${token}`,
+  'Authorization': `Basic ${token}`,
+  'Content-Type': 'application/json',
 };
 
 interface SendcloudSenderAddress {
@@ -39,19 +40,39 @@ interface SendcloudServicePoint {
   distance: number;
 }
 
+interface ShippingMethod {
+  id: number;
+  name: string;
+  carrier: string;
+  min_weight: string;
+  max_weight: string;
+}
+
 interface CreateParcelPayload {
   parcel: {
     name: string; // Recipient name
-    // company_name?: string;
-    // address: string; // Not needed for service points
-    // house_number: string;
-    // city: string;
-    // postal_code: string;
-    // country: string;
+    address: string;
+    house_number: string;
+    city: string;
+    postal_code: string;
+    country: string;
     email: string; // Recipient email
     telephone: string; // Recipient phone
     to_service_point: number; // Service Point ID
-    sender_address: number; // Sender Address ID from Sendcloud
+    
+    // For marketplace model, we pass the sender address directly
+    from_address: {
+      from_name: string;
+      from_company_name?: string;
+      from_street: string;
+      from_house_number: string;
+      from_city: string;
+      from_postal_code: string;
+      from_country: string;
+      from_telephone?: string;
+      from_email: string;
+    };
+
     weight: string; // In kgs, e.g., "1.5"
     request_label: boolean;
     apply_shipping_rules: boolean;
@@ -96,6 +117,20 @@ class SendcloudService {
     });
   }
 
+  async getShippingMethodsForServicePoint(servicePointId: number): Promise<ShippingMethod[]> {
+    try {
+      const response = await this.apiClient.get('/shipping_methods', {
+        params: { service_point_id: servicePointId },
+      });
+      return response.data.shipping_methods;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.error('Sendcloud getShippingMethods API Error:', JSON.stringify(error.response?.data, null, 2));
+      }
+      throw new Error('Failed to fetch shipping methods from Sendcloud.');
+    }
+  }
+
   async getServicePoints(country: string, postalCode: string): Promise<SendcloudServicePoint[]> {
     try {
       const response = await this.servicePointApiClient.get('/service-points', {
@@ -123,32 +158,6 @@ class SendcloudService {
         console.error('Sendcloud Create Parcel API Error:', JSON.stringify(error.response?.data, null, 2));
       }
       throw new Error('Failed to create parcel with Sendcloud.');
-    }
-  }
-
-  async syncSenderAddress(address: IShippingAddress): Promise<SendcloudSenderAddress> {
-    const payload = {
-      sender_address: {
-        company_name: address.companyName || address.name,
-        contact_name: address.name,
-        street: address.address,
-        house_number: address.houseNumber,
-        city: address.city,
-        postal_code: address.postalCode,
-        country: address.country,
-        telephone: address.telephone || '',
-        email: '', // L'API ne semble pas requérir l'email ici.
-      }
-    };
-
-    try {
-      const response = await this.apiClient.post<{ sender_address: SendcloudSenderAddress }>('/sender_addresses', payload);
-      return response.data.sender_address;
-    } catch (error) {
-      if (axios.isAxiosError(error)) {
-        console.error('Sendcloud API Error:', error.response?.data);
-      }
-      throw new Error('Failed to sync sender address with Sendcloud.');
     }
   }
 

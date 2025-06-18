@@ -20,4 +20,69 @@ export interface SellerOffer {
         trackingNumber?: string;
         labelUrl?: string;
     };
-} 
+}
+
+export interface FrontendCategory {
+    _id: string;
+    name: string;
+    slug: string;
+    parent: string | null;
+    ancestors: { _id: string; name: string; slug: string }[];
+    isLeafNode: boolean;
+    depth: number;
+}
+
+export interface CategoryDropdownLevel {
+    level: number;
+    parentId: string | null;
+    options: FrontendCategory[];
+    selectedId: string | null;
+    placeholder: string;
+}
+
+export interface IBrand {
+    _id: string;
+    name: string;
+    slug: string;
+}
+
+export interface ProductModelReMarketSelectItem {
+    id: string;
+    name: string;
+}
+
+export interface Specifications {
+    label: string;
+    value: string;
+    unit?: string;
+}
+
+export interface DisplayableProductModel {
+    _id: string;
+    title: string;
+    brand: { name: string; } | string;
+    category: { name: string; } | string;
+    standardImageUrls: string[];
+    rawImageUrls?: string[];
+    standardDescription?: string;
+    rawDescription?: string;
+    keyFeatures?: string[];
+    specifications?: Specifications[];
+    rawAttributes?: { label: string; value: string; }[];
+    rawCategoryName?: string;
+    rawAsin?: string;
+    variantTitle?: string;
+}
+
+export const NOT_LISTED_ID = 'not-listed-create-new';
+
+export interface FormFieldDefinition {
+    name: string;
+    label: string;
+    type: 'text' | 'number' | 'select' | 'boolean';
+    required: boolean;
+    placeholder?: string;
+    options?: { value: string; label:string; }[];
+    defaultValue?: string | number | boolean;
+    description?: string;
+}
