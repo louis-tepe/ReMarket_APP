@@ -7,6 +7,7 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import ServicePointSelector from './components/ServicePointSelector';
+import AddressSelector from './components/AddressSelector';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 
@@ -23,7 +24,7 @@ interface ServicePoint {
   name: string;
 }
 
-function CheckoutForm({ isServicePointSelected }: { isServicePointSelected: boolean }) {
+function CheckoutForm({ isReadyToPay }: { isReadyToPay: boolean }) {
   const stripe = useStripe();
   const elements = useElements();
   const [isLoading, setIsLoading] = useState(false);
@@ -34,8 +35,8 @@ function CheckoutForm({ isServicePointSelected }: { isServicePointSelected: bool
       toast.error("Stripe.js n'a pas encore chargé.");
       return;
     }
-    if (!isServicePointSelected) {
-        toast.error("Veuillez sélectionner un point de livraison avant de payer.");
+    if (!isReadyToPay) {
+        toast.error("Veuillez sélectionner une adresse et un point de livraison avant de payer.");
         return;
     }
     setIsLoading(true);
@@ -58,7 +59,7 @@ function CheckoutForm({ isServicePointSelected }: { isServicePointSelected: bool
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
         <PaymentElement id="payment-element" options={{ layout: "tabs" }} />
-        <Button disabled={isLoading || !stripe || !elements || !isServicePointSelected} className="w-full" type="submit">
+        <Button disabled={isLoading || !stripe || !elements || !isReadyToPay} className="w-full" type="submit">
             {isLoading ? 'Traitement...' : 'Payer maintenant'}
         </Button>
     </form>
@@ -69,6 +70,9 @@ function StripeCheckoutCore() {
     const searchParams = useSearchParams();
     const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [selectedPoint, setSelectedPoint] = useState<ServicePoint | null>(null);
+    const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+
+    const isReadyToPay = !!selectedPoint && !!selectedAddressId;
     
     // Read params inside the client component
     const offerId = searchParams.get('offerId');
@@ -77,7 +81,7 @@ function StripeCheckoutCore() {
 
     useEffect(() => {
         async function fetchClientSecret() {
-            if (!selectedPoint || amount <= 0 || (!offerId && !cartId)) return;
+            if (!isReadyToPay || amount <= 0 || (!offerId && !cartId)) return;
             try {
                 const res = await fetch('/api/payment/create-intent', {
                     method: 'POST',
@@ -87,6 +91,7 @@ function StripeCheckoutCore() {
                         offerId,
                         cartId,
                         servicePointId: selectedPoint.id,
+                        shippingAddressId: selectedAddressId,
                     }),
                 });
                 if (!res.ok) {
@@ -95,13 +100,14 @@ function StripeCheckoutCore() {
                 }
                 const data = await res.json();
                 setClientSecret(data.clientSecret);
-            } catch (error: any) {
+            } catch (error) {
                 console.error(error);
-                toast.error(`Impossible d'initialiser le paiement: ${error.message}`);
+                const message = error instanceof Error ? error.message : "Une erreur inconnue est survenue.";
+                toast.error(`Impossible d'initialiser le paiement: ${message}`);
             }
         }
         fetchClientSecret();
-    }, [amount, offerId, cartId, selectedPoint]);
+    }, [amount, offerId, cartId, selectedPoint, selectedAddressId, isReadyToPay]);
 
     if (isNaN(amount) || amount <= 0 || (!offerId && !cartId)) {
         return (
@@ -123,21 +129,27 @@ function StripeCheckoutCore() {
             <h1 className="text-2xl font-bold text-center mb-2">Finaliser ma commande</h1>
             <p className="text-center text-xl font-semibold mb-6">{amount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</p>
             
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold mb-2">1. Choisissez votre point de livraison</h2>
-              <ServicePointSelector onSelectPoint={setSelectedPoint} />
+            <div className="mb-6 space-y-4">
+              <div>
+                  <h2 className="text-lg font-semibold mb-2">1. Choisissez votre adresse de facturation</h2>
+                  <AddressSelector onSelectAddress={setSelectedAddressId} />
+              </div>
+              <div>
+                  <h2 className="text-lg font-semibold mb-2">2. Choisissez votre point de livraison</h2>
+                  <ServicePointSelector onSelectPoint={setSelectedPoint} />
+              </div>
             </div>
 
             <Separator className="my-6" />
 
-            <div className={!selectedPoint ? 'opacity-50' : ''}>
-              <h2 className="text-lg font-semibold mb-2">2. Procédez au paiement</h2>
+            <div className={!isReadyToPay ? 'opacity-50' : ''}>
+              <h2 className="text-lg font-semibold mb-2">3. Procédez au paiement</h2>
               {clientSecret ? (
                   <Elements options={options} stripe={stripePromise} key={clientSecret}>
-                      <CheckoutForm isServicePointSelected={!!selectedPoint} />
+                      <CheckoutForm isReadyToPay={isReadyToPay} />
                   </Elements>
               ) : (
-                  <div className="text-center"><p>Veuillez sélectionner un point de livraison pour continuer.</p></div>
+                  <div className="text-center"><p>Veuillez sélectionner une adresse et un point de livraison pour continuer.</p></div>
               )}
             </div>
         </div>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import ProductModel, { IScrapedProduct } from '@/lib/mongodb/models/ScrapingProduct';
 import dbConnect from '@/lib/mongodb/dbConnect';
-import mongoose, { Types } from 'mongoose';
+import { Types } from 'mongoose';
 import { z } from 'zod';
 // import { getServerSession } from "next-auth/next"; // Décommenter si authOptions est utilisé
 // import { authOptions } from '@/app/api/auth/[...nextauth]/route'; // Décommenter pour la vérification admin
@@ -143,6 +143,12 @@ import { z } from 'zod';
  *          format: date-time
  */
 
+type Specification = {
+    label: string;
+    value: string;
+    unit?: string;
+};
+
 type PopulatedBrand = {
   _id: Types.ObjectId;
   name: string;
@@ -193,10 +199,10 @@ export async function GET(
       return NextResponse.json({ success: false, message: 'ProductModel non trouvé.' }, { status: 404 });
     }
 
-    let specifications;
+    let specifications: Specification[];
     if (Array.isArray(productModel.specifications)) {
       // Nouveau format : les spécifications sont déjà un tableau plat
-      specifications = productModel.specifications;
+      specifications = productModel.specifications as Specification[];
     } else if (typeof productModel.specifications === 'object' && productModel.specifications !== null) {
       // Ancien format : objet imbriqué nécessitant une transformation
       specifications = Object.entries(productModel.specifications).flatMap(([category, specsObject]) => {

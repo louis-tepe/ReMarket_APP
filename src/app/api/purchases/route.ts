@@ -4,6 +4,7 @@ import ProductOfferModel from '@/lib/mongodb/models/SellerProduct';
 import ProductModel from '@/lib/mongodb/models/ScrapingProduct';
 import UserModel from '@/lib/mongodb/models/User';
 import { Types } from 'mongoose';
+import OrderModel from '@/lib/mongodb/models/OrderModel';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,18 +22,23 @@ export async function GET(request: Request) {
     try {
         await dbConnect();
 
-        const purchases = await ProductOfferModel.find({ soldTo: new Types.ObjectId(userId) })
+        const purchases = await OrderModel.find({ buyer: new Types.ObjectId(userId) })
             .populate({
-                path: 'productModel',
-                model: ProductModel,
-                select: 'product.title product.images'
+                path: 'items.offer',
+                model: ProductOfferModel,
+                select: 'condition', 
+                populate: {
+                    path: 'productModel',
+                    model: ProductModel,
+                    select: 'product.title product.images'
+                }
             })
             .populate({
-                path: 'seller',
+                path: 'items.seller',
                 model: UserModel,
                 select: 'name'
             })
-            .sort({ updatedAt: -1 })
+            .sort({ createdAt: -1 })
             .lean();
 
         // LOGGING: Afficher le nombre de résultats

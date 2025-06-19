@@ -36,7 +36,7 @@ export default async function CategoryPage({ params: paramsPromise, searchParams
 
     return (
         <CategoryClientPage
-            initialProducts={JSON.parse(JSON.stringify(productsResult.data?.products || []))}
+            initialProducts={JSON.parse(JSON.stringify(productsResult.products || []))}
             allRootCategories={allRootCategories}
             currentCategory={currentCategory}
             currentCategoryChildren={currentCategoryChildren}

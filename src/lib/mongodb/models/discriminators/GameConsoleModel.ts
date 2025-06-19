@@ -1,9 +1,9 @@
-import { Schema, model, models, Model } from 'mongoose';
-import ProductOfferModel, { IProductOffer } from '../SellerProduct';
+import { Schema, models, Model } from 'mongoose';
+import ProductOfferModel, { IProductBase } from '../SellerProduct';
 import { KINDS } from '@/config/discriminatorMapping';
 
 // Interface spécifique si des champs supplémentaires sont nécessaires
-export interface IGameConsoleOffer extends IProductOffer {
+export interface IGameConsoleOffer extends IProductBase {
   modelName: string; // Ex: PlayStation 5, Xbox Series X, Nintendo Switch
   storage_gb: number;
   color?: string;

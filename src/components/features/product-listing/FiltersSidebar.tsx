@@ -56,8 +56,9 @@ export default function FiltersSidebar({
 
     const renderCategoryLink = (category: LeanCategory) => (
         <Link
-            key={category._id}
-            href={`${basePath}/${breadcrumbs.map(b => b.slug).join('/')}/${category.slug}`}
+            key={category._id.toString()}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            href={`${basePath}/${breadcrumbs.map(b => b.slug).join('/')}/${category.slug}` as any}
             onClick={() => handleCategoryClick(category.slug)}
             className={cn(
                 "flex items-center justify-between w-full text-left p-2 rounded-md hover:bg-accent",
@@ -92,11 +93,12 @@ export default function FiltersSidebar({
                                 <Home className="h-4 w-4 mr-2" /> Toutes les catégories
                             </Link>
                             {breadcrumbs.map((crumb, index) => (
-                                <div key={crumb._id} className="flex items-center">
+                                <div key={crumb._id.toString()} className="flex items-center">
                                     <span style={{marginLeft: `${index * 10}px`}} className="mr-1">
                                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                                     </span>
-                                    <Link href={`${basePath}/${breadcrumbs.slice(0, index + 1).map(c => c.slug).join('/')}`} onClick={() => handleCategoryClick(crumb.slug)} className="text-sm p-1 rounded-md hover:bg-accent">
+                                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                    <Link href={`${basePath}/${breadcrumbs.slice(0, index + 1).map(c => c.slug).join('/')}` as any} onClick={() => handleCategoryClick(crumb.slug)} className="text-sm p-1 rounded-md hover:bg-accent">
                                         {crumb.name}
                                     </Link>
                                 </div>
@@ -126,7 +128,7 @@ export default function FiltersSidebar({
                                     <ScrollArea className="max-h-52">
                                     <div className="space-y-1 pr-3">
                                         {allBrands.map(brand => (
-                                            <div key={brand._id} className="flex items-center space-x-2 py-0.5 px-1 rounded-md hover:bg-accent">
+                                            <div key={brand._id.toString()} className="flex items-center space-x-2 py-0.5 px-1 rounded-md hover:bg-accent">
                                                 <Checkbox
                                                     id={`brand-${brand.slug}`}
                                                     checked={selectedBrandSlugs.includes(brand.slug)}

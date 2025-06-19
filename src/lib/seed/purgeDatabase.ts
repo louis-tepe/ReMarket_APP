@@ -7,9 +7,14 @@ import OrderModel from '@/lib/mongodb/models/OrderModel';
 import CategoryModel from '@/lib/mongodb/models/CategoryModel';
 import BrandModel from '@/lib/mongodb/models/BrandModel';
 import ChatSession from '@/lib/mongodb/models/ChatSession';
-import mongoose from 'mongoose';
+import mongoose, { Model } from 'mongoose';
 
-const modelsToPurge = {
+interface ModelsMap {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    [key: string]: Model<any>;
+}
+
+const modelsToPurge: ModelsMap = {
     'ScrapingProducts': ScrapingProduct,
     'ProductOffers': ProductOfferModel,
     'Users': UserModel,

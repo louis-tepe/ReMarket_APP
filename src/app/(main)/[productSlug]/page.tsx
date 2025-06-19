@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { notFound } from "next/navigation";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 
 // Component Imports
 import ProductImageGallery from './components/ProductImageGallery';
@@ -198,7 +199,14 @@ export default function ProductPage({ params }: ProductPageProps) {
                     }
                 });
             } else {
-                throw new Error(result.message || "Erreur lors de l'ajout au panier.");
+                // Gestion d'erreur améliorée
+                if (result.message && result.message.includes("Le vendeur n'a pas configuré d'adresse d'expédition")) {
+                     toast.error("Ajout impossible", { 
+                        description: "Le vendeur de cette offre n'a pas encore renseigné d'adresse d'expédition. Vous ne pouvez pas acheter cet article pour le moment.",
+                     });
+                } else {
+                    throw new Error(result.message || "Erreur lors de l'ajout au panier.");
+                }
             }
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : "Une erreur inconnue s'est produite.";
@@ -229,26 +237,29 @@ export default function ProductPage({ params }: ProductPageProps) {
 
                     <Separator className="my-6" />
 
-                    <ProductOffersList
-                        offers={product.offers}
-                        isLoading={isLoading}
-                        handleAddToCart={handleAddToCart}
-                        isAddingToCartOfferId={isAddingToCartOfferId}
-                        sessionStatus={sessionStatus}
-                    />
+                    <Tabs defaultValue="offers" className="w-full">
+                        <TabsContent value="offers">
+                            <ProductOffersList
+                                offers={product.offers}
+                                handleAddToCart={handleAddToCart}
+                                isAddingToCartOfferId={isAddingToCartOfferId}
+                                sessionStatus={sessionStatus}
+                            />
+                        </TabsContent>
 
-                    <Separator className="my-8" />
+                        <Separator className="my-8" />
 
-                    <LedenicheurPriceInfo
-                        averagePriceLedenicheur={product.averagePriceLedenicheur}
-                        sourceUrlLedenicheur={product.sourceUrlLedenicheur}
-                    />
+                        <LedenicheurPriceInfo
+                            averagePriceLedenicheur={product.averagePriceLedenicheur}
+                            sourceUrlLedenicheur={product.sourceUrlLedenicheur}
+                        />
 
-                    <ProductDetailsTabs
-                        keyFeatures={product.keyFeatures}
-                        specifications={product.specifications}
-                        optionChoicesLedenicheur={product.optionChoicesLedenicheur}
-                    />
+                        <ProductDetailsTabs
+                            keyFeatures={product.keyFeatures}
+                            specifications={product.specifications}
+                            optionChoicesLedenicheur={product.optionChoicesLedenicheur}
+                        />
+                    </Tabs>
                 </div>
             </div>
         </div>

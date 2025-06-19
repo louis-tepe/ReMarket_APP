@@ -1,7 +1,11 @@
-import type { IProductModel as BackendProductModel } from '@/lib/mongodb/models/ScrapingProduct';
+import type { IScrapedProduct as BackendProductModel } from '@/lib/mongodb/models/ScrapingProduct';
 import type { ICategory as BackendCategory } from '@/lib/mongodb/models/CategoryModel';
 import type { FormFieldDefinition } from '@/types/form.types';
 import type { IBrand as BackendBrand } from '@/lib/mongodb/models/BrandModel'; // Import IBrand
+import { IProductBase } from "@/lib/mongodb/models/SellerProduct";
+import { IScrapedProduct } from "@/lib/mongodb/models/ScrapingProduct";
+import { IUser } from "@/lib/mongodb/models/User";
+import { Types } from "mongoose";
 
 // Export IProductModelReMarketType directly
 export type IProductModelReMarketType = BackendProductModel;
@@ -76,4 +80,28 @@ export interface CategorySpecificField {
     label: string;
     // ... existing code ...
 }
+
+export interface ProductModelInfo {
+    id: string;
+    name: string;
+    imageUrl?: string;
+}
+
+export type ListingStatus = 'available' | 'reserved' | 'sold' | 'archived';
+export type TransactionStatus = 'available' | 'pending_payment' | 'pending_shipment' | 'shipped' | 'delivered' | 'cancelled';
+export type OfferCondition = 'new' | 'like-new' | 'good' | 'fair' | 'poor';
+
+// Represents the raw offer data structure received from the API, 
+// which is a populated version of the IProductBase from Mongoose.
+export type SellerOffer = Omit<IProductBase, '_id' | 'productModel' | 'seller' | 'soldTo' | 'orderId'> & {
+    _id: Types.ObjectId;
+    productModel: Pick<IScrapedProduct, 'product' | 'slug' | 'brand' | 'category'> & {
+        brand?: { name: string, slug: string };
+        category?: { name: string, slug: string };
+    };
+    seller: Pick<IUser, 'name'>;
+    soldTo?: Pick<IUser, 'name'>;
+    createdAt: string; // Dates are stringified
+    updatedAt: string;
+};
 

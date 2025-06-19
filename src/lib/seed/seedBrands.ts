@@ -199,7 +199,6 @@ async function seedBrands() {
     console.log(`INFO: ${allCategories.length} catégories chargées et mappées.`);
 
     let brandsCreatedCount = 0;
-    let brandsUpdatedCount = 0;
     let brandsSkippedCount = 0;
 
     for (const brandData of BRANDS_TO_SEED_WITH_CATEGORIES) {

@@ -8,7 +8,8 @@ import Footer from "@/components/layout/Footer";
 import { cn } from "@/lib/utils";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
-import { Toaster as ReactHotToastToaster } from 'react-hot-toast';
+import { Toaster } from 'sonner';
+import ReactQueryProvider from '@/components/providers/ReactQueryProvider';
 
 export const metadata: Metadata = {
   title: "ReMarket - Votre marché de seconde main, réinventé.",
@@ -30,14 +31,16 @@ export default async function RootLayout({
     >
       <body className={cn("min-h-screen bg-background font-sans antialiased")}>
         <NextAuthProvider session={session}>
-          <div className="flex flex-col min-h-screen">
-            <Header />
-            <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              {children}
-            </main>
-            <Footer />
-          </div>
-          <ReactHotToastToaster position="top-center" reverseOrder={false} />
+          <ReactQueryProvider>
+            <div className="flex flex-col min-h-screen">
+              <Header />
+              <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                {children}
+              </main>
+              <Footer />
+            </div>
+          </ReactQueryProvider>
+          <Toaster />
         </NextAuthProvider>
       </body>
     </html>

@@ -11,6 +11,7 @@ export interface IShippingInfo {
 
 // Interface de base pour toutes les offres de produits
 export interface IProductBase extends Document {
+  _id: Types.ObjectId;
   category: Types.ObjectId | ICategory; // Réf. à Category (doit être une feuille)
   productModel: number;                   // Réf. à ScrapingProduct (fiche produit standard ReMarket)
 

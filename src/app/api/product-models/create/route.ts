@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb/dbConnect';
-import ScrapingProduct, { IScrapedProduct } from '@/lib/mongodb/models/ScrapingProduct';
+// import ScrapingProduct, { IScrapedProduct } from '@/lib/mongodb/models/ScrapingProduct';
 // import { scrapeLedenicheurProduct } from '@/services/scraping/ledenicheur/scraper';
 // import { LedenicheurProductDetails } from '@/services/scraping/ledenicheur/ledenicheur.types';
-import CategoryModel from '@/lib/mongodb/models/CategoryModel';
-import BrandModel from '@/lib/mongodb/models/BrandModel';
-import slugify from 'slugify';
-import { Types } from 'mongoose';
+// import CategoryModel from '@/lib/mongodb/models/CategoryModel';
+// import BrandModel from '@/lib/mongodb/models/BrandModel';
+// import slugify from 'slugify';
+// import { Types } from 'mongoose';
 
 // NOTE: The scraping functionality has been moved to the /api/scrape/initiate and /api/scrape/select endpoints.
 // This endpoint is currently not used for creating products via scraping.
@@ -18,6 +18,7 @@ interface PostProductData {
   brandId: string; // Ceci est un ID de marque
 }
 
+/*
 const flattenSpecifications = (specs: any): { label: string; value: string; }[] => {
     const flattened: { label: string; value: string; }[] = [];
     if (!specs) return flattened;
@@ -60,6 +61,7 @@ const flattenSpecifications = (specs: any): { label: string; value: string; }[] 
 
     return flattened;
 };
+*/
 
 /*
 const mapApiDataToScrapedProduct = (

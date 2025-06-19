@@ -94,14 +94,3 @@ export interface DisplayableProductModel {
 }
 
 export const NOT_LISTED_ID = 'not-listed-create-new';
-
-export interface FormFieldDefinition {
-    name: string;
-    label: string;
-    type: 'text' | 'number' | 'select' | 'boolean';
-    required: boolean;
-    placeholder?: string;
-    options?: { value: string; label:string; }[];
-    defaultValue?: string | number | boolean;
-    description?: string;
-}

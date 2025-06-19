@@ -14,35 +14,35 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from "sonner";
 import { useSession } from "next-auth/react";
-import {
-    FrontendCategory,
-    CategoryDropdownLevel,
-    ProductModelReMarketSelectItem,
-    DisplayableProductModel,
-    FormFieldDefinition,
-    Specifications,
-    IBrand
-} from '@/app/(main)/account/sell/types';
-import { NOT_LISTED_ID } from '@/app/(main)/account/sell/types';
-import { Loader2, CheckCircle, ArrowRight, RefreshCcw, ArrowLeft } from 'lucide-react';
+import { Loader2, CheckCircle, ArrowRight, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Switch } from '@/components/ui/switch';
 import {
     AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
-    AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { FormFieldDefinition } from '@/types/form.types';
+import type {
+  FrontendCategory,
+  CategoryDropdownLevel,
+  IBrand,
+  ProductModelReMarketSelectItem,
+  DisplayableProductModel,
+  Specifications,
+} from './types';
+import { NOT_LISTED_ID } from './types';
+import Link from 'next/link';
+import { IShippingAddress } from '@/lib/mongodb/models/User';
 
 interface ScrapeCandidate {
     title: string;
     url: string;
     similarity?: number;
+    leDenicheurId: number;
 }
 
 const OfferFormSchema = z.object({
@@ -58,10 +58,17 @@ const OfferFormSchema = z.object({
 
 type TOfferFormSchema = z.infer<typeof OfferFormSchema>;
 
+interface UserWithAddress {
+    shippingAddresses?: IShippingAddress[];
+}
+
 export default function SellPage() {
     const [step, setStep] = useState(1);
-    const { status: sessionStatus } = useSession();
+    const { data: session, status: sessionStatus } = useSession();
     const router = useRouter();
+    
+    const userWithAddress = session?.user as (UserWithAddress & { id: string }) | undefined;
+    const hasShippingAddress = userWithAddress?.shippingAddresses && userWithAddress.shippingAddresses.length > 0;
 
     const [allCategories, setAllCategories] = useState<FrontendCategory[]>([]);
     const [categoryDropdowns, setCategoryDropdowns] = useState<CategoryDropdownLevel[]>([]);
@@ -97,7 +104,6 @@ export default function SellPage() {
         control,
         formState: { errors, isValid },
         watch,
-        reset: resetForm,
     } = useForm<TOfferFormSchema>({
         resolver: zodResolver(OfferFormSchema),
         mode: 'onTouched',
@@ -110,38 +116,6 @@ export default function SellPage() {
     });
 
     const watchedImages = watch("images");
-
-    const resetSellProcess = useCallback(() => {
-        setStep(1);
-        setCategoryDropdowns([]);
-        setFinalSelectedLeafCategory(null);
-        setBrands([]);
-        setSelectedBrandId(null);
-        setProductModelsReMarketSelectItems([]);
-        setSelectedProductModelReMarketId(null);
-        setSelectedProductModel(null);
-        setShowCreateByName(false);
-        setNewProductModelName('');
-        setOfferSpecificFieldValues({});
-        setOfferSpecificFieldDefinitions([]);
-        
-        setJobId(null);
-        setScrapeCandidates([]);
-        setScrapeError(null);
-
-        resetForm();
-        if (allCategories.length > 0) {
-            setCategoryDropdowns([
-                {
-                    level: 0,
-                    parentId: null,
-                    options: allCategories.filter(cat => cat.depth === 0),
-                    selectedId: null,
-                    placeholder: "Sélectionnez la catégorie principale"
-                }
-            ]);
-        }
-    }, [allCategories, resetForm]);
 
     useEffect(() => {
         setIsLoadingCategories(true);
@@ -236,17 +210,10 @@ export default function SellPage() {
                 (formFieldsData.formFields as FormFieldDefinition[]).forEach((field: FormFieldDefinition) => {
                     if (field.defaultValue !== undefined) {
                         initialSpecificValues[field.name] = field.defaultValue;
-                    } else if (field.type === 'number') {
-                        initialSpecificValues[field.name] = '';
-                    } else if (field.type === 'boolean') {
-                        initialSpecificValues[field.name] = false;
-                    } else {
-                        initialSpecificValues[field.name] = '';
                     }
                 });
-                setOfferSpecificFieldDefinitions(formFieldsData.formFields);
+                setOfferSpecificFieldDefinitions(formFieldsData.formFields as FormFieldDefinition[]);
                 setOfferSpecificFieldValues(initialSpecificValues);
-
             } else {
                 setOfferSpecificFieldDefinitions([]);
                 setOfferSpecificFieldValues({});
@@ -315,6 +282,7 @@ export default function SellPage() {
         if (!candidateUrl) {
             setScrapeCandidates([]);
             setJobId(null);
+            setScrapeError(null);
             toast.info("Recherche annulée", { description: "Vous pouvez affiner votre recherche." });
             return;
         }
@@ -407,22 +375,18 @@ export default function SellPage() {
         setStep(1);
     };
 
-    const handleBackToBrandSelection = () => {
-        setSelectedBrandId(null);
-        setProductModelsReMarketSelectItems([]);
-        setSelectedProductModelReMarketId(null);
-        setShowCreateByName(false);
-        setNewProductModelName('');
-        setJobId(null);
-        setScrapeCandidates([]);
-        setScrapeError(null);
-    };
-
     const onOfferSubmit = async (formData: TOfferFormSchema) => {
         if (!finalSelectedLeafCategory || !selectedProductModel) {
             toast.error("Erreur", { description: "Catégorie ou modèle de produit manquant." });
             return;
         }
+
+        const userId = (session?.user as { id?: string })?.id;
+        if (!userId) {
+            toast.error("Erreur", { description: "Identifiant de session manquant." });
+            return;
+        }
+
         setIsSubmitting(true);
         
         try {
@@ -479,7 +443,8 @@ export default function SellPage() {
         }
     };
 
-    const getDisplayString = (value: any): string => {
+    type DisplayableValue = string | number | boolean | null | undefined | { name?: string; title?: string };
+    const getDisplayString = (value: DisplayableValue): string => {
         if (value === null || value === undefined) return 'N/A';
         if (typeof value === 'string') return value;
         if (typeof value === 'number') return String(value);
@@ -565,52 +530,64 @@ export default function SellPage() {
     };
 
     const renderDynamicFields = () => {
-        if (offerSpecificFieldDefinitions.length === 0) return null;
+        if (!selectedProductModel) return null;
 
-        return (
-            <div className="my-6 p-4 border rounded-md bg-muted/20">
-                <h3 className="font-semibold text-lg mb-4">Détails spécifiques à la catégorie</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {offerSpecificFieldDefinitions.map(field => (
-                        <div key={field.name} className="space-y-2">
-                            <Label htmlFor={field.name}>
-                                {field.label}
-                                {field.required && <span className="text-destructive">*</span>}
-                            </Label>
-                            {field.type === 'boolean' ? (
-                                <div className="flex items-center space-x-2">
-                                    <Switch
-                                        id={field.name}
-                                        checked={offerSpecificFieldValues[field.name] as boolean}
-                                        onCheckedChange={(value) => handleSpecificFieldChange(field.name, value)}
-                                    />
-                                    <Label htmlFor={field.name}>{field.description}</Label>
-                                </div>
-                            ) : field.type === 'select' ? (
-                                <Select onValueChange={(value) => handleSpecificFieldChange(field.name, value)} value={offerSpecificFieldValues[field.name] as string}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder={field.placeholder} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {field.options?.map(option => (
-                                            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            ) : (
-                                <Input
-                                    id={field.name}
-                                    type={field.type}
-                                    value={offerSpecificFieldValues[field.name] as string | number}
-                                    onChange={(e) => handleSpecificFieldChange(field.name, e.target.value)}
-                                    placeholder={field.placeholder}
-                                />
-                            )}
-                        </div>
-                    ))}
+        return offerSpecificFieldDefinitions.map((field) => {
+            const label = <Label htmlFor={field.name}>{field.label}</Label>;
+            const description = field.description ? <p className="text-sm text-muted-foreground">{field.description}</p> : null;
+
+            if (field.type === 'switch') {
+                return (
+                    <div key={field.name} className="flex items-center space-x-2">
+                        <Switch
+                            id={field.name}
+                            checked={offerSpecificFieldValues[field.name] as boolean}
+                            onCheckedChange={(checked) => handleSpecificFieldChange(field.name, checked)}
+                        />
+                        {label}
+                        {description}
+                    </div>
+                );
+            }
+
+            if (field.type === 'select') {
+                return (
+                    <div key={field.name} className="space-y-2">
+                        {label}
+                        <Select
+                            name={field.name}
+                            value={offerSpecificFieldValues[field.name] as string}
+                            onValueChange={(value) => handleSpecificFieldChange(field.name, value)}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder={field.placeholder} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {field.options?.map(option => (
+                                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        {description}
+                    </div>
+                );
+            }
+            
+            const commonInputProps = {
+                name: field.name,
+                value: offerSpecificFieldValues[field.name] as string | number | undefined,
+                onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+                    handleSpecificFieldChange(field.name, e.target.value),
+            };
+
+            return (
+                <div key={field.name} className="space-y-2">
+                    {label}
+                    <Input {...commonInputProps} placeholder={field.placeholder} />
+                    {description}
                 </div>
-            </div>
-        );
+            );
+        });
     };
 
     const renderCategoryDropdowns = () => {
@@ -640,10 +617,11 @@ export default function SellPage() {
     };
 
     const renderCandidatesModal = () => (
-        <AlertDialog open={scrapeCandidates.length > 0} onOpenChange={() => {
-            if (!isSelectingScrape) {
+        <AlertDialog open={scrapeCandidates.length > 0} onOpenChange={(open) => {
+            if (!open && !isSelectingScrape) {
                 setScrapeCandidates([]);
                 setJobId(null);
+                setScrapeError(null);
             }
         }}>
             <AlertDialogContent>
@@ -678,6 +656,12 @@ export default function SellPage() {
                     <div className="flex items-center justify-center p-4">
                         <Loader2 className="h-6 w-6 animate-spin mr-2" />
                         <span className="text-muted-foreground">Standardisation en cours...</span>
+                    </div>
+                )}
+                {scrapeError && (
+                    <div className="flex items-center p-4 mt-2 text-destructive bg-destructive/10 rounded-md">
+                        <AlertTriangle className="h-5 w-5 mr-3 flex-shrink-0" />
+                        <span className="text-sm">{scrapeError}</span>
                     </div>
                 )}
             </AlertDialogContent>
@@ -809,7 +793,6 @@ export default function SellPage() {
             );
         }
 
-        const { product, specifications, price_analysis } = selectedProductModel;
         const displayData = prepareDisplayData();
 
         return (
@@ -817,17 +800,17 @@ export default function SellPage() {
                 <CardHeader>
                     <div className="flex justify-between items-start">
                         <div>
-                            <CardTitle>{product.title}</CardTitle>
+                            <CardTitle>{selectedProductModel.title}</CardTitle>
                             <CardDescription>Confirmez les informations du produit avant de continuer.</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
                 <CardContent className="grid md:grid-cols-2 gap-6">
                     <div className="space-y-4">
-                        {product.image_url && (
+                        {displayData.displayImageUrls.length > 0 && (
                             <Image
-                                src={product.image_url}
-                                alt={`Image pour ${product.title}`}
+                                src={displayData.displayImageUrls[0]}
+                                alt={`Image pour ${selectedProductModel.title}`}
                                 width={200}
                                 height={200}
                                 className="rounded-lg object-cover w-full"
@@ -856,9 +839,9 @@ export default function SellPage() {
                                         Analyse de Prix
                                         {isUpdatingPrice && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
                                     </h4>
-                                    {price_analysis ? (
+                                    {selectedProductModel.price_analysis ? (
                                         <ul className="list-disc pl-5 space-y-1 text-sm">
-                                            {Object.entries(price_analysis).map(([period, data]) => (
+                                            {Object.entries(selectedProductModel.price_analysis).map(([period, data]) => (
                                                 data && data.average_price && <li key={period}>
                                                     <span className="font-semibold">{period.replace('_', ' ')}:</span> {data.average_price?.toFixed(2)}€ ({data.data_points} points de données)
                                                 </li>
@@ -967,6 +950,41 @@ export default function SellPage() {
         }
     };
 
+    if (sessionStatus === 'loading') {
+        return <div className='container mx-auto p-4'><Loader2 className="h-8 w-8 animate-spin" /></div>;
+    }
+
+    if (sessionStatus === 'unauthenticated') {
+        router.push('/signin');
+        return null;
+    }
+
+    if (!hasShippingAddress) {
+        return (
+            <div className="container mx-auto p-4">
+                <Card className="text-center">
+                    <CardHeader>
+                        <AlertTriangle className="mx-auto h-12 w-12 text-destructive" />
+                        <CardTitle className="mt-4">Adresse d'expédition manquante</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <CardDescription>
+                            Vous devez ajouter une adresse d'expédition à votre profil avant de pouvoir mettre en vente un article.
+                        </CardDescription>
+                    </CardContent>
+                    <CardFooter className="flex-col gap-4">
+                        <Button asChild>
+                            <Link href="/account/settings">Ajouter une adresse</Link>
+                        </Button>
+                        <Button variant="ghost" onClick={() => router.back()}>
+                            Retour
+                        </Button>
+                    </CardFooter>
+                </Card>
+            </div>
+        );
+    }
+    
     return (
         <div className="container mx-auto px-4 py-8 max-w-4xl">
             <h1 className="text-3xl font-bold mb-2">Vendre un article</h1>

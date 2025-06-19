@@ -207,8 +207,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const newOfferData: Partial<IProductBase> & { category: Types.ObjectId, productModel: Types.ObjectId, seller: Types.ObjectId, kind: string } = {
-      productModel: productModelDoc._id as Types.ObjectId,
+    const newOfferData: Partial<IProductBase> & { category: Types.ObjectId, productModel: number, seller: Types.ObjectId, kind: string } = {
+      productModel: productModelDoc._id,
       seller: seller._id as Types.ObjectId,
       category: productModelDoc.category as Types.ObjectId, // Utiliser la catégorie du ProductModel
       kind: categoryDoc.slug, // kind est le slug de la catégorie feuille

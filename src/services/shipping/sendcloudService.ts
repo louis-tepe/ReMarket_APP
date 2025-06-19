@@ -1,6 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
 import { loadEnv } from '@/lib/loadEnv';
-import { IShippingAddress } from '@/lib/mongodb/models/User';
 
 const { SENDCLOUD_PUBLIC_KEY, SENDCLOUD_SECRET_KEY } = loadEnv();
 
@@ -14,19 +13,6 @@ const authHeaders = {
   'Authorization': `Basic ${token}`,
   'Content-Type': 'application/json',
 };
-
-interface SendcloudSenderAddress {
-  id: number;
-  company_name: string;
-  contact_name: string;
-  email: string;
-  telephone: string;
-  street: string;
-  house_number: string;
-  postal_code: string;
-  city: string;
-  country: string; // ISO 2
-}
 
 interface SendcloudServicePoint {
   id: number;

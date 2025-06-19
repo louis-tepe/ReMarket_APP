@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb/dbConnect';
-import ScrapingProduct, { IScrapedProduct, IScrapedProductDocument } from '@/lib/mongodb/models/ScrapingProduct';
-import BrandModel from '@/lib/mongodb/models/BrandModel';
+import ScrapingProduct, { IScrapedProductDocument } from '@/lib/mongodb/models/ScrapingProduct';
 import CategoryModel from '@/lib/mongodb/models/CategoryModel';
-import { FilterQuery } from 'mongoose';
+import { FilterQuery, Types } from 'mongoose';
 
 export async function GET(request: NextRequest) {
     try {
@@ -16,10 +15,12 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ message: "L'ID de la marque et le slug de la catégorie sont requis." }, { status: 400 });
         }
 
-        const category = await CategoryModel.findOne({ slug: categorySlug }).select('_id').lean();
+        const category = await CategoryModel.findOne({ slug: categorySlug }).select('_id').lean<{ _id: Types.ObjectId }>();
         if (!category) {
             return NextResponse.json({ message: `Catégorie non trouvée: ${categorySlug}` }, { status: 404 });
         }
+        
+        console.log('DEBUG: Found category object:', category);
 
         const query: FilterQuery<IScrapedProductDocument> = {
             category: category._id,
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
 
         const productModels = products
             .map(p => ({
-                id: (p._id as any).toString(),
+                id: p._id.toString(),
                 name: p.product?.title 
             }))
             .filter(p => p.name);

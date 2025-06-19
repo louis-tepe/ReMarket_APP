@@ -1,14 +1,13 @@
 import { NextResponse } from 'next/server';
-import { headers } from 'next/headers';
 import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
 import dbConnect from '@/lib/mongodb/dbConnect';
-import OrderModel from '@/lib/mongodb/models/OrderModel';
+import OrderModel, { IOrderItem } from '@/lib/mongodb/models/OrderModel';
 import CartModel from '@/lib/mongodb/models/CartModel';
-import ProductOfferModel, { IProductOffer } from '@/lib/mongodb/models/SellerProduct';
-import { IOrderItem } from '@/lib/mongodb/models/OrderModel';
+import ProductOfferModel, { IProductBase } from '@/lib/mongodb/models/SellerProduct';
 import { Types, ClientSession, startSession } from 'mongoose';
-import clientPromise from '@/lib/mongoClient';
+import { createShipmentInTransaction } from '@/services/shipping/shipmentService';
+import { MongoError } from 'mongodb';
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 export const dynamic = 'force-dynamic';
@@ -25,53 +24,141 @@ async function executeTransactionWithRetry(
             await session.commitTransaction();
             session.endSession();
             return;
-        } catch (error: any) {
+        } catch (error) {
             await session.abortTransaction();
             session.endSession();
 
-            if (error.errorLabels?.includes('TransientTransactionError') && i < maxRetries - 1) {
+            if (error instanceof MongoError && error.hasErrorLabel('TransientTransactionError') && i < maxRetries - 1) {
                 console.log(`Transient transaction error caught. Retrying... (Attempt ${i + 1}/${maxRetries})`);
                 await new Promise(res => setTimeout(res, 100 * Math.pow(2, i))); // Exponential backoff
             } else {
-                console.error('Error handling webhook event in transaction:', error.message);
+                const message = error instanceof Error ? error.message : 'An unknown error occurred';
+                console.error('Error handling webhook event in transaction:', message);
                 throw error;
             }
         }
     }
 }
 
-async function createOrderFromCart(userId: string, cartId: string, servicePointId: string, paymentIntent: Stripe.PaymentIntent, session: ClientSession) {
-    const cart = await CartModel.findById(cartId).session(session).populate<{ items: { offer: IProductOffer }[] }>({
-        path: 'items.offer',
-        model: 'ProductOffer',
+async function createOrderFromSingleOffer(
+    userId: string,
+    offerId: string,
+    servicePointId: string,
+    shippingAddressId: string,
+    paymentIntent: Stripe.PaymentIntent,
+    session: ClientSession
+) {
+    const offer = await ProductOfferModel.findById(offerId)
+        .populate({
+            path: 'seller',
+            select: 'shippingAddresses email name',
+        })
+        .session(session);
+
+    if (!offer) {
+        throw new Error(`Offer ${offerId} not found.`);
+    }
+    if (offer.listingStatus === 'sold') {
+        // This can happen in race conditions. Abort the transaction.
+        throw new Error(`Offer ${offerId} has already been sold.`);
+    }
+
+    // Mark offer as sold
+    offer.listingStatus = 'sold';
+    offer.soldTo = new Types.ObjectId(userId);
+    await offer.save({ session });
+    console.log(`[Webhook] Offer ${offerId} marked as sold.`);
+
+    // Create the order
+    const newOrder = new OrderModel({
+        buyer: new Types.ObjectId(userId),
+        items: [{
+            offer: offer._id,
+            productModel: offer.productModel,
+            seller: offer.seller,
+            quantity: 1, // Quantity is 1 for a single offer
+            priceAtPurchase: offer.price,
+            currencyAtPurchase: 'eur',
+        }],
+        totalAmount: paymentIntent.amount / 100,
+        currency: paymentIntent.currency,
+        status: 'processing',
+        paymentIntentId: paymentIntent.id,
+        paymentStatus: 'succeeded',
+        paymentMethod: paymentIntent.payment_method_types[0],
+        relayPointId: servicePointId,
     });
+    await newOrder.save({ session });
+    console.log(`[Webhook] Order ${newOrder._id} created in DB.`);
+
+    // Trigger shipment creation directly within the transaction
+    await createShipmentInTransaction(offerId, userId, Number(servicePointId), shippingAddressId, session);
+
+    console.log(`[Webhook] Shipment process completed for single offer: ${offerId}`);
+}
+
+async function createOrderFromCart(
+    userId: string,
+    cartId: string,
+    servicePointId: string,
+    shippingAddressId: string,
+    paymentIntent: Stripe.PaymentIntent,
+    session: ClientSession
+) {
+    const cart = await CartModel.findById(cartId)
+        .session(session)
+        .populate({
+            path: 'items.offer',
+            model: 'ProductOffer',
+            populate: {
+                path: 'seller',
+                model: 'User',
+                select: 'shippingAddresses email name',
+            },
+        });
 
     if (!cart) throw new Error(`Cart with id ${cartId} not found.`);
 
     const orderItems: IOrderItem[] = [];
+    const processedOffers = [];
 
     for (const item of cart.items) {
-        const productOffer = item.offer as IProductOffer;
-        if (!productOffer || !productOffer.price) throw new Error('Invalid product data in cart.');
+        // Cast explicite pour s'assurer que TypeScript traite l'offre comme populée
+        const productOffer = item.offer as IProductBase;
         
-        const response = await fetch(`${process.env.NEXTAUTH_URL}/api/orders/create-shipment`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                offerId: productOffer._id.toString(),
-                buyerId: userId,
-                servicePointId: Number(servicePointId),
-            }),
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.text();
-            throw new Error(`Failed to create shipment for offer ${productOffer._id.toString()} in cart ${cartId}: ${errorData}`);
+        if (!productOffer || !productOffer.price) {
+            console.warn(`Invalid product data for offer in cart ${cartId}. Skipping item.`);
+            continue;
+        };
+
+        // Ensure the offer is not already sold before processing
+        const freshOffer = await ProductOfferModel.findById(productOffer._id).session(session);
+        if (!freshOffer) {
+             throw new Error(`Offer ${productOffer._id} not found during cart processing.`);
         }
-        console.log(`Successfully triggered shipment creation for offer ${productOffer._id.toString()} from cart.`);
+        if (freshOffer.listingStatus === 'sold') {
+            console.warn(`Offer ${productOffer._id} in cart was already sold. Skipping item.`);
+            // If an item was already sold, we must abort the entire transaction
+            // to prevent partial fulfillment and incorrect charges.
+            throw new Error(`One of the items in the cart (offer: ${productOffer._id}) has already been sold. The transaction cannot proceed.`);
+        }
+
+        // Mark the offer as sold
+        freshOffer.listingStatus = 'sold';
+        freshOffer.soldTo = new Types.ObjectId(userId);
+        await freshOffer.save({ session });
+        console.log(`[Webhook] Offer ${productOffer._id} from cart marked as sold.`);
+        
+        // Trigger shipment creation for each offer directly
+        await createShipmentInTransaction(
+            productOffer._id.toString(),
+            userId,
+            Number(servicePointId),
+            shippingAddressId,
+            session
+        );
         
         orderItems.push({
-            _id: new Types.ObjectId(),
             offer: productOffer._id,
             productModel: productOffer.productModel,
             seller: productOffer.seller,
@@ -79,6 +166,14 @@ async function createOrderFromCart(userId: string, cartId: string, servicePointI
             priceAtPurchase: productOffer.price,
             currencyAtPurchase: 'eur',
         });
+        processedOffers.push(productOffer._id.toString());
+    }
+
+    if (orderItems.length === 0) {
+        console.warn(`No valid items could be processed from cart ${cartId}. Aborting order creation.`);
+        // No need to throw an error here, as the loop would have thrown if an item was invalid.
+        // This case handles an empty cart being sent, which shouldn't happen.
+        return;
     }
 
     const newOrder = new OrderModel({
@@ -94,6 +189,8 @@ async function createOrderFromCart(userId: string, cartId: string, servicePointI
     });
 
     await newOrder.save({ session });
+    console.log(`[Webhook] Order ${newOrder._id} created from cart ${cartId}.`);
+
     await CartModel.findByIdAndDelete(cartId, { session });
 }
 
@@ -104,9 +201,10 @@ export async function POST(req: Request) {
     let event: Stripe.Event;
     try {
         event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-    } catch (err: any) {
-        console.error(`Error verifying webhook signature: ${err.message}`);
-        return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 });
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'An unknown error occurred';
+        console.error(`Error verifying webhook signature: ${message}`);
+        return new NextResponse(`Webhook Error: ${message}`, { status: 400 });
     }
 
     const paymentIntent = event.data.object as Stripe.PaymentIntent;
@@ -115,42 +213,28 @@ export async function POST(req: Request) {
     await dbConnect();
 
     const transactionLogic = async (session: ClientSession) => {
-        const { userId, cartId, offerId, servicePointId } = paymentIntent.metadata || {};
+        const { userId, cartId, offerId, servicePointId, shippingAddressId } = paymentIntent.metadata || {};
+
+        if (!userId || !servicePointId || !shippingAddressId) {
+            console.error('Webhook received payment_intent.succeeded without userId, servicePointId, or shippingAddressId in metadata.');
+            // We cannot process this, but returning success to Stripe to avoid retries for a permanent failure.
+            return;
+        }
 
         switch (event.type) {
             case 'payment_intent.succeeded':
                 console.log('PaymentIntent succeeded:', paymentIntent.id);
                 
-                if (offerId && userId && servicePointId) {
+                if (offerId) {
                     console.log(`Handling single offer purchase: offerId=${offerId}, userId=${userId}, servicePointId=${servicePointId}`);
-                    
-                    // La logique de mise à jour de l'offre est maintenant gérée par la route 'create-shipment'
-                    // pour assurer une transaction atomique. On se contente de déclencher la création.
+                    await createOrderFromSingleOffer(userId, offerId, servicePointId, shippingAddressId, paymentIntent, session);
 
-                    const response = await fetch(`${process.env.NEXTAUTH_URL}/api/orders/create-shipment`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            offerId,
-                            buyerId: userId,
-                            servicePointId: Number(servicePointId),
-                        }),
-                    });
-
-                    if (!response.ok) {
-                        const errorData = await response.text();
-                        // Il est crucial de lever une erreur ici pour que la transaction soit annulée
-                        // si la création du bordereau échoue.
-                        throw new Error(`Failed to create shipment, transaction will be rolled back: ${errorData}`);
-                    }
-                    console.log("Successfully triggered shipment creation for offer:", offerId);
-
-                } else if (cartId && userId && servicePointId) {
+                } else if (cartId) {
                     console.log(`Handling cart purchase: cartId=${cartId}, userId=${userId}, servicePointId=${servicePointId}`);
-                    await createOrderFromCart(userId, cartId, servicePointId, paymentIntent, session);
+                    await createOrderFromCart(userId, cartId, servicePointId, shippingAddressId, paymentIntent, session);
                 
                 } else {
-                    console.warn('PaymentIntent succeeded but metadata was incomplete.', paymentIntent.metadata);
+                    console.warn('PaymentIntent succeeded but metadata was incomplete (missing offerId or cartId).', paymentIntent.metadata);
                 }
                 break;
             
@@ -167,9 +251,10 @@ export async function POST(req: Request) {
 
     try {
         await executeTransactionWithRetry(transactionLogic);
-    } catch (error) {
-        return new NextResponse('Webhook handler failed after multiple retries.', { status: 500 });
+        return NextResponse.json({ received: true });
+    } catch {
+        // The transaction retry logic already logs the specific error.
+        // This is a final catch-all.
+        return new NextResponse('Server error processing webhook.', { status: 500 });
     }
-
-    return new NextResponse('Received', { status: 200 });
 } 

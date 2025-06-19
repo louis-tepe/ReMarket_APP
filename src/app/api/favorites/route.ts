@@ -1,13 +1,16 @@
 import User from '@/lib/mongodb/models/User';
-import ProductModel, { IProductModel } from '@/lib/mongodb/models/ScrapingProduct';
+import ProductModel, { IScrapedProduct } from '@/lib/mongodb/models/ScrapingProduct';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';
 import dbConnect from '@/lib/mongodb/dbConnect';
-import { isValidObjectId, Types } from 'mongoose';
 
 // Interface pour un ProductModel populé partiel dans les favoris
-interface PopulatedFavoriteProduct extends Pick<IProductModel, '_id' | 'title' | 'slug' | 'standardImageUrls'> {
+interface PopulatedFavoriteProduct {
+    _id: IScrapedProduct['_id'];
+    title: IScrapedProduct['product']['title'];
+    slug: IScrapedProduct['slug'];
+    standardImageUrls?: IScrapedProduct['product']['images'];
     sellerOffers?: { price: number }[];
 }
 
@@ -16,7 +19,7 @@ export async function GET() {
     await dbConnect();
     const session = await getServerSession(authOptions);
 
-    if (!session?.user.id) { // Vérification concise
+    if (!session?.user.id) {
         return NextResponse.json({ message: 'Non autorisé' }, { status: 401 });
     }
     const userId = session.user.id;
@@ -115,18 +118,18 @@ export async function DELETE(req: NextRequest) {
 
     try {
         const { searchParams } = new URL(req.url);
-        let productIdFromBody: any;
+        let productIdFromBody: unknown;
         try {
             const body = await req.json();
             productIdFromBody = body.productId;
-        } catch (e) {
+        } catch {
             // Pas de corps ou JSON invalide, on continue avec les searchParams
         }
 
         const productId = searchParams.get('productId') || productIdFromBody;
         
-        if (!productId) {
-            return NextResponse.json({ message: 'ID de produit manquant.' }, { status: 400 });
+        if (!productId || typeof productId !== 'string') {
+            return NextResponse.json({ message: 'ID de produit manquant ou invalide.' }, { status: 400 });
         }
 
         const productNumericId = parseInt(productId, 10);

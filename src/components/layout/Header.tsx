@@ -13,8 +13,6 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-    UserCircle,
-    LayoutDashboard,
     Settings,
     Heart,
     LogIn,

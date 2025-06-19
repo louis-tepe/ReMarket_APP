@@ -27,7 +27,6 @@ export default function ServicePointSelector({ onSelectPoint }: ServicePointSele
   const [country] = useState('FR'); // Default to France
   const [servicePoints, setServicePoints] = useState<ServicePoint[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedPointId, setSelectedPointId] = useState<number | null>(null);
 
   const handleSearch = async () => {
     if (!postalCode) {
@@ -37,7 +36,6 @@ export default function ServicePointSelector({ onSelectPoint }: ServicePointSele
     setIsLoading(true);
     setServicePoints([]);
     onSelectPoint(null);
-    setSelectedPointId(null);
     try {
       const response = await fetch(`/api/shipping/service-points?country=${country}&postalCode=${postalCode}`);
       if (!response.ok) throw new Error('Failed to fetch service points.');
@@ -55,7 +53,6 @@ export default function ServicePointSelector({ onSelectPoint }: ServicePointSele
 
   const handleSelect = (pointId: string) => {
     const point = servicePoints.find(p => p.id === parseInt(pointId, 10)) || null;
-    setSelectedPointId(point?.id || null);
     onSelectPoint(point);
   };
 

@@ -1,9 +1,11 @@
 import dbConnect from "@/lib/mongodb/dbConnect";
-import ProductModel from "@/lib/mongodb/models/ScrapingProduct";
+import ProductModel, { IScrapedProduct } from "@/lib/mongodb/models/ScrapingProduct";
 import CategoryModel from "@/lib/mongodb/models/CategoryModel";
 import BrandModel from "@/lib/mongodb/models/BrandModel";
-import { Types, FilterQuery, SortOrder } from "mongoose";
-import { LeanProduct, ProductSearchServiceResult, SearchFilters } from "@/types/product";
+import { Types, FilterQuery, PipelineStage } from "mongoose";
+import { ProductSearchServiceResult, SearchFilters } from "@/types/product";
+import { LeanCategory } from "@/types/category";
+import { IProductBase } from "@/lib/mongodb/models/SellerProduct";
 
 const FEATURED_PRODUCTS_LIMIT = 4;
 
@@ -18,7 +20,7 @@ export interface FeaturedProductData {
 export async function fetchFeaturedProductData(userId?: string): Promise<FeaturedProductData[]> {
   await dbConnect();
 
-  const offerMatch: FilterQuery<any> = { transactionStatus: "available" };
+  const offerMatch: FilterQuery<IProductBase> = { transactionStatus: "available" };
   if (userId) {
     offerMatch.seller = { $ne: new Types.ObjectId(userId) };
   }
@@ -67,16 +69,16 @@ export async function fetchFeaturedProductData(userId?: string): Promise<Feature
 }
 
 async function getCategoryWithDescendants(categorySlug: string): Promise<Types.ObjectId[]> {
-    const mainCategory = await CategoryModel.findOne({ slug: categorySlug }).lean();
+    const mainCategory = await CategoryModel.findOne({ slug: categorySlug }).lean<LeanCategory>();
     if (!mainCategory) {
         return [];
     }
 
-    const allCategories = await CategoryModel.find({}).lean();
-    const categoryMap = new Map(allCategories.map(c => [c._id.toString(), c]));
+    const allCategories = await CategoryModel.find({}).lean<LeanCategory[]>();
     
-    const descendants: Types.ObjectId[] = [mainCategory._id];
-    const queue: Types.ObjectId[] = [mainCategory._id];
+    const mainCategoryId = new Types.ObjectId(mainCategory._id);
+    const descendants: Types.ObjectId[] = [mainCategoryId];
+    const queue: Types.ObjectId[] = [mainCategoryId];
 
     while (queue.length > 0) {
         const currentId = queue.shift()?.toString();
@@ -84,8 +86,9 @@ async function getCategoryWithDescendants(categorySlug: string): Promise<Types.O
         
         for (const category of allCategories) {
             if (category.parent?.toString() === currentId) {
-                descendants.push(category._id);
-                queue.push(category._id);
+                const categoryId = new Types.ObjectId(category._id);
+                descendants.push(categoryId);
+                queue.push(categoryId);
             }
         }
     }
@@ -103,7 +106,7 @@ export async function searchProducts(filters: SearchFilters): Promise<ProductSea
     userId,
   } = filters;
 
-  const query: FilterQuery<any> = {};
+  const query: FilterQuery<IScrapedProduct> = {};
 
   if (filters.searchQuery) {
     query.$text = { $search: filters.searchQuery };
@@ -127,7 +130,7 @@ export async function searchProducts(filters: SearchFilters): Promise<ProductSea
 
   const totalProducts = await ProductModel.countDocuments(query);
 
-  const sortOptions: { [key: string]: SortOrder | { $meta: "textScore" } } = {};
+  const sortOptions: { [key: string]: 1 | -1 | { $meta: "textScore" } } = {};
   if (sort === 'relevance' && filters.searchQuery) {
     sortOptions.score = { $meta: "textScore" };
   } else if (sort === 'price-asc') {
@@ -138,12 +141,12 @@ export async function searchProducts(filters: SearchFilters): Promise<ProductSea
 
   const skip = (page - 1) * limit;
 
-  const offerMatch: FilterQuery<any> = { transactionStatus: "available" };
+  const offerMatch: FilterQuery<IProductBase> = { transactionStatus: "available" };
   if (userId) {
     offerMatch.seller = { $ne: new Types.ObjectId(userId) };
   }
 
-  const aggregationPipeline: any[] = [
+  const aggregationPipeline: PipelineStage[] = [
     { $match: query },
     {
       $lookup: {

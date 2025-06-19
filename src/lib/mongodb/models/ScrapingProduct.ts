@@ -51,7 +51,7 @@ export interface IScrapedProduct {
   slug?: string;
   product: IProductData;
   options?: Record<string, string[]>;
-  specifications: Record<string, unknown>;
+  specifications: Array<{ label: string; value: string }>;
   price_analysis?: {
       "3_months"?: IPriceAnalysisPeriod;
       "6_months"?: IPriceAnalysisPeriod;
@@ -78,7 +78,10 @@ const ScrapingProductSchema = new Schema<IScrapedProductDocument>({
     brand: { type: Schema.Types.ObjectId, ref: 'Brand', index: true },
     product: { type: ProductSchema, required: true },
     options: { type: Schema.Types.Map, of: [String] },
-    specifications: { type: Schema.Types.Mixed },
+    specifications: [{
+      label: String,
+      value: String
+    }],
     price_analysis: { type: PriceAnalysisSchema },
 }, {
   timestamps: true, // `createdAt` et `updatedAt`

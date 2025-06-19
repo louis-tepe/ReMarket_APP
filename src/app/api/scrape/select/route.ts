@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb/dbConnect';
-import ScrapingProduct, { IScrapedProduct } from '@/lib/mongodb/models/ScrapingProduct';
+import ScrapingProduct from '@/lib/mongodb/models/ScrapingProduct';
 import { selectAndScrape } from '@/services/scraping/ledenicheur/scraper';
-import { LedenicheurProductDetails } from '@/services/scraping/ledenicheur/ledenicheur.types';
 import CategoryModel from '@/lib/mongodb/models/CategoryModel';
 import BrandModel from '@/lib/mongodb/models/BrandModel';
 import slugify from 'slugify';
@@ -16,11 +15,11 @@ interface SelectRequestBody {
     brandId: string;
 }
 
-const flattenSpecifications = (specs: any): { label: string; value: string; }[] => {
+const flattenSpecifications = (specs: Record<string, unknown>): { label: string; value: string; }[] => {
     const flattened: { label: string; value: string; }[] = [];
     if (!specs) return flattened;
 
-    const formatValue = (value: any): string => {
+    const formatValue = (value: unknown): string => {
         if (Array.isArray(value)) return value.join(', ');
         if (typeof value === 'boolean') return value ? 'Oui' : 'Non';
         if (value === null || value === undefined) return 'N/A';
@@ -40,34 +39,6 @@ const flattenSpecifications = (specs: any): { label: string; value: string; }[] 
         }
     }
     return flattened;
-};
-
-const mapApiDataToScrapedProduct = (
-  apiData: LedenicheurProductDetails,
-  productNameToScrape: string,
-  categoryId: Types.ObjectId,
-  brandDocument: { _id: Types.ObjectId, name: string }
-): Omit<IScrapedProduct, 'createdAt' | 'updatedAt'> => {
-  const slug = slugify(apiData.product.title, { lower: true, strict: true });
-  return {
-    _id: apiData.product.id,
-    source_name: 'ledenicheur',
-    product_search_name: productNameToScrape,
-    category: categoryId,
-    brand: brandDocument._id,
-    slug: slug,
-    product: {
-        id: apiData.product.id,
-        title: apiData.product.title,
-        brand: apiData.product.brand || brandDocument.name,
-        url: apiData.product.url,
-        image_url: apiData.product.image_url,
-        images: apiData.product.images
-    },
-    options: apiData.options,
-    specifications: flattenSpecifications(apiData.specifications),
-    price_analysis: apiData.price_analysis
-  };
 };
 
 export async function POST(request: NextRequest) {
@@ -106,12 +77,12 @@ export async function POST(request: NextRequest) {
         }
 
         // 1. Valider la catégorie et la marque
-        const categoryDoc = await CategoryModel.findOne({ slug: categorySlug }).select('_id').lean();
+        const categoryDoc = await CategoryModel.findOne({ slug: categorySlug }).select('_id').lean<{ _id: Types.ObjectId }>();
         if (!categoryDoc) {
             return NextResponse.json({ message: `Catégorie non trouvée.` }, { status: 404 });
         }
 
-        const brandDoc = await BrandModel.findById(brandId).select('_id name').lean();
+        const brandDoc = await BrandModel.findById(brandId).select('_id name').lean<{ _id: Types.ObjectId, name: string }>();
         if (!brandDoc) {
             return NextResponse.json({ message: `Marque non trouvée.` }, { status: 404 });
         }
@@ -123,7 +94,26 @@ export async function POST(request: NextRequest) {
         }
         
         // 3. Mapper les données et sauvegarder le nouveau produit
-        const mappedData = mapApiDataToScrapedProduct(scrapedData, productNameToScrape, categoryDoc._id, brandDoc);
+        const slug = slugify(scrapedData.product.title, { lower: true, strict: true });
+        const mappedData = {
+            _id: scrapedData.product.id,
+            source_name: 'ledenicheur',
+            product_search_name: productNameToScrape,
+            category: categoryDoc._id,
+            brand: brandDoc._id,
+            slug: slug,
+            product: {
+                id: scrapedData.product.id,
+                title: scrapedData.product.title,
+                brand: scrapedData.product.brand || brandDoc.name,
+                url: scrapedData.product.url,
+                image_url: scrapedData.product.image_url,
+                images: scrapedData.product.images
+            },
+            options: scrapedData.options,
+            specifications: flattenSpecifications(scrapedData.specifications as Record<string, unknown>),
+            price_analysis: scrapedData.price_analysis
+        };
         
         const newScrapedProduct = new ScrapingProduct(mappedData);
         await newScrapedProduct.save();

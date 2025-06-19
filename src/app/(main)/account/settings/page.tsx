@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession, signOut } from 'next-auth/react';
-import ShippingAddressForm from './components/ShippingAddressForm';
+import ShippingAddressManager from './components/ShippingAddressForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -57,7 +57,7 @@ export default function SettingsPage() {
             )}
 
             {userData && (
-                <ShippingAddressForm initialData={userData.shippingAddress} />
+                <ShippingAddressManager />
             )}
         </div>
     );

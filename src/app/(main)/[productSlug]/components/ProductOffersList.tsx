@@ -1,15 +1,16 @@
+'use client';
+
 import React from 'react';
 import { Tag, Package } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import SellerOfferCard from "./SellerOfferCard";
-import { Offer } from '../types';
+import { PopulatedOffer } from '@/app/(main)/[productSlug]/types';
 
 interface ProductOffersListProps {
-    offers: Offer[];
-    onAddToCart: (offer: Offer) => void;
-    addingToCartOfferId: string | null;
-    isUserLoggedIn: boolean;
-    sessionLoading: boolean;
+    offers: PopulatedOffer[];
+    handleAddToCart: (offer: PopulatedOffer) => void;
+    isAddingToCartOfferId: string | null;
+    sessionStatus: "authenticated" | "loading" | "unauthenticated";
 }
 
 /**
@@ -17,13 +18,12 @@ interface ProductOffersListProps {
  * Each offer is displayed using the SellerOfferCard component.
  * Shows a message if no offers are available.
  */
-export default function ProductOffersList({
+const ProductOffersList: React.FC<ProductOffersListProps> = ({
     offers,
-    onAddToCart,
-    addingToCartOfferId,
-    isUserLoggedIn,
-    sessionLoading
-}: ProductOffersListProps) {
+    handleAddToCart,
+    isAddingToCartOfferId,
+    sessionStatus
+}) => {
     const availableOffers = offers.filter(
         offer => offer.transactionStatus === 'available' && offer.stockQuantity > 0
     );
@@ -35,35 +35,39 @@ export default function ProductOffersList({
             acc[offer.condition] = offer;
         }
         return acc;
-    }, {} as Record<Offer['condition'], Offer>);
+    }, {} as Record<PopulatedOffer['condition'], PopulatedOffer>);
 
     const bestOffers = Object.values(bestOffersByCondition).sort((a, b) => a.price - b.price);
+
+    if (bestOffers.length === 0) {
+        return (
+            <Card className="p-6 text-center">
+                <Package className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                <p className="text-muted-foreground">Aucune offre disponible pour ce produit pour le moment.</p>
+                <p className="text-sm text-muted-foreground mt-1">Revenez bientôt ou explorez d&apos;autres articles.</p>
+            </Card>
+        );
+    }
 
     return (
         <div className="mb-8">
             <h2 className="text-2xl font-semibold mb-4 flex items-center">
                 <Tag className="h-6 w-6 mr-2 text-primary" /> Choisir une offre ReMarket
             </h2>
-            {bestOffers.length > 0 ? (
-                <div className="space-y-4">
-                    {bestOffers.map((offer, index) => (
-                        <SellerOfferCard
-                            key={offer._id || index}
-                            offer={offer}
-                            onAddToCart={onAddToCart}
-                            isAddingToCart={addingToCartOfferId === offer._id}
-                            isUserLoggedIn={isUserLoggedIn}
-                            sessionLoading={sessionLoading}
-                        />
-                    ))}
-                </div>
-            ) : (
-                <Card className="p-6 text-center">
-                    <Package className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                    <p className="text-muted-foreground">Aucune offre disponible pour ce produit pour le moment.</p>
-                    <p className="text-sm text-muted-foreground mt-1">Revenez bientôt ou explorez d&apos;autres articles.</p>
-                </Card>
-            )}
+            <div className="space-y-4">
+                {bestOffers.map((offer, index) => (
+                    <SellerOfferCard
+                        key={offer._id || index}
+                        offer={offer}
+                        onAddToCart={handleAddToCart}
+                        isAddingToCart={isAddingToCartOfferId === offer._id}
+                        isUserLoggedIn={sessionStatus === 'authenticated'}
+                        sessionLoading={sessionStatus === 'loading'}
+                    />
+                ))}
+            </div>
         </div>
     );
-} 
+}
+
+export default ProductOffersList; 

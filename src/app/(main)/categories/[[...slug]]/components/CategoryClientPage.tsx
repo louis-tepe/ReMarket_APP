@@ -12,15 +12,6 @@ import { useSession } from 'next-auth/react';
 import type { LeanBrand } from '@/types/brand';
 import type { LeanCategory } from '@/types/category';
 
-interface DisplayProductCardProps {
-    id: string;
-    slug: string;
-    name: string;
-    imageUrl?: string;
-    price: number;
-    offerCount?: number;
-}
-
 interface FiltersState {
     categorySlug?: string;
     brandSlugs?: string[];
@@ -100,21 +91,34 @@ export default function CategoryClientPage({
     }, [session?.user]);
     
     const updateUrl = useCallback((newFilters: FiltersState) => {
-        let newPath = "/categories";
+        let pathname: string;
+        const query: { brands?: string; search?: string } = {};
+
         if (newFilters.categorySlug) {
-            const categoryInBreadcrumbs = breadcrumbs.find(b => b.slug === newFilters.categorySlug);
-            const slugPath = breadcrumbs.map(b => b.slug).join('/') + (categoryInBreadcrumbs ? '' : `/${newFilters.categorySlug}`);
-            newPath = `/categories/${slugPath}`;
+            // Reconstruct the full path from breadcrumbs + the new slug if it's not already the last one
+            const lastBreadcrumbSlug = breadcrumbs.length > 0 ? breadcrumbs[breadcrumbs.length - 1].slug : undefined;
+            let slugPath = breadcrumbs.map(b => b.slug).join('/');
+            if (newFilters.categorySlug !== lastBreadcrumbSlug) {
+                 // This logic might need refinement depending on how categories are structured
+                 // For now, assuming breadcrumbs are always correct up to the parent
+                 const parentPath = breadcrumbs.map(b => b.slug).join('/');
+                 slugPath = parentPath ? `${parentPath}/${newFilters.categorySlug}` : newFilters.categorySlug;
+            }
+             pathname = `/categories/${slugPath}`;
+        } else {
+            pathname = '/categories';
         }
 
-        const query = new URLSearchParams();
-        if (newFilters.brandSlugs?.length) query.set('brands', newFilters.brandSlugs.join(','));
-        if (newFilters.searchQuery?.trim()) query.set('search', newFilters.searchQuery.trim());
-
-        const finalUrl = `${newPath}${query.toString() ? `?${query.toString()}` : ''}`;
+        if (newFilters.brandSlugs?.length) {
+            query.brands = newFilters.brandSlugs.join(',');
+        }
+        if (newFilters.searchQuery?.trim()) {
+            query.search = newFilters.searchQuery.trim();
+        }
         
         startTransition(() => {
-            router.push(finalUrl, { scroll: false });
+            // @ts-expect-error Typed routes are not yet fully supported with dynamic pathnames.
+            router.push({ pathname, query }, { scroll: false });
         });
     }, [router, breadcrumbs]);
 

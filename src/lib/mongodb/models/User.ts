@@ -2,6 +2,7 @@ import mongoose, { Schema, Document, models, Model as MongooseModel, Types } fro
 
 // Interface pour l'adresse de livraison/expédition
 export interface IShippingAddress {
+  _id: Types.ObjectId; // Ajout de l'ID pour chaque adresse
   companyName?: string;
   name: string;
   address: string;
@@ -22,7 +23,7 @@ export interface IUser extends Document {
   emailVerified?: Date | null; // Date de vérification de l'email
   role: 'user' | 'seller' | 'admin'; // Rôle de l'utilisateur sur la plateforme
   favorites: number[]; // IDs des ProductModels favoris (maintenant numériques)
-  shippingAddress?: IShippingAddress; // Adresse d'expédition du vendeur
+  shippingAddresses: IShippingAddress[]; // Changé pour un tableau
   sendcloudSenderId?: number; // ID de l'adresse d'expéditeur chez Sendcloud
   createdAt: Date;
   updatedAt: Date;
@@ -37,7 +38,7 @@ const ShippingAddressSchema: Schema<IShippingAddress> = new Schema({
   postalCode: { type: String, required: true, trim: true },
   country: { type: String, required: true, trim: true },
   telephone: { type: String, trim: true },
-}, { _id: false });
+}, { _id: true }); // Mongoose ajoutera un _id
 
 const UserSchema: Schema<IUser> = new Schema(
   {
@@ -82,9 +83,9 @@ const UserSchema: Schema<IUser> = new Schema(
         ref: 'ScrapingProduct', // Réf. à ScrapingProduct
       },
     ],
-    shippingAddress: {
-      type: ShippingAddressSchema,
-      required: false,
+    shippingAddresses: {
+      type: [ShippingAddressSchema], // Utilisation d'un tableau de schémas
+      default: [],
     },
     sendcloudSenderId: {
       type: Number,

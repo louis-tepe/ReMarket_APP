@@ -1,34 +1,11 @@
 "use server";
 
-import { z } from "zod";
 import { LeanProduct } from "@/types/product";
 import { searchProducts } from "../core/product-service";
-import { SearchFilters } from "@/types/product";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { ProductSearchFilters, ProductSearchServerResult, productSearchFiltersSchema } from "@/types/product";
-
-const SearchFiltersSchema = z.object({
-    searchQuery: z.string().optional(),
-    categorySlug: z.string().optional(),
-    brandSlugs: z.array(z.string()).optional(),
-    sort: z.enum(['relevance', 'price-asc', 'price-desc']).optional(),
-    limit: z.number().int().positive().optional(),
-    page: z.number().int().positive().optional(),
-    includeOffers: z.boolean().optional(),
-    isFeatured: z.boolean().optional(),
-});
-
-interface ProductActionResult {
-    success: boolean;
-    data?: {
-        products: LeanProduct[];
-        total: number;
-        totalPages: number;
-    };
-    message?: string;
-}
 
 /**
  * Server Action pour effectuer une recherche de produits.
@@ -58,7 +35,7 @@ export async function getProducts(
 
     const { products, totalProducts } = await searchProducts({
       ...validatedFilters.data,
-      userId,
+      userId: userId || undefined,
     });
 
     return {
@@ -112,7 +89,7 @@ export async function searchProductsAction(
     const userId = session?.user?.id;
 
     // Appelle le service de recherche avec les filtres validés et l'ID utilisateur.
-    const { products, totalProducts } = await searchProducts({ ...validatedFilters.data, userId });
+    const { products, totalProducts } = await searchProducts({ ...validatedFilters.data, userId: userId || undefined });
 
     revalidatePath("/(main)/categories", "layout");
 
@@ -127,7 +104,6 @@ export async function searchProductsAction(
     return {
       success: false,
       error: errorMessage,
-      errorDetails: [],
       products: [],
       totalProducts: 0,
     };

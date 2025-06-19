@@ -9,8 +9,9 @@ import '@/lib/mongodb/models/CategoryModel';
 import ProductModel from '@/lib/mongodb/models/ScrapingProduct';
 import ProductOfferModel from '@/lib/mongodb/models/SellerProduct';
 import CartModel from '@/lib/mongodb/models/CartModel';
+import { IShippingAddress } from '@/lib/mongodb/models/User';
 
-import { LeanCart as GlobalLeanCart, LeanCartItem } from "@/types/cart";
+import { LeanCartItem } from "@/types/cart";
 import { Types } from 'mongoose';
 
 // INTERFACES POUR LE PANIER LEAN ET LES OFFRES LEAN
@@ -40,8 +41,24 @@ interface LeanCartItemPopulated extends Omit<LeanCartItem, 'productOffer' | 'pri
     productModel: PopulatedProductModelForCartItem;
 }
 
-interface LeanCart extends Omit<GlobalLeanCart, 'items'> {
-    items: LeanCartItemPopulated[];
+interface FinalCartItemRaw {
+    _id: Types.ObjectId;
+    quantity: number;
+    offer: {
+        _id: Types.ObjectId;
+        price: number;
+        seller: PopulatedSellerForCart;
+        productModel: PopulatedProductModelForCartItem;
+        stockQuantity: number;
+        condition: string;
+        images: string[];
+    };
+    user: Types.ObjectId;
+}
+
+interface FinalCartState {
+    items: FinalCartItemRaw[];
+    user: Types.ObjectId;
 }
 
 interface CartActionPayload {
@@ -66,56 +83,6 @@ function calculateCartTotals(items: LeanCartItemPopulated[]) {
         }
     }
     return { total, count };
-}
-
-// GET: Récupérer le panier de l'utilisateur
-export async function GET() {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-        return NextResponse.json({ success: false, message: 'Authentification requise.' }, { status: 401 });
-    }
-    const userId = session.user.id;
-
-    try {
-        await dbConnect();
-        const cart = await CartModel.findOne({ user: userId })
-            .populate([
-                {
-                    path: 'items.offer',
-                    model: ProductOfferModel,
-                    select: '_id price seller images productModel stockQuantity condition',
-                    populate: [
-                        { path: 'seller', select: '_id name username' },
-                        {
-                            path: 'productModel',
-                            model: ProductModel,
-                            select: '_id title standardImageUrls slug'
-                        }
-                    ]
-                }
-            ])
-            .lean<any>(); // Utiliser 'any' pour la transformation
-
-        if (!cart || !cart.items) {
-            return NextResponse.json({ success: true, data: { items: [], count: 0, total: 0 } });
-        }
-
-        const transformedItems = cart.items.map((item: any) => ({
-            ...item,
-            productModel: item.offer.productModel,
-        }));
-
-        const { total, count } = calculateCartTotals(transformedItems);
-        
-        const finalData = { ...cart, items: transformedItems, count, total };
-
-        return NextResponse.json({ success: true, data: finalData });
-
-    } catch (error) {
-        console.error('[API_CART_GET]', error);
-        const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue.';
-        return NextResponse.json({ success: false, message: 'Erreur serveur lors de la récupération du panier.', error: errorMessage }, { status: 500 });
-    }
 }
 
 // POST: Gérer les actions sur le panier
@@ -157,11 +124,22 @@ export async function POST(request: NextRequest) {
                 }
 
                 const offerToAdd = await ProductOfferModel.findById(offerId)
-                    .select('_id transactionStatus productModel price stockQuantity')
-                    .lean<{ _id: Types.ObjectId, transactionStatus: string, productModel: number, price: number, stockQuantity: number } | null>();
+                    .select('_id transactionStatus productModel price stockQuantity seller')
+                    .populate('seller', 'shippingAddresses')
+                    .lean<{ 
+                        _id: Types.ObjectId, 
+                        transactionStatus: string, 
+                        productModel: number, 
+                        price: number, 
+                        stockQuantity: number,
+                        seller: { shippingAddresses?: IShippingAddress[] }
+                    } | null>();
 
                 if (!offerToAdd) {
                     return NextResponse.json({ success: false, message: 'Offre introuvable.' }, { status: 404 });
+                }
+                if (!offerToAdd.seller?.shippingAddresses || offerToAdd.seller.shippingAddresses.length === 0) {
+                    return NextResponse.json({ success: false, message: "Le vendeur n'a pas configuré d'adresse d'expédition et ne peut pas vendre cet article pour le moment." }, { status: 400 });
                 }
                 if (offerToAdd.transactionStatus !== 'available' || offerToAdd.stockQuantity < 1) {
                     return NextResponse.json({ success: false, message: 'Cette offre n\'est plus disponible.' }, { status: 404 });
@@ -217,19 +195,19 @@ export async function POST(request: NextRequest) {
                     ]
                 },
             ])
-            .lean<any>();
+            .lean<FinalCartState | null>();
             
-        const transformedItems = finalCartState?.items.map((item: any) => ({
+        const transformedItems: LeanCartItemPopulated[] = finalCartState?.items.map((item: FinalCartItemRaw) => ({
             ...item,
             productModel: item.offer.productModel,
-        }));
+        })) || [];
 
-        const { total, count } = calculateCartTotals(transformedItems || []);
+        const { total, count } = calculateCartTotals(transformedItems);
 
         return NextResponse.json({ 
             success: true, 
             message: message, 
-            data: { items: transformedItems || [], count, total } 
+            data: { items: transformedItems, count, total } 
         }, { status: 200 });
 
     } catch (error) {

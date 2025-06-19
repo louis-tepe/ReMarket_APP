@@ -11,7 +11,7 @@ export interface LeanProduct {
     brand?: Types.ObjectId | string;
     isFeatured?: boolean;
     minPrice?: number;
-    specifications?: Record<string, any>;
+    specifications?: { label: string; value: string; }[];
 }
 
 /*
@@ -35,7 +35,7 @@ export const productSearchFiltersSchema = z.object({
 
 export type ProductSearchFilters = z.infer<typeof productSearchFiltersSchema>;
 
-export interface SearchFilters extends ProductSearchFilters {}
+export type SearchFilters = ProductSearchFilters;
 
 export interface ProductSearchServiceResult {
     products: LeanProduct[];
@@ -51,7 +51,7 @@ export type ProductSearchServerResult =
   | {
       success: false;
       error: string;
-      errorDetails?: any;
+      errorDetails?: Record<string, string[] | undefined>;
       products: [];
       totalProducts: 0;
     };

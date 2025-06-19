@@ -19,8 +19,8 @@ export type OrderStatus =
 export type PaymentStatus = 'pending' | 'succeeded' | 'failed';
 
 // Interface pour un article commandé
-interface IOrderItem extends Document { // Etend Document pour _id, etc.
-  _id: Types.ObjectId; // ID unique de l'item dans la commande
+export interface IOrderItem { // Ne plus étendre Document
+  _id?: Types.ObjectId; // ID unique de l'item dans la commande
   offer: Types.ObjectId | IProductBase; // Réf. à l'offre (ProductOffer)
   productModel: number;                  // Réf. au modèle de produit (ScrapingProduct)
   seller: Types.ObjectId | IUser;        // Réf. au vendeur (User)
@@ -29,10 +29,14 @@ interface IOrderItem extends Document { // Etend Document pour _id, etc.
   currencyAtPurchase: string;          // Devise au moment de l'achat
 }
 
+interface IOrderItemDocument extends IOrderItem, Document {
+  _id: Types.ObjectId;
+}
+
 // Interface pour le document Order
 export interface IOrder extends Document {
   buyer: Types.ObjectId | IUser;      // Acheteur (User)
-  items: IOrderItem[];                // Articles de la commande
+  items: IOrderItemDocument[];                // Articles de la commande
   totalAmount: number;                // Montant total payé
   currency: string;                   // Devise de la transaction
   status: OrderStatus;                // Statut actuel de la commande
@@ -49,7 +53,7 @@ export interface IOrder extends Document {
   updatedAt: Date;
 }
 
-const OrderItemSchema = new Schema<IOrderItem>(
+const OrderItemSchema = new Schema<IOrderItemDocument>(
   {
     // _id est généré automatiquement par Mongoose pour les sous-documents par défaut si { _id: true }
     offer: {
@@ -96,7 +100,7 @@ const OrderSchema = new Schema<IOrder>(
     items: {
       type: [OrderItemSchema],
       required: true,
-      validate: [(val: IOrderItem[]) => val.length > 0, 'La commande doit contenir au moins un article.'],
+      validate: [(val: IOrderItemDocument[]) => val.length > 0, 'La commande doit contenir au moins un article.'],
     },
     totalAmount: {
       type: Number,
@@ -196,5 +200,4 @@ OrderSchema.pre('save', async function(next) {
 
 const OrderModel: MongooseModel<IOrder> = models.Order || model<IOrder>('Order', OrderSchema);
 
-export default OrderModel;
-export type { IOrderItem }; 
+export default OrderModel; 

@@ -58,4 +58,13 @@ export interface Product {
     variantTitle?: string;
     averagePriceLedenicheur?: number;
     optionChoicesLedenicheur?: { optionName: string; availableValues: string[] }[];
+}
+
+// Represents an offer with populated seller information.
+export interface PopulatedOffer extends Omit<Offer, 'seller'> {
+    seller: {
+        _id: string;
+        name?: string;
+        username?: string;
+    };
 } 

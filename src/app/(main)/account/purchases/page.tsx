@@ -1,107 +1,152 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
+import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import Image from 'next/image';
-import { Package, Truck, CheckCircle } from 'lucide-react';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import { IOrder } from '@/lib/mongodb/models/OrderModel';
 import { IProductBase } from '@/lib/mongodb/models/SellerProduct';
+import { IScrapedProduct } from '@/lib/mongodb/models/ScrapingProduct';
+import { IUser } from '@/lib/mongodb/models/User';
+import { Types } from 'mongoose';
 
-// Assuming IProductBase includes populated seller and productModel
-type Purchase = IProductBase & {
-  productModel: { product: { title: string; images: string[] }};
-  seller: { name: string };
-}
-
-// Map statuses to UI elements
-const statusConfig = {
-    pending_shipment: { text: "En attente d'expédition", icon: Package, color: 'bg-yellow-500' },
-    shipped: { text: "Expédié", icon: Truck, color: 'bg-blue-500' },
-    delivered: { text: "Livré", icon: CheckCircle, color: 'bg-green-500' },
-    // Add other statuses as needed
+type PopulatedOffer = Omit<IProductBase, 'productModel' | 'seller'> & {
+  productModel: Pick<IScrapedProduct, 'product'>;
 };
 
-export default function PurchasesPage() {
-    const { data: session } = useSession();
-    const [purchases, setPurchases] = useState<Purchase[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+type PopulatedItem = {
+  offer: PopulatedOffer;
+  seller: Pick<IUser, 'name'>;
+  quantity: number;
+  priceAtPurchase: number;
+};
 
-    useEffect(() => {
-        if (session?.user?.id) {
-            fetch(`/api/purchases?userId=${session.user.id}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.error) {
-                        console.error('Failed to fetch purchases:', data.message);
-                        setPurchases([]);
-                    } else {
-                        setPurchases(data);
-                    }
-                    setIsLoading(false);
-                })
-                .catch(err => {
-                    console.error('An error occurred while fetching purchases:', err);
-                    setIsLoading(false);
-                });
-        } else if (session === null) {
-            // If session is loaded and there's no user, stop loading.
-            setIsLoading(false);
-        }
-    }, [session]);
+type PopulatedOrder = Omit<IOrder, 'items' | 'buyer'> & {
+  _id: Types.ObjectId;
+  items: PopulatedItem[];
+};
 
-    if (isLoading) {
-        return <div>Chargement des achats...</div>;
+const PurchasesPage = () => {
+  const { data: session } = useSession();
+  const [purchases, setPurchases] = useState<PopulatedOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPurchases = useCallback(async () => {
+    if (!session?.user?.id) {
+      setLoading(false);
+      return;
     }
 
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/purchases?userId=${session.user.id}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch purchases.');
+      }
+      const data = await response.json();
+      setPurchases(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred.');
+    } finally {
+      setLoading(false);
+    }
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    fetchPurchases();
+  }, [fetchPurchases]);
+
+  if (loading) {
     return (
-        <div className="container mx-auto py-8">
-            <h1 className="text-3xl font-bold mb-8">Mes Achats</h1>
-            <div className="space-y-6">
-                {purchases.length > 0 ? purchases.map(purchase => {
-                    const statusInfo = purchase.transactionStatus ? statusConfig[purchase.transactionStatus as keyof typeof statusConfig] : null;
-                    return (
-                        <Card key={purchase._id.toString()}>
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle className="text-lg">{purchase.productModel.product.title}</CardTitle>
-                                <Badge>{purchase.price} {purchase.currency}</Badge>
-                            </CardHeader>
-                            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div className="md:col-span-1">
-                                    <Image
-                                        src={purchase.productModel.product.images[0] || '/images/placeholder-product.webp'}
-                                        alt={purchase.productModel.product.title}
-                                        width={150}
-                                        height={150}
-                                        className="rounded-lg object-cover"
-                                    />
-                                    <p className="text-sm text-muted-foreground mt-2">Vendu par : <span className="font-semibold">{purchase.seller.name}</span></p>
-                                </div>
-                                <div className="md:col-span-2">
-                                    <h3 className="font-semibold mb-2">Suivi de la commande</h3>
-                                    {statusInfo ? (
-                                        <div className="flex items-center">
-                                            <statusInfo.icon className={`h-6 w-6 mr-3 p-1 rounded-full text-white ${statusInfo.color}`} />
-                                            <div>
-                                                <p className="font-medium">{statusInfo.text}</p>
-                                                {purchase.shippingInfo?.trackingNumber && (
-                                                    <p className="text-sm text-muted-foreground">
-                                                        N° de suivi : {purchase.shippingInfo.trackingNumber}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <p className="text-muted-foreground">Statut indisponible</p>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )
-                }) : (
-                    <p>Vous n'avez encore effectué aucun achat.</p>
-                )}
-            </div>
+      <div className='container mx-auto p-4'>
+        <h1 className='text-3xl font-bold mb-6'>Mes Achats</h1>
+        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+          {[...Array(3)].map((_, i) => (
+            <Card key={i} className='animate-pulse'>
+              <CardHeader>
+                <div className='h-6 bg-gray-200 rounded w-3/4'></div>
+                <div className='h-4 bg-gray-200 rounded w-1/2 mt-2'></div>
+              </CardHeader>
+              <CardContent>
+                <div className='h-48 bg-gray-200 rounded-md mb-4'></div>
+                <div className='h-4 bg-gray-200 rounded w-1/4'></div>
+                <div className='h-4 bg-gray-200 rounded w-1/3 mt-2'></div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
+      </div>
     );
-}
+  }
+
+  if (error) {
+    return (
+      <div className='container mx-auto p-4'>
+        <h1 className='text-3xl font-bold mb-6'>Mes Achats</h1>
+        <p className='text-red-500'>Erreur: {error}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className='container mx-auto p-4'>
+      <h1 className='text-3xl font-bold mb-6'>Mes Achats</h1>
+      {purchases.length > 0 ? (
+        <div className='space-y-8'>
+          {purchases.map((order) => (
+            <Card key={order._id.toString()} className='overflow-hidden'>
+               <CardHeader className='bg-gray-50 dark:bg-gray-800'>
+                 <div className='flex justify-between items-center'>
+                    <div>
+                        <CardTitle className='text-lg'>Commande du {format(new Date(order.createdAt), "d MMMM yyyy 'à' HH:mm", { locale: fr })}</CardTitle>
+                        <p className='text-sm text-gray-500'>Total : {(order.totalAmount).toFixed(2)}€ - Statut : <Badge>{order.status}</Badge></p>
+                    </div>
+                    <span className='text-xs text-gray-400'>ID: {order._id.toString()}</span>
+                 </div>
+              </CardHeader>
+              <CardContent className='p-4'>
+                <div className='space-y-4'>
+                  {order.items.map((item, index) => {
+                    const product = item.offer.productModel?.product;
+                    if (!product) return <div key={index}>Information produit indisponible.</div>;
+                    
+                    return (
+                        <div key={index} className='flex items-center gap-4'>
+                            <Image
+                            src={product.images?.[0] || '/images/placeholder-product.webp'}
+                            alt={product.title}
+                            width={80}
+                            height={80}
+                            className='rounded-md object-cover'
+                            />
+                            <div className='flex-grow'>
+                                <p className='font-semibold'>{product.title}</p>
+                                <p className='text-sm text-gray-600'>Vendu par : {item.seller?.name || 'Vendeur inconnu'}</p>
+                                <p className='text-sm text-gray-500'>État : <Badge variant="outline">{item.offer.condition}</Badge></p>
+                            </div>
+                            <div className='text-right'>
+                                <p className='font-semibold'>{(item.priceAtPurchase).toFixed(2)}€</p>
+                                <p className='text-sm text-gray-500'>x{item.quantity}</p>
+                            </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <p>Vous n'avez encore effectué aucun achat.</p>
+      )}
+    </div>
+  );
+};
+
+export default PurchasesPage;

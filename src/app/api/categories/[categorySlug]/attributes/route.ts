@@ -1,6 +1,6 @@
 import ProductOfferModel from '@/lib/mongodb/models/SellerProduct';
 import { NextRequest, NextResponse } from 'next/server';
-import type { FormFieldDefinition } from '@/app/(main)/account/sell/types';
+import type { FormFieldDefinition } from '@/types/form.types';
 import { getKindFromSlug } from '@/config/discriminatorMapping';
 import mongoose from 'mongoose';
 

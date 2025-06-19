@@ -8,6 +8,7 @@ export interface LedenicheurProductDetails {
 }
 
 export interface Product {
+  id: number;
   title: string;
   brand: string;
   image_url: string;

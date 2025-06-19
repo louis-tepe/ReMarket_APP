@@ -1,8 +1,15 @@
+import { ClientSafeCart, ClientSafeCartItemPopulated } from '@/types/cart';
+
+export type OfferCondition = 'new' | 'like-new' | 'good' | 'fair' | 'poor';
+
 // Represents an offer associated with a cart item.
 export interface CartItemOffer {
     _id: string;
     price: number;
     seller?: { name?: string; username?: string };
+    condition: OfferCondition;
+    stockQuantity: number;
+    images?: string[];
     // Add other offer fields if necessary for the cart display
 }
 
@@ -12,23 +19,7 @@ export interface CartItemProductModel {
     title: string;
     standardImageUrls?: string[];
     slug?: string; // For linking back to the product page
-    condition: 'new' | 'like-new' | 'good' | 'fair' | 'poor';
-}
-
-// Represents a single item in the shopping cart.
-export interface CartItem {
-    _id: string; // Cart item's unique ID
-    offer: CartItemOffer;
-    productModel: CartItemProductModel;
-    quantity: number;
-    addedAt?: string; // ISO date string - optional since API might not return it
-}
-
-// Represents the overall structure of the cart data.
-export interface CartData {
-    items: CartItem[];
-    count: number; // Total number of items (sum of quantities)
-    total: number; // Total price of the cart
+    condition: OfferCondition;
 }
 
 // Defines the payload for cart modification actions.
@@ -50,7 +41,7 @@ export interface Offer {
     };
     images?: string[];
     stockQuantity: number;
-    condition: 'new' | 'like-new' | 'good' | 'fair' | 'poor';
+    condition: OfferCondition;
 }
 
 export interface ProductModel {
@@ -58,4 +49,13 @@ export interface ProductModel {
     title: string;
     standardImageUrls?: string[];
     slug?: string;
+}
+
+export interface CartData extends ClientSafeCart {
+    hasUnavailableItems: boolean;
+    items: CartItem[];
+}
+
+export interface CartItem extends ClientSafeCartItemPopulated {
+    isAvailable: boolean;
 } 

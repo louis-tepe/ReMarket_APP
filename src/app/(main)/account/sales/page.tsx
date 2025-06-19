@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,47 +8,37 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import Link from 'next/link';
 import Image from 'next/image';
-import { Edit3, Trash2, PlusCircle, AlertTriangle, Info, Package, Loader2, Download } from 'lucide-react';
+import { Edit3, Trash2, PlusCircle, AlertTriangle, Info, Package, Loader2 } from 'lucide-react';
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from 'sonner';
-import type { SellerOffer } from './types';
+import type { SellerOffer, OfferCondition, TransactionStatus } from './types';
 import { useRouter } from 'next/navigation';
-import { format } from "date-fns";
-import { fr } from "date-fns/locale";
 
-export interface ProductModelInfo {
-    id: string;
-    name: string;
-    imageUrl?: string;
-}
-
-// Constants for translations to avoid magic strings and improve maintainability
-const CONDITIONS_MAP: Record<SellerOffer['condition'], string> = {
+const CONDITIONS_MAP: Record<OfferCondition, string> = {
     'new': 'Neuf',
-    'used_likenew': 'Comme neuf',
-    'used_good': 'Bon état',
-    'used_fair': 'État correct',
+    'like-new': 'Comme neuf',
+    'good': 'Bon état',
+    'fair': 'État correct',
+    'poor': 'Usé'
 };
 
-const STATUS_MAP: Record<SellerOffer['status'], string> = {
+const TRANSACTION_STATUS_MAP: Record<TransactionStatus, string> = {
     'available': 'Disponible',
-    'reserved': 'Réservée',
-    'sold': 'Vendu',
+    'pending_payment': 'Paiement en attente',
     'pending_shipment': 'Envoi en attente',
     'shipped': 'Expédiée',
     'delivered': 'Livrée',
     'cancelled': 'Annulée',
-    'archived': 'Archivée',
 };
 
 // Helper function to get badge variant based on status
-const getStatusBadgeVariant = (status: SellerOffer['status']): 'default' | 'destructive' | 'outline' | 'secondary' => {
+const getTransactionStatusBadgeVariant = (status: TransactionStatus): 'default' | 'destructive' | 'outline' | 'secondary' => {
     switch (status) {
         case 'available': return 'default';
-        case 'sold': return 'destructive';
-        case 'shipped': return 'secondary';
         case 'pending_shipment': return 'outline';
-        case 'archived': return 'secondary';
+        case 'shipped': return 'secondary';
+        case 'delivered': return 'default';
+        case 'cancelled': return 'destructive';
         default: return 'default';
     }
 };
@@ -178,8 +168,7 @@ export default function SellerDashboardPage() {
      * @param offerId - The ID of the offer to edit.
      */
     const handleModifyOffer = (offerId: string) => {
-        // console.log(`Modifier l'offre: ${offerId}`);
-        router.push(`/account/sell/edit/${offerId}`);
+        router.push(`/account/sales/edit/${offerId}`);
     };
 
     /**
@@ -193,18 +182,14 @@ export default function SellerDashboardPage() {
 
         try {
             setDeletingOffers(prev => ({ ...prev, [offerId]: true }));
-
-            // console.log(`Suppression de l'offre: ${offerId}`);
-
             const response = await fetch(`/api/offers/${offerId}`, {
                 method: 'DELETE',
             });
 
             const result = await response.json();
 
-            if (result.success) {
+            if (response.ok) {
                 toast.success("Offre supprimée avec succès");
-                // Recharger les offres
                 fetchUserOffers();
             } else {
                 toast.error(result.message || "Erreur lors de la suppression");
@@ -214,6 +199,44 @@ export default function SellerDashboardPage() {
             toast.error("Erreur lors de la suppression de l'offre");
         } finally {
             setDeletingOffers(prev => ({ ...prev, [offerId]: false }));
+        }
+    };
+
+    const handleDownloadLabel = async (offer: SellerOffer) => {
+        if (!offer.shippingInfo?.labelUrl) {
+            toast.error("URL du bordereau non disponible.");
+            return;
+        }
+
+        const labelId = getLabelIdFromUrl(offer.shippingInfo.labelUrl);
+
+        if (!labelId) {
+            toast.error("ID du bordereau invalide.");
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/shipping/label/${labelId}`);
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || "Impossible de télécharger le bordereau.");
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `label-${offer._id.toString()}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            toast.success("Bordereau téléchargé.");
+
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
+            toast.error("Échec du téléchargement", { description: errorMessage });
         }
     };
 
@@ -283,68 +306,83 @@ export default function SellerDashboardPage() {
                                     <TableHead className="hidden md:table-cell">Prix</TableHead>
                                     <TableHead className="hidden md:table-cell">État</TableHead>
                                     <TableHead>Statut</TableHead>
-                                    <TableHead className="hidden lg:table-cell">Mise en vente</TableHead>
-                                    <TableHead>Actions d'expédition</TableHead>
+                                    <TableHead className="hidden lg:table-cell">Date Création</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {offers.filter(offer => offer && offer.id).map((offer) => (
-                                    <TableRow key={offer.id}>
-                                        <TableCell className="hidden sm:table-cell">
-                                            {offer.productModel.imageUrl ? (
-                                                <Image src={offer.productModel.imageUrl} alt={offer.productModel.name} width={48} height={48} className="h-12 w-12 object-cover rounded-md border" />
-                                            ) : (
-                                                <div className="h-12 w-12 bg-muted rounded-md flex items-center justify-center text-xs text-muted-foreground border">
-                                                    <Package className="h-6 w-6" />
-                                                </div>
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="font-medium group-hover:text-primary transition-colors">
-                                                <Link href={`/account/sell/edit/${offer.id}`} className="hover:underline" title={`Modifier ${offer.productModel.name}`}>{offer.productModel.name}</Link>
-                                            </div>
-                                            <div className="text-xs text-muted-foreground md:hidden">
-                                                {offer.price.toLocaleString('fr-FR', { style: 'currency', currency: offer.currency })} - {CONDITIONS_MAP[offer.condition] || offer.condition}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="hidden md:table-cell">{offer.price.toLocaleString('fr-FR', { style: 'currency', currency: offer.currency })}</TableCell>
-                                        <TableCell className="hidden md:table-cell">{CONDITIONS_MAP[offer.condition] || offer.condition}</TableCell>
-                                        <TableCell>
-                                            <Badge variant={getStatusBadgeVariant(offer.status)}>{STATUS_MAP[offer.status] || offer.status}</Badge>
-                                        </TableCell>
-                                        <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">{new Date(offer.createdAt).toLocaleDateString('fr-FR')}</TableCell>
-                                        <TableCell>
-                                            {offer.shippingInfo?.labelUrl && offer.status === 'pending_shipment' && (
-                                                <Button asChild>
-                                                    <a href={`/api/shipping/label/${getLabelIdFromUrl(offer.shippingInfo.labelUrl)}`} target="_blank">
-                                                        Télécharger le bordereau
-                                                    </a>
-                                                </Button>
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {(offer.status === 'available' || offer.status === 'archived') ? (
-                                                <div className="flex justify-end space-x-2">
-                                                    <Button variant="outline" size="icon" onClick={() => handleModifyOffer(offer.id)} aria-label="Modifier">
-                                                        <Edit3 className="h-4 w-4" />
-                                                    </Button>
+                                {offers.map((offer) => {
+                                    const isDeleting = deletingOffers[offer._id.toString()];
+                                    const product = offer.productModel?.product;
+                                    const imageUrl = product?.images?.[0] || product?.image_url || '/images/placeholder-product.webp';
+                                    const productTitle = product?.title || 'Produit sans nom';
+                                    const offerIdStr = offer._id.toString();
+
+                                    return (
+                                        <TableRow key={offerIdStr}>
+                                            <TableCell className="hidden sm:table-cell">
+                                                <Image
+                                                    src={imageUrl}
+                                                    alt={productTitle}
+                                                    width={64}
+                                                    height={64}
+                                                    className="rounded-md object-cover"
+                                                />
+                                            </TableCell>
+                                            <TableCell className="font-medium">
+                                                <Link href={`/${offer.productModel.slug}`} className="hover:underline">
+                                                    {productTitle}
+                                                </Link>
+                                                <div className="text-xs text-muted-foreground sm:hidden">{offer.price} €</div>
+                                            </TableCell>
+                                            <TableCell className="hidden md:table-cell">{offer.price} €</TableCell>
+                                            <TableCell className="hidden md:table-cell">
+                                                {CONDITIONS_MAP[offer.condition as OfferCondition] || offer.condition}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant={getTransactionStatusBadgeVariant(offer.transactionStatus as TransactionStatus)}>
+                                                    {TRANSACTION_STATUS_MAP[offer.transactionStatus as TransactionStatus] || 'Indisponible'}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="hidden lg:table-cell">
+                                                {new Date(offer.createdAt).toLocaleDateString()}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                {offer.transactionStatus === 'pending_shipment' && offer.shippingInfo?.labelUrl ? (
                                                     <Button
-                                                        variant="destructive"
-                                                        size="icon"
-                                                        onClick={() => handleDeleteOffer(offer.id)}
-                                                        disabled={deletingOffers[offer.id]}
-                                                        aria-label="Supprimer"
+                                                        onClick={() => handleDownloadLabel(offer)}
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className='mr-2'
                                                     >
-                                                        {deletingOffers[offer.id] ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                                        <Package className="mr-2 h-4 w-4" />
+                                                        Bordereau
                                                     </Button>
-                                                </div>
-                                            ) : (
-                                               <span className="text-muted-foreground">-</span>
-                                            )}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
+                                                ) : (
+                                                    <>
+                                                        <Button
+                                                            onClick={() => handleModifyOffer(offerIdStr)}
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            disabled={isDeleting}
+                                                        >
+                                                            <Edit3 className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            onClick={() => handleDeleteOffer(offerIdStr)}
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            disabled={isDeleting}
+                                                            className='text-destructive hover:text-destructive'
+                                                        >
+                                                            {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                                        </Button>
+                                                    </>
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
                             </TableBody>
                         </Table>
                     </CardContent>

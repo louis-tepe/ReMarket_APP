@@ -5,7 +5,7 @@ import dbConnect from '@/lib/mongodb/dbConnect';
 // Importé pour enregistrement Mongoose, nécessaire pour les opérations .populate()
 import '@/lib/mongodb/models/BrandModel'; 
 import '@/lib/mongodb/models/CategoryModel';
-import ProductModel, { IProductModel } from '@/lib/mongodb/models/ScrapingProduct';
+import ProductModel, { IScrapedProduct } from '@/lib/mongodb/models/ScrapingProduct';
 import ProductOfferModel, { IProductBase } from '@/lib/mongodb/models/SellerProduct';
 import UserModel from '@/lib/mongodb/models/User';
 import { Types, FilterQuery } from 'mongoose';
@@ -29,8 +29,7 @@ interface IOfferWithPopulatedSeller extends Omit<IProductBase, 'seller' | '_id'>
 }
 
 // Interface pour ProductModel avec brand et category peuplés
-interface IProductModelPopulated extends Omit<IProductModel, 'brand' | 'category'> {
-  _id: Types.ObjectId; // L'_id est un ObjectId
+interface IProductModelPopulated extends Omit<IScrapedProduct, 'brand' | 'category'> {
   brand: { _id?: Types.ObjectId; name: string; slug: string; };
   category: { _id?: Types.ObjectId; name: string; slug: string; };
 }
@@ -45,7 +44,7 @@ export async function GET(
     const { productslug } = await params; 
 
     try {
-        let query: FilterQuery<IProductModel>;
+        let query: FilterQuery<IScrapedProduct>;
         const potentialId = parseInt(productslug, 10);
 
         if (!isNaN(potentialId)) {
