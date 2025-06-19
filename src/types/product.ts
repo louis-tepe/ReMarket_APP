@@ -11,7 +11,15 @@ export interface LeanProduct {
     brand?: Types.ObjectId | string;
     isFeatured?: boolean;
     minPrice?: number;
+    specifications?: Record<string, any>;
 }
+
+/*
+export interface IProductOffer extends LeanProduct {
+    // This interface is currently empty because all fields are in LeanProduct.
+    // It's kept for future extension.
+}
+*/
 
 export const productSearchFiltersSchema = z.object({
   searchQuery: z.string().optional(),
@@ -46,4 +54,4 @@ export type ProductSearchServerResult =
       errorDetails?: any;
       products: [];
       totalProducts: 0;
-    }; 
+    };

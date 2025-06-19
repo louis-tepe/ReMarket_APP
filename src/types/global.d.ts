@@ -1,9 +1,7 @@
 import mongoose from 'mongoose';
 
-declare global {
-  // eslint-disable-next-line no-var
-  var mongooseCache: { // Cache pour la connexion Mongoose
-    conn: mongoose.Mongoose | null;
-    promise: Promise<mongoose.Mongoose> | null;
-  };
+// This ensures that the mongoose cache is stored on the global object
+// in development, avoiding issues with HMR (Hot Module Replacement).
+declare namespace global {
+  var mongooseCache: { conn: any; promise: any };
 } 

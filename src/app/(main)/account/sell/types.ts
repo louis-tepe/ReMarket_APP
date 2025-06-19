@@ -57,8 +57,20 @@ export interface Specifications {
     unit?: string;
 }
 
+interface IPriceAnalysisPeriod {
+    average_price?: number;
+    data_points?: number;
+}
+
+export interface IPriceAnalysis {
+    "3_months"?: IPriceAnalysisPeriod;
+    "6_months"?: IPriceAnalysisPeriod;
+    "1_year"?: IPriceAnalysisPeriod;
+}
+
 export interface DisplayableProductModel {
-    _id: string;
+    _id: string; // This is the SellerProduct ID
+    leDenicheurId: number; // This is the ScrapingProduct ID
     title: string;
     brand: { name: string; } | string;
     category: { name: string; } | string;
@@ -72,6 +84,13 @@ export interface DisplayableProductModel {
     rawCategoryName?: string;
     rawAsin?: string;
     variantTitle?: string;
+    // Fields from ScrapingProduct
+    options?: Record<string, string[]>;
+    price_analysis?: IPriceAnalysis;
+    product: {
+        title: string;
+        image_url?: string;
+    };
 }
 
 export const NOT_LISTED_ID = 'not-listed-create-new';

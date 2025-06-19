@@ -31,7 +31,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: 'Offer, Seller or Buyer not found' }, { status: 404 });
     }
     
-    // @ts-ignore
+    // @ts-expect-error
     const seller = offer.seller;
 
     if (!seller.shippingAddress) {

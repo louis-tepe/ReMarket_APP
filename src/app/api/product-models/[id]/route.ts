@@ -213,6 +213,7 @@ export async function GET(
 
     const response = {
         _id: productModel._id.toString(),
+        leDenicheurId: productModel._id,
         slug: productModel.slug,
         title: productModel.product.title,
         brand: {
@@ -229,6 +230,12 @@ export async function GET(
         standardImageUrls: productModel.product.images || [],
         rawImageUrls: productModel.product.images || [],
         specifications: specifications,
+        options: productModel.options,
+        price_analysis: productModel.price_analysis,
+        product: {
+            title: productModel.product.title,
+            image_url: productModel.product.image_url
+        }
     };
 
     return NextResponse.json(response, { status: 200 });

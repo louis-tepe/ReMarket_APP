@@ -81,6 +81,30 @@ export async function POST(request: NextRequest) {
         
         await dbConnect();
 
+        const productIdMatch = selectedUrl.match(/[?&]p=(\d+)/);
+        const productId = productIdMatch ? productIdMatch[1] : null;
+
+        if (productId) {
+            const existingProduct = await ScrapingProduct.findById(productId)
+                .populate('brand', 'name slug')
+                .populate('category', 'name slug')
+                .lean();
+        
+            if (existingProduct) {
+                console.log(`[API_SCRAPE_SELECT] Produit ${productId} trouvé en BDD. Pas de scraping nécessaire.`);
+                const response = {
+                    _id: existingProduct._id.toString(),
+                    slug: existingProduct.slug,
+                    title: existingProduct.product.title,
+                    brand: existingProduct.brand,
+                    category: existingProduct.category,
+                    standardImageUrls: existingProduct.product.images || [],
+                    specifications: existingProduct.specifications,
+                };
+                return NextResponse.json({ message: "Produit déjà existant.", productModel: response }, { status: 200 });
+            }
+        }
+
         // 1. Valider la catégorie et la marque
         const categoryDoc = await CategoryModel.findOne({ slug: categorySlug }).select('_id').lean();
         if (!categoryDoc) {
@@ -98,19 +122,13 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ message: `Le scraping final n'a retourné aucune donnée valide.` }, { status: 404 });
         }
         
-        // 3. Vérifier si le produit existe déjà en BDD
-        const existingProduct = await ScrapingProduct.findById(scrapedData.product.id);
-        if (existingProduct) {
-            return NextResponse.json({ message: "Ce produit existe déjà.", productModel: existingProduct }, { status: 200 });
-        }
-
-        // 4. Mapper les données et sauvegarder le nouveau produit
+        // 3. Mapper les données et sauvegarder le nouveau produit
         const mappedData = mapApiDataToScrapedProduct(scrapedData, productNameToScrape, categoryDoc._id, brandDoc);
         
         const newScrapedProduct = new ScrapingProduct(mappedData);
         await newScrapedProduct.save();
 
-        // 5. Récupérer le produit avec les champs populés pour le retour
+        // 4. Récupérer le produit avec les champs populés pour le retour
         const populatedProduct = await ScrapingProduct.findById(newScrapedProduct._id)
             .populate('brand', 'name slug')
             .populate('category', 'name slug')
@@ -120,7 +138,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ message: 'Erreur lors de la récupération du produit nouvellement créé.' }, { status: 500 });
         }
 
-        // 6. Aplatir la réponse pour correspondre au format de la route GET [id]
+        // 5. Aplatir la réponse pour correspondre au format de la route GET [id]
         const response = {
             _id: populatedProduct._id.toString(),
             slug: populatedProduct.slug,

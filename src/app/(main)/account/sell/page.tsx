@@ -37,6 +37,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface ScrapeCandidate {
     title: string;
@@ -82,6 +83,7 @@ export default function SellPage() {
     const [isLoadingProductModels, setIsLoadingProductModels] = useState(false);
     const [isLoadingFullProduct, setIsLoadingFullProduct] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isUpdatingPrice, setIsUpdatingPrice] = useState(false);
 
     const [jobId, setJobId] = useState<string | null>(null);
     const [scrapeCandidates, setScrapeCandidates] = useState<ScrapeCandidate[]>([]);
@@ -369,26 +371,26 @@ export default function SellPage() {
     const handleSelectProductModel = async (productModelId: string) => {
         if (productModelId === NOT_LISTED_ID) {
             setShowCreateByName(true);
-            setSelectedProductModel(null);
-            setNewProductModelName('');
-            setIsLoadingFullProduct(false);
             return;
         }
-        setShowCreateByName(false);
+
         setIsLoadingFullProduct(true);
         try {
             const response = await fetch(`/api/product-models/${productModelId}`);
-            const fullProductModelData = await response.json();
-            if (!response.ok) throw new Error(fullProductModelData.message || "Erreur chargement détail produit.");
-            
-            const fullProductModel = fullProductModelData as DisplayableProductModel;
-            
-            setSelectedProductModel(fullProductModel);
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || `Erreur lors du chargement du produit.`);
+            }
+            const productData: DisplayableProductModel = await response.json();
+            setSelectedProductModel(productData);
             setStep(2);
-            toast.success("Produit ReMarket sélectionné", { description: `Prêt à décrire: ${fullProductModel.title}` });
+
+            // Automatically trigger price update in the background
+            handleUpdatePrice(productData.leDenicheurId);
+
         } catch (error) {
-            toast.error("Erreur Chargement Produit", { description: (error as Error).message });
-            setSelectedProductModelReMarketId(null);
+            console.error(error);
+            toast.error("Erreur", { description: error instanceof Error ? error.message : "Impossible de charger le produit." });
         } finally {
             setIsLoadingFullProduct(false);
         }
@@ -749,59 +751,137 @@ export default function SellPage() {
         </Card>
     );
 
-    const renderStep2_ProductConfirmation = () => {
-        if (!selectedProductModel) return <p>Chargement des détails du produit...</p>;
+    const handleUpdatePrice = async (productId: number) => {
+        if (!productId) {
+            toast.error("Aucun ID de produit disponible pour la mise à jour.");
+            return;
+        }
+        setIsUpdatingPrice(true);
+        try {
+            const response = await fetch('/api/update-product-price', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ productId }),
+            });
 
-        const { displayAttributes, displayTitle, displayBrand, displayCategory, displayAsin, displayStandardDescription, displayImageUrls } = prepareDisplayData();
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                throw new Error(result.message || 'Échec de la mise à jour des prix.');
+            }
+            
+            setSelectedProductModel(prevModel => {
+                if (!prevModel) return null;
+                
+                const updatedProductData = result.product;
+
+                return {
+                    ...prevModel,
+                    options: updatedProductData.options,
+                    price_analysis: updatedProductData.price_analysis,
+                };
+            });
+
+            toast.success('Les prix ont été mis à jour avec succès !');
+
+        } catch (error) {
+            console.error('Erreur lors de la mise à jour du prix :', error);
+            const message = error instanceof Error ? error.message : 'Une erreur inconnue est survenue.';
+            toast.error('Échec de la mise à jour des prix', { description: message });
+        } finally {
+            setIsUpdatingPrice(false);
+        }
+    };
+
+    const renderStep2_ProductConfirmation = () => {
+        if (isLoadingFullProduct) {
+            return <div className="flex justify-center items-center p-8"><Loader2 className="animate-spin mr-2" /> Chargement des détails du produit...</div>;
+        }
+
+        if (!selectedProductModel) {
+            return (
+                <div className="text-center p-8">
+                    <p>Aucun produit sélectionné.</p>
+                    <Button onClick={handleBackToStep1} variant="outline" className="mt-4">
+                        <ArrowLeft className="mr-2 h-4 w-4" /> Retour à la sélection
+                    </Button>
+                </div>
+            );
+        }
+
+        const { product, specifications, price_analysis } = selectedProductModel;
+        const displayData = prepareDisplayData();
 
         return (
-            <>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Étape 2: Confirmez votre produit</CardTitle>
-                        <CardDescription>
-                            Vérifiez que les informations ci-dessous correspondent bien à votre article.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex flex-col md:flex-row gap-6">
-                            <div className="md:w-1/3">
-                                <Image
-                                    src={displayImageUrls[0]}
-                                    alt={`Image pour ${displayTitle}`}
-                                    width={200}
-                                    height={200}
-                                    className="rounded-lg object-cover w-full"
-                                />
-                            </div>
-                            <div className="md:w-2/3 space-y-3">
-                                <h3 className="text-2xl font-bold">{displayTitle}</h3>
-                                <div className="text-sm text-muted-foreground space-y-1">
-                                    <p><strong>Marque:</strong> {displayBrand}</p>
-                                    <p><strong>Catégorie:</strong> {displayCategory}</p>
-                                    {displayAsin && <p><strong>ASIN:</strong> {displayAsin}</p>}
+            <Card>
+                <CardHeader>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <CardTitle>{product.title}</CardTitle>
+                            <CardDescription>Confirmez les informations du produit avant de continuer.</CardDescription>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                        {product.image_url && (
+                            <Image
+                                src={product.image_url}
+                                alt={`Image pour ${product.title}`}
+                                width={200}
+                                height={200}
+                                className="rounded-lg object-cover w-full"
+                            />
+                        )}
+                    </div>
+                    <div className="space-y-4">
+                        <Tabs defaultValue="specifications">
+                            <TabsList>
+                                <TabsTrigger value="specifications">Spécifications</TabsTrigger>
+                                <TabsTrigger value="price-info">Infos Prix</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="specifications">
+                                <h4 className="font-semibold text-lg mb-2">Spécifications</h4>
+                                <ul className="list-disc pl-5 space-y-1 text-sm">
+                                    {displayData.displayAttributes.map((attr, index) => (
+                                        <li key={`${attr.label}-${index}`}>
+                                            <span className="font-semibold">{attr.label}:</span> {attr.value}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </TabsContent>
+                            <TabsContent value="price-info">
+                                <div className="mt-4">
+                                    <h4 className="font-semibold text-lg mb-2 flex items-center">
+                                        Analyse de Prix
+                                        {isUpdatingPrice && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+                                    </h4>
+                                    {price_analysis ? (
+                                        <ul className="list-disc pl-5 space-y-1 text-sm">
+                                            {Object.entries(price_analysis).map(([period, data]) => (
+                                                data && data.average_price && <li key={period}>
+                                                    <span className="font-semibold">{period.replace('_', ' ')}:</span> {data.average_price?.toFixed(2)}€ ({data.data_points} points de données)
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <p className="text-sm text-gray-500">Aucune analyse de prix disponible.</p>
+                                    )}
                                 </div>
-                                <p className="text-sm">{displayStandardDescription || 'Aucune description disponible.'}</p>
-                            </div>
-                        </div>
-                        <div className="mt-6 pt-6 border-t">
-                            <h4 className="font-semibold mb-3">Spécifications</h4>
-                            <ul className="space-y-1 text-sm list-disc list-inside">
-                                {displayAttributes.map((attr, index) => <li key={`${attr.label}-${index}`}><strong>{attr.label}:</strong> {attr.value}</li>)}
-                            </ul>
-                        </div>
-                    </CardContent>
-                </Card>
-                <div className="mt-6 flex justify-between">
+                            </TabsContent>
+                        </Tabs>
+                    </div>
+                </CardContent>
+                <CardFooter className="flex justify-between">
                     <Button variant="outline" onClick={handleBackToStep1}>
-                        <ArrowLeft className="mr-2 h-4 w-4" /> Changer de produit
+                        <ArrowLeft className="mr-2 h-4 w-4" /> Retour
                     </Button>
                     <Button onClick={() => setStep(3)}>
                         Continuer <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
-                </div>
-            </>
-        )
+                </CardFooter>
+            </Card>
+        );
     };
 
     const renderOfferForm = () => (
