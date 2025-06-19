@@ -31,10 +31,12 @@ export async function GET(request: NextRequest) {
             .select('product.title')
             .lean();
 
-        const productModels = products.map((p: IScrapedProduct) => ({
-            _id: (p._id as any).toString(),
-            title: p.product.title
-        }));
+        const productModels = products
+            .map(p => ({
+                id: (p._id as any).toString(),
+                name: p.product?.title 
+            }))
+            .filter(p => p.name);
 
         return NextResponse.json({ success: true, productModels });
 

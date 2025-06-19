@@ -12,7 +12,7 @@ export interface IShippingInfo {
 // Interface de base pour toutes les offres de produits
 export interface IProductBase extends Document {
   category: Types.ObjectId | ICategory; // Réf. à Category (doit être une feuille)
-  productModel: Types.ObjectId;         // Réf. à ProductModel (fiche produit standard ReMarket)
+  productModel: number;                   // Réf. à ScrapingProduct (fiche produit standard ReMarket)
 
   // Informations sur l'offre spécifique du vendeur
   seller: Types.ObjectId;               // Réf. à User (vendeur)
@@ -56,8 +56,8 @@ const ProductBaseSchema = new Schema<IProductBase>(
       required: [true, "La catégorie (feuille) du produit est obligatoire."],
     },
     productModel: {
-      type: Schema.Types.ObjectId,
-      ref: 'ProductModel',
+      type: Number,
+      ref: 'ScrapingProduct', // Référence explicite au modèle ScrapingProduct
       required: [true, "La référence au ProductModel (fiche produit standard) est obligatoire."],
       index: true,
     },

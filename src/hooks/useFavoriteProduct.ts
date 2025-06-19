@@ -43,11 +43,13 @@ export function useFavoriteProduct({
         const newFavoriteStatus = !isFavorite;
 
         try {
-            const response = await fetch('/api/favorites', {
+            const fetchOptions: RequestInit = {
                 method: newFavoriteStatus ? 'POST' : 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ productId }),
-            });
+            };
+            
+            const response = await fetch('/api/favorites', fetchOptions);
 
             const result = await response.json();
 

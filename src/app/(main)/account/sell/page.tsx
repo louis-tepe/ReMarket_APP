@@ -27,6 +27,22 @@ import { NOT_LISTED_ID } from '@/app/(main)/account/sell/types';
 import { Loader2, CheckCircle, ArrowRight, RefreshCcw, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Switch } from '@/components/ui/switch';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+interface ScrapeCandidate {
+    title: string;
+    url: string;
+    similarity?: number;
+}
 
 const OfferFormSchema = z.object({
   price: z.string().nonempty("Le prix est requis."),
@@ -64,9 +80,14 @@ export default function SellPage() {
     const [isLoadingCategories, setIsLoadingCategories] = useState(false);
     const [isLoadingBrands, setIsLoadingBrands] = useState(false);
     const [isLoadingProductModels, setIsLoadingProductModels] = useState(false);
-    const [isLoadingCreate, setIsLoadingCreate] = useState(false);
     const [isLoadingFullProduct, setIsLoadingFullProduct] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const [jobId, setJobId] = useState<string | null>(null);
+    const [scrapeCandidates, setScrapeCandidates] = useState<ScrapeCandidate[]>([]);
+    const [isInitiatingScrape, setIsInitiatingScrape] = useState(false);
+    const [isSelectingScrape, setIsSelectingScrape] = useState(false);
+    const [scrapeError, setScrapeError] = useState<string | null>(null);
 
     const {
         register,
@@ -101,6 +122,11 @@ export default function SellPage() {
         setNewProductModelName('');
         setOfferSpecificFieldValues({});
         setOfferSpecificFieldDefinitions([]);
+        
+        setJobId(null);
+        setScrapeCandidates([]);
+        setScrapeError(null);
+
         resetForm();
         if (allCategories.length > 0) {
             setCategoryDropdowns([
@@ -124,24 +150,24 @@ export default function SellPage() {
             })
             .then(data => {
                 if (data && data.success && Array.isArray(data.categories)) {
-                    setAllCategories(data.categories as FrontendCategory[]);
+                    const typedCategories = data.categories as FrontendCategory[];
+                    setAllCategories(typedCategories);
                     setCategoryDropdowns([
                         {
                             level: 0,
                             parentId: null,
-                            options: (data.categories as FrontendCategory[]).filter((cat: FrontendCategory) => cat.depth === 0),
+                            options: typedCategories.filter((cat: FrontendCategory) => cat.depth === 0),
                             selectedId: null,
                             placeholder: "Sélectionnez la catégorie principale"
                         }
                     ]);
                 } else {
                     setAllCategories([]);
-                    // console.warn("Structure de données des catégories inattendue reçue:", data);
                 }
             })
             .catch(err => {
                 console.error("Erreur chargement catégories:", err);
-                toast.error("Erreur Catégories", { description: err.message || "Impossible de charger les catégories." });
+                toast.error("Erreur Catégories", { description: err instanceof Error ? err.message : "Impossible de charger les catégories." });
                 setAllCategories([]);
             })
             .finally(() => setIsLoadingCategories(false));
@@ -236,176 +262,115 @@ export default function SellPage() {
         setOfferSpecificFieldValues(prev => ({ ...prev, [name]: value }));
     };
 
-    const renderDynamicFields = () => {
-        if (offerSpecificFieldDefinitions.length === 0) return null;
+    const handleInitiateScrape = async (e: FormEvent) => {
+        e.preventDefault();
+        const trimmedNewProductModelName = newProductModelName.trim();
+        if (!trimmedNewProductModelName) {
+            toast.error("Le nom du produit ne peut pas être vide.");
+            return;
+        }
 
-    return (
-            <div className="my-6 p-4 border rounded-md bg-muted/20">
-                <h3 className="font-semibold text-lg mb-4">Détails spécifiques à la catégorie</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {offerSpecificFieldDefinitions.map(field => (
-                        <div key={field.name} className="space-y-2">
-                            <Label htmlFor={field.name}>
-                                {field.label}
-                                {field.required && <span className="text-destructive">*</span>}
-                            </Label>
-                            {field.type === 'text' && (
-                                <Input
-                                    id={field.name}
-                                    type="text"
-                                    value={offerSpecificFieldValues[field.name] as string || ''}
-                                    onChange={(e) => handleSpecificFieldChange(field.name, e.target.value)}
-                                    placeholder={field.placeholder}
-                                />
-                            )}
-                            {field.type === 'number' && (
-                                <Input
-                                    id={field.name}
-                                    type="number"
-                                    value={offerSpecificFieldValues[field.name] as number | ''}
-                                    onChange={(e) => handleSpecificFieldChange(field.name, e.target.value === '' ? '' : parseFloat(e.target.value))}
-                                    placeholder={field.placeholder}
-                                />
-                            )}
-                            {field.type === 'select' && field.options && (
-                                <Select
-                                    value={offerSpecificFieldValues[field.name] as string || ''}
-                                    onValueChange={(value) => handleSpecificFieldChange(field.name, value)}
-                                >
-                                    <SelectTrigger><SelectValue placeholder={field.placeholder} /></SelectTrigger>
-                                    <SelectContent>
-                                        {field.options.map(option => (
-                                            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            )}
-                            {field.type === 'boolean' && (
-                                <div className="flex items-center space-x-2 h-10">
-                                    <Switch
-                                        id={field.name}
-                                        checked={offerSpecificFieldValues[field.name] as boolean || false}
-                                        onCheckedChange={(checked) => handleSpecificFieldChange(field.name, checked)}
-                                    />
-                                    <Label htmlFor={field.name} className="font-normal">{field.placeholder || field.label}</Label>
-                                </div>
-                            )}
-                            {field.description && <p className="text-xs text-muted-foreground">{field.description}</p>}
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
+        const currentBrand = brands.find(b => b._id === selectedBrandId);
+        if (!currentBrand) {
+            toast.error("Aucune marque sélectionnée.");
+            return;
+        }
+
+        const nameForScraping = `${currentBrand.name} ${trimmedNewProductModelName}`;
+
+        setIsInitiatingScrape(true);
+        setScrapeError(null);
+        setScrapeCandidates([]);
+        toast.info("Recherche en cours...", { description: `Recherche de candidats pour "${nameForScraping}".` });
+
+        try {
+            const response = await fetch('/api/scrape/initiate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ productName: nameForScraping }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || "Erreur lors de l'initiation du scraping.");
+            }
+            
+            setJobId(data.job_id);
+            setScrapeCandidates(data.candidates);
+
+        } catch (error) {
+            const typedError = error as Error;
+            console.error("Erreur initiate scrape:", typedError);
+            setScrapeError(typedError.message);
+            toast.error("Erreur de recherche", { description: typedError.message });
+        } finally {
+            setIsInitiatingScrape(false);
+        }
     };
 
-    useEffect(() => {
-        if (finalSelectedLeafCategory && finalSelectedLeafCategory.isLeafNode) {
-        } else {
-            setOfferSpecificFieldValues({});
+    const handleSelectAndScrape = async (candidateUrl: string | null) => {
+        if (!candidateUrl) {
+            setScrapeCandidates([]);
+            setJobId(null);
+            toast.info("Recherche annulée", { description: "Vous pouvez affiner votre recherche." });
+            return;
         }
-    }, [finalSelectedLeafCategory]);
 
-    useEffect(() => {
-        if (finalSelectedLeafCategory) {
-            setIsLoadingBrands(true);
-            setBrands([]);
-            setSelectedBrandId(null);
-            fetch(`/api/brands?categorySlug=${finalSelectedLeafCategory.slug}`)
-                .then(res => {
-                    if (!res.ok) throw new Error(`Erreur HTTP: ${res.status} - ${res.statusText}`);
-                    return res.json();
-                })
-                .then(data => {
-                    if (data && data.success && Array.isArray(data.brands)) {
-                        setBrands(data.brands);
-                        if (data.brands.length === 0) {
-                            toast.info("Aucune Marque", { description: "Aucune marque trouvée pour cette catégorie. Vous pourrez en créer une si besoin." });
-                        }
-                    } else {
-                        setBrands([]);
-                        toast.error("Erreur Marques", { description: data.message || "Format de données incorrect pour les marques." });
-                    }
-                })
-                .catch(err => {
-                    console.error("Erreur chargement marques:", err);
-                    toast.error("Erreur Marques", { description: err.message || "Impossible de charger les marques." });
-                    setBrands([]);
-                })
-                .finally(() => setIsLoadingBrands(false));
-        } else {
-            setBrands([]);
-            setSelectedBrandId(null);
+        if (!jobId || !finalSelectedLeafCategory || !selectedBrandId) {
+            toast.error("Erreur interne", { description: "Des informations de session sont manquantes (jobId, catégorie, marque)." });
+            return;
         }
-    }, [finalSelectedLeafCategory]);
 
-    useEffect(() => {
-        if (finalSelectedLeafCategory && selectedBrandId) {
-            setIsLoadingProductModels(true);
-            setProductModelsReMarketSelectItems([]);
+        setIsSelectingScrape(true);
+        setScrapeError(null);
+        toast.info("Standardisation en cours...", { description: "Récupération des détails du produit sélectionné." });
 
-            const brandObject = brands.find(b => b.slug === selectedBrandId);
-            if (!brandObject) return;
+        try {
+            const response = await fetch('/api/scrape/select', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    jobId: jobId,
+                    selectedUrl: candidateUrl,
+                    productNameToScrape: `${brands.find(b => b._id === selectedBrandId)?.name} ${newProductModelName.trim()}`,
+                    categorySlug: finalSelectedLeafCategory.slug,
+                    brandId: selectedBrandId,
+                }),
+            });
 
-            fetch(`/api/product-models/search?categorySlug=${finalSelectedLeafCategory.slug}&brandId=${brandObject._id}`)
-                .then(res => {
-                    if (!res.ok) {
-                        const error = new Error(`Erreur HTTP: ${res.status} - ${res.statusText}`);
-                        throw error;
-                    }
-                    return res.json();
-                })
-                .then((data: { success: boolean; productModels?: Array<{ _id?: string; id?: string; title?: string; name?: string; }>; message?: string } | Array<{ _id?: string; id?: string; title?: string; name?: string; }>) => {
-                    let items: ProductModelReMarketSelectItem[] = [];
-                    const processPmData = (pmList: Array<{ _id?: string; id?: string; title?: string; name?: string; }>) => {
-                        return pmList.map(pm => ({
-                            id: pm._id || pm.id || '',
-                            name: pm.title || pm.name || 'Produit sans nom'
-                        })).filter(pm => pm.id);
-                    };
+            const data = await response.json();
 
-                    if (Array.isArray(data)) {
-                        items = processPmData(data);
-                    } else if (data && data.success && Array.isArray(data.productModels)) {
-                        items = processPmData(data.productModels);
-                    } else if (data && data.message) {
-                        // console.info("Message de l'API ProductModels:", data.message);
-                    }
-                    const notListedOption: ProductModelReMarketSelectItem = {
-                        id: NOT_LISTED_ID,
-                        name: "Mon produit n'est pas dans cette liste (créer)",
-                    };
-                    setProductModelsReMarketSelectItems([...items, notListedOption]);
-                    if (items.length === 0) {
-                        toast.info("Info Produits", { description: "Aucun produit ReMarket existant. Sélectionnez l'option pour en créer un." });
-                    }
-                })
-                .catch(err => {
-                    console.error("Erreur chargement ProductModels:", err);
-                    toast.error("Erreur Produits", { description: err.message || "Impossible de charger les produits." });
-                    setProductModelsReMarketSelectItems([{ id: NOT_LISTED_ID, name: "Mon produit n'est pas dans cette liste (créer)" }]);
-                })
-                .finally(() => setIsLoadingProductModels(false));
-        } else {
-            setProductModelsReMarketSelectItems([]);
-            setSelectedProductModelReMarketId(null);
+            if (!response.ok) {
+                throw new Error(data.message || "Erreur lors de la finalisation du scraping.");
+            }
+            
+            const newProductModel = data.productModel as DisplayableProductModel;
+
+            toast.success("Produit standardisé avec succès !", {
+                description: newProductModel.title,
+            });
+
+            setSelectedProductModel(newProductModel);
+            setStep(2);
+            setScrapeCandidates([]);
+            setJobId(null);
+
+        } catch (error) {
+            const typedError = error as Error;
+            console.error("Erreur select and scrape:", typedError);
+            setScrapeError(typedError.message);
+            toast.error("Erreur de standardisation", { description: typedError.message });
+        } finally {
+            setIsSelectingScrape(false);
         }
-    }, [finalSelectedLeafCategory, selectedBrandId, brands]);
-
-    const handleSelectBrand = (brandSlug: string) => {
-        setSelectedBrandId(brandSlug);
-        setSelectedProductModelReMarketId(null);
-        setProductModelsReMarketSelectItems([]);
-        setSelectedProductModel(null);
-        setShowCreateByName(false);
     };
 
-    const handleSelectProductModelReMarket = useCallback(async (productModelId: string) => {
-        setSelectedProductModelReMarketId(productModelId);
+    const handleSelectProductModel = async (productModelId: string) => {
         if (productModelId === NOT_LISTED_ID) {
             setShowCreateByName(true);
             setSelectedProductModel(null);
-            const currentBrand = brands.find(b => b.slug === selectedBrandId);
-            setNewProductModelName(currentBrand ? `${currentBrand.name} ` : '');
+            setNewProductModelName('');
             setIsLoadingFullProduct(false);
             return;
         }
@@ -415,7 +380,9 @@ export default function SellPage() {
             const response = await fetch(`/api/product-models/${productModelId}`);
             const fullProductModelData = await response.json();
             if (!response.ok) throw new Error(fullProductModelData.message || "Erreur chargement détail produit.");
+            
             const fullProductModel = fullProductModelData as DisplayableProductModel;
+            
             setSelectedProductModel(fullProductModel);
             setStep(2);
             toast.success("Produit ReMarket sélectionné", { description: `Prêt à décrire: ${fullProductModel.title}` });
@@ -425,62 +392,29 @@ export default function SellPage() {
         } finally {
             setIsLoadingFullProduct(false);
         }
-    }, [brands, selectedBrandId]);
+    };
 
-    const handleScrapeNewProductModel = useCallback(async (e: FormEvent) => {
-        e.preventDefault();
-        const trimmedNewProductModelName = newProductModelName.trim();
-        if (!trimmedNewProductModelName) {
-            toast.error("Nom du produit manquant", { description: "Veuillez entrer un nom précis pour le produit à rechercher." });
-            return;
-        }
-        const currentBrand = brands.find(b => b.slug === selectedBrandId);
-        if (!finalSelectedLeafCategory || !selectedBrandId || !currentBrand) {
-            toast.error("Sélection Marque/Catégorie Feuille Manquante", { description: "Veuillez sélectionner une catégorie feuille et une marque valides." });
-            return;
-        }
-        setIsLoadingCreate(true);
+    const handleBackToStep1 = () => {
         setSelectedProductModel(null);
-        let nameForScraping = trimmedNewProductModelName;
-        if (!trimmedNewProductModelName.toLowerCase().startsWith(currentBrand.name.toLowerCase())) {
-            nameForScraping = `${currentBrand.name} ${trimmedNewProductModelName}`;
-        }
-        toast.info("Recherche en cours...", { description: `Recherche d'informations pour "${nameForScraping}".` });
+        setSelectedProductModelReMarketId(null);
+        setShowCreateByName(false);
+        setNewProductModelName('');
+        setJobId(null);
+        setScrapeCandidates([]);
+        setScrapeError(null);
+        setStep(1);
+    };
 
-        try {
-            const response = await fetch('/api/product-models/create', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: nameForScraping,
-                    categoryId: finalSelectedLeafCategory.slug,
-                    brandId: currentBrand._id
-                }),
-            });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || "Erreur création/scraping produit.");
-
-            if (data.productModel?._id) {
-                setIsLoadingFullProduct(true);
-                const pmResponse = await fetch(`/api/product-models/${data.productModel._id}`);
-                const fullProductModelForDisplayData = await pmResponse.json();
-                if (!pmResponse.ok) throw new Error(fullProductModelForDisplayData.message || "Erreur recharge produit standardisé.");
-                const fullProductModelForDisplay = fullProductModelForDisplayData as DisplayableProductModel;
-                setSelectedProductModel(fullProductModelForDisplay);
-                setStep(2);
-                toast.success("Produit Prêt !", { description: `Les informations pour "${fullProductModelForDisplay.title}" sont prêtes pour votre offre.` });
-            } else {
-                throw new Error(data.error || data.message || `Produit "${nameForScraping}" non trouvé/standardisé.`);
-            }
-
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : "Impossible de récupérer/créer les informations du produit.";
-            toast.error("Erreur Création Produit", { description: errorMessage });
-        } finally {
-            setIsLoadingCreate(false);
-            setIsLoadingFullProduct(false);
-        }
-    }, [newProductModelName, brands, selectedBrandId, finalSelectedLeafCategory]);
+    const handleBackToBrandSelection = () => {
+        setSelectedBrandId(null);
+        setProductModelsReMarketSelectItems([]);
+        setSelectedProductModelReMarketId(null);
+        setShowCreateByName(false);
+        setNewProductModelName('');
+        setJobId(null);
+        setScrapeCandidates([]);
+        setScrapeError(null);
+    };
 
     const onOfferSubmit = async (formData: TOfferFormSchema) => {
         if (!finalSelectedLeafCategory || !selectedProductModel) {
@@ -490,7 +424,7 @@ export default function SellPage() {
         setIsSubmitting(true);
         
         try {
-            const uploadedImageUrls = [];
+            const uploadedImageUrls: string[] = [];
             if (formData.images) {
                 for (const imageFile of Array.from(formData.images)) {
                     const formImageData = new FormData();
@@ -509,7 +443,7 @@ export default function SellPage() {
                 }
             });
 
-            const payload: Partial<TNewOfferSchema> & Record<string, unknown> = {
+            const payload: Omit<TNewOfferSchema, 'productModelId'> & { productModelId: string } & Record<string, unknown> = {
                 price: parseFloat(formData.price),
                 stockQuantity: parseInt(formData.stockQuantity, 10),
                 condition: formData.condition,
@@ -543,7 +477,7 @@ export default function SellPage() {
         }
     };
 
-    const getDisplayString = (value: string | number | null | undefined | { name?: string; title?: string; toString?: () => string; }): string => {
+    const getDisplayString = (value: any): string => {
         if (value === null || value === undefined) return 'N/A';
         if (typeof value === 'string') return value;
         if (typeof value === 'number') return String(value);
@@ -565,58 +499,116 @@ export default function SellPage() {
         let displayCategory = 'N/A';
         let displayAsin: string | undefined = undefined;
         let displayStandardDescription: string | undefined = 'N/A';
-        let displayImageUrls: string[] = ['/images/placeholder-product.png'];
+        let displayImageUrls: string[] = ['/images/placeholder-product.webp'];
 
         if (selectedProductModel) {
             displayTitle = selectedProductModel.title || 'N/A';
-            displayBrand = selectedProductModel.brand ? getDisplayString(selectedProductModel.brand) : 'N/A';
+            displayBrand = getDisplayString(selectedProductModel.brand);
+            displayCategory = getDisplayString(selectedProductModel.category);
             displayAsin = selectedProductModel.rawAsin;
+            displayStandardDescription = selectedProductModel.standardDescription;
             
-            let displayCategoryName: string | undefined = finalSelectedLeafCategory?.name;
-            if (!displayCategoryName && selectedProductModel.category) {
-                const categoryData = selectedProductModel.category;
-                if (typeof categoryData === 'object' && categoryData !== null && 'name' in categoryData && typeof categoryData.name === 'string') {
-                    displayCategoryName = categoryData.name;
-                } else if (typeof categoryData === 'string' && categoryData) {
-                    displayCategoryName = categoryData;
-                } else if (selectedProductModel.rawCategoryName) {
-                    displayCategoryName = selectedProductModel.rawCategoryName;
-                } else if (categoryData && typeof categoryData.toString === 'function' && categoryData.constructor.name !== 'Object') {
-                    const categoryString = categoryData.toString();
-                    if (categoryString !== '[object Object]' && categoryString) {
-                        displayCategoryName = categoryString;
-                    }
-                }
+            const urls = selectedProductModel.standardImageUrls;
+            if (urls && urls.length > 0) {
+                displayImageUrls = urls;
             }
-            displayCategory = displayCategoryName || 'N/A';
-            
-            if (selectedProductModel.standardDescription) {
-                displayStandardDescription = selectedProductModel.standardDescription;
-            } else if (selectedProductModel.rawDescription) {
-                displayStandardDescription = selectedProductModel.rawDescription + " (Description brute)";
-            }
-
-            const urls = (selectedProductModel.standardImageUrls && selectedProductModel.standardImageUrls.length > 0)
-                ? selectedProductModel.standardImageUrls
-                : (selectedProductModel.rawImageUrls && selectedProductModel.rawImageUrls.length > 0
-                    ? selectedProductModel.rawImageUrls
-                    : null);
-            if (urls) displayImageUrls = urls;
 
             if (selectedProductModel.specifications && selectedProductModel.specifications.length > 0) {
-                displayAttributes = selectedProductModel.specifications.map((spec: {label: string, value: string, unit?: string}) => ({
-                    label: spec.label,
-                    value: spec.value,
-                    unit: spec.unit
-                }));
+                displayAttributes = selectedProductModel.specifications;
             } else if (selectedProductModel.rawAttributes && selectedProductModel.rawAttributes.length > 0) {
-                displayAttributes = selectedProductModel.rawAttributes.map((attr: {label: string, value: string}) => ({
-                    label: attr.label,
-                    value: attr.value,
-                }));
+                displayAttributes = selectedProductModel.rawAttributes;
             }
         }
         return { displayAttributes, displayTitle, displayBrand, displayCategory, displayAsin, displayStandardDescription, displayImageUrls };
+    };
+
+    const fetchBrandsAndProductModels = useCallback(async (categorySlug: string) => {
+        setIsLoadingBrands(true);
+        setIsLoadingProductModels(true);
+        try {
+            const brandsRes = await fetch(`/api/brands?categorySlug=${categorySlug}`);
+            if (!brandsRes.ok) throw new Error('Erreur chargement marques.');
+            const brandsData = await brandsRes.json();
+            setBrands(brandsData.brands);
+        } catch (error) {
+            toast.error("Erreur Marques", { description: (error as Error).message });
+            setBrands([]);
+        } finally {
+            setIsLoadingBrands(false);
+        }
+        setIsLoadingProductModels(false);
+    }, []);
+
+    useEffect(() => {
+        if (finalSelectedLeafCategory) {
+            fetchBrandsAndProductModels(finalSelectedLeafCategory.slug);
+        }
+    }, [finalSelectedLeafCategory, fetchBrandsAndProductModels]);
+
+    const handleSelectBrand = (brandId: string) => {
+        setSelectedBrandId(brandId);
+        setSelectedProductModelReMarketId(null);
+        setShowCreateByName(false);
+        if (!finalSelectedLeafCategory) return;
+        setIsLoadingProductModels(true);
+        fetch(`/api/product-models/search?categorySlug=${finalSelectedLeafCategory.slug}&brandId=${brandId}`)
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    setProductModelsReMarketSelectItems(data.productModels);
+                }
+            })
+            .catch(err => console.error(err))
+            .finally(() => setIsLoadingProductModels(false));
+    };
+
+    const renderDynamicFields = () => {
+        if (offerSpecificFieldDefinitions.length === 0) return null;
+
+        return (
+            <div className="my-6 p-4 border rounded-md bg-muted/20">
+                <h3 className="font-semibold text-lg mb-4">Détails spécifiques à la catégorie</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {offerSpecificFieldDefinitions.map(field => (
+                        <div key={field.name} className="space-y-2">
+                            <Label htmlFor={field.name}>
+                                {field.label}
+                                {field.required && <span className="text-destructive">*</span>}
+                            </Label>
+                            {field.type === 'boolean' ? (
+                                <div className="flex items-center space-x-2">
+                                    <Switch
+                                        id={field.name}
+                                        checked={offerSpecificFieldValues[field.name] as boolean}
+                                        onCheckedChange={(value) => handleSpecificFieldChange(field.name, value)}
+                                    />
+                                    <Label htmlFor={field.name}>{field.description}</Label>
+                                </div>
+                            ) : field.type === 'select' ? (
+                                <Select onValueChange={(value) => handleSpecificFieldChange(field.name, value)} value={offerSpecificFieldValues[field.name] as string}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder={field.placeholder} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {field.options?.map(option => (
+                                            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            ) : (
+                                <Input
+                                    id={field.name}
+                                    type={field.type}
+                                    value={offerSpecificFieldValues[field.name] as string | number}
+                                    onChange={(e) => handleSpecificFieldChange(field.name, e.target.value)}
+                                    placeholder={field.placeholder}
+                                />
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
     };
 
     const renderCategoryDropdowns = () => {
@@ -626,7 +618,7 @@ export default function SellPage() {
                 <Select
                     value={dropdown.selectedId || ''}
                     onValueChange={(value) => handleCategoryLevelSelect(dropdown.level, value)}
-                    disabled={isLoadingCategories || (index > 0 && !categoryDropdowns[index - 1]?.selectedId) || isLoadingFullProduct || isLoadingCreate}
+                    disabled={isLoadingCategories || (index > 0 && !categoryDropdowns[index - 1]?.selectedId) || isInitiatingScrape || isSelectingScrape}
                 >
                     <SelectTrigger id={`category-level-${index}`} className="bg-input">
                         <SelectValue placeholder={isLoadingCategories && index === 0 ? "Chargement..." : dropdown.placeholder} />
@@ -634,12 +626,7 @@ export default function SellPage() {
                     <SelectContent>
                         {dropdown.options.length > 0 ? (
                             dropdown.options.map((cat: FrontendCategory) => (
-                                <SelectItem
-                                    key={cat._id}
-                                    value={cat._id}
-                                >
-                                    {cat.name}
-                                </SelectItem>
+                                <SelectItem key={cat._id} value={cat._id}>{cat.name}</SelectItem>
                             ))
                         ) : (
                             <SelectItem value="no-options" disabled>Aucune sous-catégorie</SelectItem>
@@ -650,12 +637,179 @@ export default function SellPage() {
         ));
     };
 
+    const renderCandidatesModal = () => (
+        <AlertDialog open={scrapeCandidates.length > 0} onOpenChange={() => {
+            if (!isSelectingScrape) {
+                setScrapeCandidates([]);
+                setJobId(null);
+            }
+        }}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Confirmez-vous le produit ?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Nous avons trouvé plusieurs correspondances. Veuillez sélectionner le produit exact que vous souhaitez vendre.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="max-h-[40vh] overflow-y-auto space-y-2 pr-2">
+                    {scrapeCandidates.map((candidate, index) => (
+                        <Button
+                            key={index}
+                            variant="outline"
+                            className="w-full justify-start text-left h-auto py-2"
+                            onClick={() => handleSelectAndScrape(candidate.url)}
+                            disabled={isSelectingScrape}
+                        >
+                            {candidate.title}
+                        </Button>
+                    ))}
+                    <Button
+                        variant="destructive"
+                        className="w-full justify-start mt-4"
+                        onClick={() => handleSelectAndScrape(null)}
+                        disabled={isSelectingScrape}
+                    >
+                        Aucun de ces produits ne correspond
+                    </Button>
+                </div>
+                 {isSelectingScrape && (
+                    <div className="flex items-center justify-center p-4">
+                        <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                        <span className="text-muted-foreground">Standardisation en cours...</span>
+                    </div>
+                )}
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+
+    const renderStep1_Selection = () => (
+        <Card>
+            <CardHeader>
+                <CardTitle>Étape 1: Quel produit vendez-vous ?</CardTitle>
+                <CardDescription>
+                    Commencez par sélectionner une catégorie pour trouver votre produit.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                {renderCategoryDropdowns()}
+
+                {finalSelectedLeafCategory && (
+                    <div className="mt-6 pt-6 border-t">
+                        <Label>2. Marque</Label>
+                        <Select onValueChange={handleSelectBrand} value={selectedBrandId || ''} disabled={isLoadingBrands}>
+                            <SelectTrigger><SelectValue placeholder={isLoadingBrands ? "Chargement..." : "Sélectionnez une marque"} /></SelectTrigger>
+                            <SelectContent>
+                                {brands.map(brand => <SelectItem key={brand._id} value={brand._id}>{brand.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
+
+                {selectedBrandId && (
+                    <div className="mt-6 pt-6 border-t">
+                        <Label>3. Modèle du produit</Label>
+                        {isLoadingProductModels ? <Loader2 className="animate-spin mt-2" /> : (
+                            <>
+                                <Select onValueChange={handleSelectProductModel} value={selectedProductModelReMarketId || ''}>
+                                    <SelectTrigger><SelectValue placeholder="Sélectionnez un modèle existant" /></SelectTrigger>
+                                    <SelectContent>
+                                        {productModelsReMarketSelectItems.map((pm, index) => <SelectItem key={`${pm.id}-${index}`} value={pm.id}>{pm.name}</SelectItem>)}
+                                        <SelectItem value={NOT_LISTED_ID}>Produit non listé / Créer</SelectItem>
+                                    </SelectContent>
+                                </Select>
+
+                                {showCreateByName && (
+                                    <form onSubmit={handleInitiateScrape} className="mt-4 p-4 border rounded-lg bg-muted/50 space-y-3">
+                                        <p className="text-sm font-medium">Rechercher pour créer un nouveau modèle de produit</p>
+                                        <div className="relative">
+                                            <Input
+                                                type="search"
+                                                placeholder="Ex: iPhone 13 Pro 256Go"
+                                                value={newProductModelName}
+                                                onChange={(e) => setNewProductModelName(e.target.value)}
+                                                className="pr-20"
+                                                disabled={isInitiatingScrape}
+                                            />
+                                            <Button 
+                                                type="submit" 
+                                                className="absolute top-0 right-0 rounded-l-none" 
+                                                disabled={!newProductModelName.trim() || isInitiatingScrape}
+                                            >
+                                                {isInitiatingScrape ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Rechercher'}
+                                            </Button>
+                                        </div>
+                                        {scrapeError && <p className="text-sm text-destructive mt-2">{scrapeError}</p>}
+                                    </form>
+                                )}
+                            </>
+                        )}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+
+    const renderStep2_ProductConfirmation = () => {
+        if (!selectedProductModel) return <p>Chargement des détails du produit...</p>;
+
+        const { displayAttributes, displayTitle, displayBrand, displayCategory, displayAsin, displayStandardDescription, displayImageUrls } = prepareDisplayData();
+
+        return (
+            <>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Étape 2: Confirmez votre produit</CardTitle>
+                        <CardDescription>
+                            Vérifiez que les informations ci-dessous correspondent bien à votre article.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex flex-col md:flex-row gap-6">
+                            <div className="md:w-1/3">
+                                <Image
+                                    src={displayImageUrls[0]}
+                                    alt={`Image pour ${displayTitle}`}
+                                    width={200}
+                                    height={200}
+                                    className="rounded-lg object-cover w-full"
+                                />
+                            </div>
+                            <div className="md:w-2/3 space-y-3">
+                                <h3 className="text-2xl font-bold">{displayTitle}</h3>
+                                <div className="text-sm text-muted-foreground space-y-1">
+                                    <p><strong>Marque:</strong> {displayBrand}</p>
+                                    <p><strong>Catégorie:</strong> {displayCategory}</p>
+                                    {displayAsin && <p><strong>ASIN:</strong> {displayAsin}</p>}
+                                </div>
+                                <p className="text-sm">{displayStandardDescription || 'Aucune description disponible.'}</p>
+                            </div>
+                        </div>
+                        <div className="mt-6 pt-6 border-t">
+                            <h4 className="font-semibold mb-3">Spécifications</h4>
+                            <ul className="space-y-1 text-sm list-disc list-inside">
+                                {displayAttributes.map((attr, index) => <li key={`${attr.label}-${index}`}><strong>{attr.label}:</strong> {attr.value}</li>)}
+                            </ul>
+                        </div>
+                    </CardContent>
+                </Card>
+                <div className="mt-6 flex justify-between">
+                    <Button variant="outline" onClick={handleBackToStep1}>
+                        <ArrowLeft className="mr-2 h-4 w-4" /> Changer de produit
+                    </Button>
+                    <Button onClick={() => setStep(3)}>
+                        Continuer <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                </div>
+            </>
+        )
+    };
+
     const renderOfferForm = () => (
         <Card>
-                    <CardHeader>
-                <CardTitle>Étape 3: Décrivez votre article</CardTitle>
-                <CardDescription>Détails pour : {selectedProductModel?.title}</CardDescription>
-                    </CardHeader>
+            <CardHeader>
+                <CardTitle>Étape 3: Décrivez votre offre</CardTitle>
+                <CardDescription>Détails de l'article : {selectedProductModel?.title || 'Produit'}</CardDescription>
+            </CardHeader>
             <form onSubmit={handleSubmit(onOfferSubmit)} noValidate>
                 <CardContent className="space-y-6">
                     {renderDynamicFields()}
@@ -663,7 +817,7 @@ export default function SellPage() {
                         <div className="space-y-2">
                             <Label htmlFor="price">Prix (€)</Label>
                             <Input id="price" type="number" step="0.01" {...register('price')} placeholder="150" />
-                            {errors.price && <p className="text-sm text-red-500">{errors.price.message}</p>}
+                            {errors.price && <p className="text-sm text-destructive mt-2">{errors.price.message}</p>}
                         </div>
                         <div className="space-y-2">
                             <Label>État</Label>
@@ -679,25 +833,25 @@ export default function SellPage() {
                                     </SelectContent>
                                 </Select>
                             )} />
-                            {errors.condition && <p className="text-sm text-red-500">{errors.condition.message}</p>}
+                            {errors.condition && <p className="text-sm text-destructive mt-2">{errors.condition.message}</p>}
                         </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
                             <Label htmlFor="stockQuantity">Quantité</Label>
                             <Input id="stockQuantity" type="number" step="1" {...register('stockQuantity')} placeholder="1" />
-                            {errors.stockQuantity && <p className="text-sm text-red-500">{errors.stockQuantity.message}</p>}
+                            {errors.stockQuantity && <p className="text-sm text-destructive mt-2">{errors.stockQuantity.message}</p>}
                         </div>
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="description">Description</Label>
                         <Textarea id="description" {...register('description')} placeholder="Ex: Vendu avec boîte d'origine..." />
-                        {errors.description && <p className="text-sm text-red-500">{errors.description.message}</p>}
+                        {errors.description && <p className="text-sm text-destructive mt-2">{errors.description.message}</p>}
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="photos">Photos (jusqu&apos;à 5)</Label>
                         <Input id="photos" type="file" multiple accept="image/*" {...register('images')} />
-                        {errors.images && <p className="text-sm text-red-500">{errors.images.message}</p>}
+                        {errors.images && <p className="text-sm text-destructive mt-2">{errors.images.message}</p>}
                         {watchedImages?.length > 0 && (
                             <div className="mt-2 grid grid-cols-3 sm:grid-cols-5 gap-2">
                                 {Array.from(watchedImages).map((file, index) => (
@@ -720,129 +874,6 @@ export default function SellPage() {
                 </Card>
     );
 
-    const renderStep1_Selection = () => (
-                <Card>
-                    <CardHeader>
-                <CardTitle>Étape 1: Identifiez votre produit</CardTitle>
-                <CardDescription>Sélectionnez la catégorie, la marque et le modèle de votre produit.</CardDescription>
-                    </CardHeader>
-            <CardContent>
-                {renderCategoryDropdowns()}
-                {finalSelectedLeafCategory && (
-                    <React.Fragment key={finalSelectedLeafCategory._id}>
-                        <div className="mb-4">
-                            <Label htmlFor="brand-select">2. Marque</Label>
-                            <Select
-                                value={selectedBrandId || ''}
-                                onValueChange={handleSelectBrand}
-                                disabled={isLoadingBrands || isLoadingFullProduct || isLoadingCreate}
-                            >
-                                <SelectTrigger id="brand-select" className="bg-input">
-                                    <SelectValue placeholder={isLoadingBrands ? "Chargement des marques..." : "Sélectionnez une marque"} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {brands.length > 0 ? brands.map(brand => (
-                                        <SelectItem key={brand._id} value={brand.slug}>{brand.name}</SelectItem>
-                                    )) : <SelectItem value="no-brands" disabled>Aucune marque trouvée</SelectItem>}
-                                </SelectContent>
-                            </Select>
-                                                </div>
-
-                        {selectedBrandId && (
-                            <div>
-                                <Label htmlFor="product-model-select">3. Modèle du produit</Label>
-                                <Select
-                                    value={selectedProductModelReMarketId || ''}
-                                    onValueChange={(value) => {
-                                        if (typeof value === 'string') {
-                                            handleSelectProductModelReMarket(value)
-                                        }
-                                    }}
-                                    disabled={isLoadingProductModels || isLoadingFullProduct || isLoadingCreate}
-                                >
-                                    <SelectTrigger id="product-model-select" className="bg-input">
-                                        <SelectValue placeholder={isLoadingProductModels ? "Chargement des modèles..." : "Sélectionnez un modèle"} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {productModelsReMarketSelectItems.map(pm => (
-                                            <SelectItem key={pm.id} value={pm.id}>{pm.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-
-                                {showCreateByName && (
-                                    <form onSubmit={handleScrapeNewProductModel} className="mt-4 p-4 border rounded-lg bg-muted/50 space-y-3">
-                                        <p className="text-sm font-medium">Créer un nouveau modèle de produit</p>
-                                        <Input
-                                            type="text"
-                                            value={newProductModelName}
-                                            onChange={(e) => setNewProductModelName(e.target.value)}
-                                            placeholder="Ex: iPhone 15 Pro Max 256GB"
-                                            disabled={isLoadingCreate}
-                                        />
-                                        <Button type="submit" disabled={isLoadingCreate || !newProductModelName.trim()}>
-                                            {isLoadingCreate ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
-                                            Rechercher et créer
-                                                    </Button>
-                                    </form>
-                                )}
-                                                </div>
-                                            )}
-                    </React.Fragment>
-                )}
-            </CardContent>
-             <CardFooter className="flex justify-end">
-                <Button onClick={resetSellProcess} variant="ghost" >
-                    <RefreshCcw className="mr-2 h-4 w-4" /> Recommencer
-                </Button>
-            </CardFooter>
-        </Card>
-    );
-
-    const renderStep2_ProductConfirmation = () => {
-        if (!selectedProductModel) return null;
-        const { displayAttributes, displayTitle, displayBrand, displayCategory, displayAsin, displayStandardDescription, displayImageUrls } = prepareDisplayData();
-
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>Étape 2: Confirmez votre produit</CardTitle>
-                    <CardDescription>Vérifiez les informations ci-dessous. Est-ce bien le produit que vous vendez ?</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="flex flex-col md:flex-row gap-6">
-                        <div className="md:w-1/3">
-                            <Image src={displayImageUrls[0]} alt={displayTitle} width={200} height={200} className="rounded-lg object-contain mx-auto" />
-                        </div>
-                        <div className="md:w-2/3 space-y-2">
-                            <h2 className="text-2xl font-bold">{displayTitle}</h2>
-                            <p><span className="font-semibold">Marque:</span> {displayBrand}</p>
-                            <p><span className="font-semibold">Catégorie:</span> {displayCategory}</p>
-                            {displayAsin && <p><span className="font-semibold">ASIN:</span> {displayAsin}</p>}
-                            <p className="text-sm text-muted-foreground pt-2">{displayStandardDescription}</p>
-                        </div>
-                    </div>
-                    {displayAttributes.length > 0 && (
-                        <div>
-                            <h3 className="text-lg font-semibold border-b pb-2 mb-2">Spécifications</h3>
-                            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                                {displayAttributes.map((attr: Specifications, index: number) => (
-                                    <li key={index}><span className="font-medium">{attr.label}:</span> {attr.value} {attr.unit || ''}</li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-                    </CardContent>
-                <CardFooter className="flex justify-between">
-                    <Button type="button" variant="outline" onClick={() => setStep(1)}><ArrowLeft className="mr-2 h-4 w-4" /> Précédent</Button>
-                    <Button type="button" onClick={() => setStep(3)}>
-                        Oui, c&apos;est mon produit <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                </CardFooter>
-                </Card>
-        );
-    };
-
     const renderCurrentStep = () => {
         switch (step) {
             case 1:
@@ -852,13 +883,18 @@ export default function SellPage() {
             case 3:
                 return renderOfferForm();
             default:
-                return <p>Étape inconnue.</p>;
+                return <p>Étape invalide</p>;
         }
-    }
+    };
 
     return (
-        <div className="container mx-auto max-w-4xl py-8">
+        <div className="container mx-auto px-4 py-8 max-w-4xl">
+            <h1 className="text-3xl font-bold mb-2">Vendre un article</h1>
+            <p className="text-muted-foreground mb-8">
+                Suivez les étapes pour mettre en vente votre produit rapidement et au meilleur prix.
+            </p>
             {renderCurrentStep()}
+            {renderCandidatesModal()}
         </div>
     );
 } 

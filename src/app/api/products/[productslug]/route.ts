@@ -27,8 +27,8 @@ interface IOfferWithPopulatedSeller extends Omit<IProductBase, 'seller' | '_id'>
 }
 
 // Interface pour ProductModel avec brand et category peuplés
-interface IProductModelPopulated extends Omit<IProductModel, 'brand' | 'category'> {
-  _id: Types.ObjectId; // S'assurer que _id est un ObjectId ici
+interface IProductModelPopulated extends Omit<IProductModel, 'brand' | 'category' | '_id'> {
+  _id: number; // L'_id est maintenant un nombre
   brand: { _id?: Types.ObjectId; name: string; slug: string; };
   category: { _id?: Types.ObjectId; name: string; slug: string; };
 }
@@ -42,8 +42,10 @@ export async function GET(
 
     try {
         let query: FilterQuery<IProductModel>;
-        if (Types.ObjectId.isValid(productslug)) {
-            query = { _id: new Types.ObjectId(productslug) };
+        const potentialId = parseInt(productslug, 10);
+
+        if (!isNaN(potentialId)) {
+            query = { _id: potentialId };
         } else {
             query = { slug: productslug };
         }

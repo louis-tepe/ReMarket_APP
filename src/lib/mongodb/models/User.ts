@@ -21,7 +21,7 @@ export interface IUser extends Document {
   image?: string; // URL de l'image de profil (via OAuth ou upload)
   emailVerified?: Date | null; // Date de vérification de l'email
   role: 'user' | 'seller' | 'admin'; // Rôle de l'utilisateur sur la plateforme
-  favorites: Types.ObjectId[]; // IDs des ProductModels favoris
+  favorites: number[]; // IDs des ProductModels favoris (maintenant numériques)
   shippingAddress?: IShippingAddress; // Adresse d'expédition du vendeur
   sendcloudSenderId?: number; // ID de l'adresse d'expéditeur chez Sendcloud
   createdAt: Date;
@@ -78,8 +78,8 @@ const UserSchema: Schema<IUser> = new Schema(
     },
     favorites: [
       {
-        type: Schema.Types.ObjectId,
-        ref: 'ProductModel', // Réf. à ProductModel
+        type: Number,
+        ref: 'ScrapingProduct', // Réf. à ScrapingProduct
       },
     ],
     shippingAddress: {

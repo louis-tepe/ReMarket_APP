@@ -8,8 +8,10 @@
     "start": "next start",
     "lint": "next lint",
     "test:scrape": "tsx ./test-scraper.ts",
-    "db:seed:categories": "tsx src/lib/seed/seedCategories.ts",
-    "db:seed:brands": "tsx src/lib/seed/seedBrands.ts",
+    "db:purge": "tsx -r dotenv/config src/lib/seed/purgeDatabase.ts",
+    "db:seed:categories": "tsx -r dotenv/config src/lib/seed/seedCategories.ts",
+    "db:seed:brands": "tsx -r dotenv/config src/lib/seed/seedBrands.ts",
+    "db:seed": "npm run db:purge && npm run db:seed:categories && npm run db:seed:brands",
     "db:check-indexes": "node scripts/check-mongodb-indexes.js",
     "test:api-perf": "node scripts/test-api-performance.js"
   },

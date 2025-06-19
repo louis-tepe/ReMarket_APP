@@ -8,10 +8,11 @@ export interface CartItemOffer {
 
 // Represents product model details for a cart item.
 export interface CartItemProductModel {
-    _id: string;
+    _id: number;
     title: string;
     standardImageUrls?: string[];
     slug?: string; // For linking back to the product page
+    condition: 'new' | 'like-new' | 'good' | 'fair' | 'poor';
 }
 
 // Represents a single item in the shopping cart.
@@ -53,7 +54,7 @@ export interface Offer {
 }
 
 export interface ProductModel {
-    _id: string;
+    _id: number;
     title: string;
     standardImageUrls?: string[];
     slug?: string;

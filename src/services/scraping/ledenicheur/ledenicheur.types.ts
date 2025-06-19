@@ -29,11 +29,27 @@ export interface PriceAnalysisPeriod {
 export interface Meta {
   source: string;
   scraped_at: string;
-  search_candidates: SearchCandidate[];
 }
 
-export interface SearchCandidate {
+/**
+ * Représente un produit candidat retourné par l'étape d'initiation.
+ */
+export interface ScrapeCandidate {
   title: string;
   url: string;
-  similarity: number;
-} 
+  similarity?: number; // La similarité peut être optionnelle
+}
+
+/**
+ * Type de la réponse pour l'endpoint /scrape/initiate.
+ */
+export interface ScrapeInitiateResponse {
+  job_id: string;
+  candidates: ScrapeCandidate[];
+}
+
+/**
+ * Type de la réponse pour l'endpoint /scrape/select.
+ * C'est la même structure que les détails complets du produit.
+ */
+export type ScrapeSelectResponse = LedenicheurProductDetails; 

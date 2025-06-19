@@ -22,7 +22,7 @@ export type PaymentStatus = 'pending' | 'succeeded' | 'failed';
 interface IOrderItem extends Document { // Etend Document pour _id, etc.
   _id: Types.ObjectId; // ID unique de l'item dans la commande
   offer: Types.ObjectId | IProductBase; // Réf. à l'offre (ProductOffer)
-  productModel: Types.ObjectId;        // Réf. au modèle de produit (ProductModel)
+  productModel: number;                  // Réf. au modèle de produit (ScrapingProduct)
   seller: Types.ObjectId | IUser;        // Réf. au vendeur (User)
   quantity: number;                    // Quantité commandée
   priceAtPurchase: number;             // Prix unitaire au moment de l'achat
@@ -58,8 +58,8 @@ const OrderItemSchema = new Schema<IOrderItem>(
       required: true,
     },
     productModel: {
-      type: Schema.Types.ObjectId,
-      ref: 'ProductModel',
+      type: Number,
+      ref: 'ScrapingProduct',
       required: true,
     },
     seller: {

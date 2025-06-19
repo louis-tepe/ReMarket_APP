@@ -5,7 +5,7 @@ interface ICartItem extends Document {
   _id: Types.ObjectId; // ID unique de l'item dans le panier
   offer: Types.ObjectId; // Réf. à ProductOfferModel
   quantity: number; // Quantité de l'offre
-  productModel: Types.ObjectId; // Réf. à ProductModel (pour affichage)
+  productModel: number; // Réf. à ScrapingProduct (pour affichage)
   addedAt: Date; // Date d'ajout au panier
 }
 
@@ -17,7 +17,7 @@ export interface ICart extends Document {
   updatedAt: Date;
 
   // Déclaration des méthodes pour l'interface
-  addItem(itemDetails: { offerId: string | Types.ObjectId; productModelId: string | Types.ObjectId; quantity?: number }): Promise<ICart>;
+  addItem(itemDetails: { offerId: string | Types.ObjectId; productModelId: string | number; quantity?: number }): Promise<ICart>;
   removeItem(cartItemId: string | Types.ObjectId): Promise<ICart>;
   clearCart(): Promise<ICart>;
 }
@@ -29,8 +29,8 @@ const CartItemSchema = new Schema<ICartItem>({
     required: true,
   },
   productModel: { // Dénormalisation pour accès facile aux détails du produit
-    type: Schema.Types.ObjectId,
-    ref: 'ProductModel',
+    type: Number,
+    ref: 'ScrapingProduct',
     required: true,
   },
   quantity: {
@@ -65,10 +65,14 @@ const CartSchema = new Schema<ICart>(
 // Méthode pour ajouter ou mettre à jour un article
 CartSchema.methods.addItem = async function (
   { offerId, productModelId, quantity = 1 }: 
-  { offerId: string | Types.ObjectId; productModelId: string | Types.ObjectId; quantity?: number }
+  { offerId: string | Types.ObjectId; productModelId: string | number; quantity?: number }
 ) {
   const offerObjectId = typeof offerId === 'string' ? new Types.ObjectId(offerId) : offerId;
-  const productModelObjectId = typeof productModelId === 'string' ? new Types.ObjectId(productModelId) : productModelId;
+  const productModelNumericId = typeof productModelId === 'string' ? parseInt(productModelId, 10) : productModelId;
+
+  if (isNaN(productModelNumericId)) {
+    throw new Error("L'ID du modèle de produit est invalide.");
+  }
 
   const existingItem = this.items.find((item: ICartItem) => item.offer.equals(offerObjectId));
 
@@ -81,7 +85,7 @@ CartSchema.methods.addItem = async function (
     this.items.push({
       _id: new Types.ObjectId(), // Générer un nouvel ObjectId pour l'item
       offer: offerObjectId,
-      productModel: productModelObjectId,
+      productModel: productModelNumericId,
       quantity: quantity,
       addedAt: new Date(),
     } as ICartItem);

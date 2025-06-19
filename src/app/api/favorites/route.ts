@@ -72,22 +72,25 @@ export async function POST(req: NextRequest) {
     try {
         const { productId } = await req.json();
 
-        if (!productId || !isValidObjectId(productId)) {
+        if (!productId) {
+            return NextResponse.json({ message: 'ID de produit manquant.' }, { status: 400 });
+        }
+
+        const productNumericId = parseInt(productId, 10);
+        if (isNaN(productNumericId)) {
             return NextResponse.json({ message: 'ID de produit invalide.' }, { status: 400 });
         }
 
-        const productObjectId = new Types.ObjectId(productId);
-
-        const productExists = await ProductModel.findById(productObjectId).lean(); // .lean() pour performance
+        const productExists = await ProductModel.findById(productNumericId).lean();
         if (!productExists) {
             return NextResponse.json({ message: 'Produit non trouvé.' }, { status: 404 });
         }
 
         const updatedUser = await User.findByIdAndUpdate(
             userId,
-            { $addToSet: { favorites: productObjectId } }, 
+            { $addToSet: { favorites: productNumericId } }, 
             { new: true }
-        ).lean(); // .lean() si on ne retourne que les IDs des favoris
+        ).lean();
 
         if (!updatedUser) {
             return NextResponse.json({ message: 'Utilisateur non trouvé.' }, { status: 404 });
@@ -112,19 +115,30 @@ export async function DELETE(req: NextRequest) {
 
     try {
         const { searchParams } = new URL(req.url);
-        const productId = searchParams.get('productId');
+        let productIdFromBody: any;
+        try {
+            const body = await req.json();
+            productIdFromBody = body.productId;
+        } catch (e) {
+            // Pas de corps ou JSON invalide, on continue avec les searchParams
+        }
+
+        const productId = searchParams.get('productId') || productIdFromBody;
         
-        if (!productId || !isValidObjectId(productId)) {
+        if (!productId) {
+            return NextResponse.json({ message: 'ID de produit manquant.' }, { status: 400 });
+        }
+
+        const productNumericId = parseInt(productId, 10);
+        if (isNaN(productNumericId)) {
             return NextResponse.json({ message: 'ID de produit invalide.' }, { status: 400 });
         }
         
-        const productObjectId = new Types.ObjectId(productId);
-
         const updatedUser = await User.findByIdAndUpdate(
             userId,
-            { $pull: { favorites: productObjectId } },
+            { $pull: { favorites: productNumericId } },
             { new: true }
-        ).lean(); // .lean() si on ne retourne que les IDs des favoris
+        ).lean();
 
         if (!updatedUser) {
             return NextResponse.json({ message: 'Utilisateur non trouvé.' }, { status: 404 });

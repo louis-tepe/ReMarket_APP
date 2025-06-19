@@ -5,7 +5,7 @@ import { Types } from 'mongoose';
 
 // Interface de base pour les données d'une offre attendues en entrée.
 interface BaseOfferData {
-  productModel: Types.ObjectId | string;
+  productModel: number | string;
   seller: Types.ObjectId | string;
   price: number;
   currency?: string;
@@ -74,7 +74,7 @@ export interface OfferFilters {
     condition?: string | string[];
     priceMin?: number;
     priceMax?: number;
-    productModelId?: string;
+    productModelId?: number | string;
     sellerId?: string;
     transactionStatus?: 'available' | 'reserved' | 'pending_shipment' | 'shipped' | 'delivered' | 'cancelled' | 'sold';
     listingStatus?: 'active' | 'inactive' | 'rejected' | 'sold'; // 'pending_approval' a été retiré car géré par d'autres mécanismes.

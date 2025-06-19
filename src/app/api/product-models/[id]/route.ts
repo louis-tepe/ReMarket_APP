@@ -156,8 +156,8 @@ type PopulatedCategory = {
 };
 
 // Étend IScrapedProduct pour inclure les champs populés et _id
-type PopulatedScrapedProduct = Omit<IScrapedProduct, 'brand' | 'category'> & {
-  _id: Types.ObjectId;
+type PopulatedScrapedProduct = Omit<IScrapedProduct, 'brand' | 'category' | '_id'> & {
+  _id: number;
   brand?: PopulatedBrand;
   category?: PopulatedCategory;
 };
@@ -176,13 +176,15 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  if (!id || !Types.ObjectId.isValid(id)) {
+  const productId = parseInt(id, 10);
+
+  if (isNaN(productId)) {
     return NextResponse.json({ message: 'ID du ProductModel invalide.' }, { status: 400 });
   }
 
   try {
     await dbConnect();
-    const productModel = await ProductModel.findById(id)
+    const productModel = await ProductModel.findById(productId)
       .populate('brand', 'name slug')
       .populate('category', 'name slug')
       .lean<PopulatedScrapedProduct | null>();
@@ -242,66 +244,48 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  if (!id || !Types.ObjectId.isValid(id)) {
+  const productId = parseInt(id, 10);
+
+  if (isNaN(productId)) {
     return NextResponse.json({ message: 'ID du ProductModel invalide.' }, { status: 400 });
   }
 
   // La vérification des droits admin doit être implémentée ici si nécessaire
 
   try {
-    await dbConnect();
     const body = await request.json();
-
     const validationResult = UpdateProductModelSchema.safeParse(body);
 
     if (!validationResult.success) {
-      return NextResponse.json({ 
-        message: 'Données d\'entrée invalides.',
-        errors: validationResult.error.flatten().fieldErrors,
+      return NextResponse.json({
+        success: false,
+        message: 'Données de mise à jour invalides.',
+        errors: validationResult.error.flatten().fieldErrors
       }, { status: 400 });
     }
-    
-    const { title, brand, category, standardDescription, standardImageUrls, specifications } = validationResult.data;
 
-    const updateData: Record<string, unknown> = {};
-    if (title) updateData['product.title'] = title;
-    if (brand) updateData['brand'] = new Types.ObjectId(brand);
-    if (category) updateData['category'] = new Types.ObjectId(category);
-    if (standardDescription) updateData['product.description'] = standardDescription;
-    if (standardImageUrls) updateData['product.images'] = standardImageUrls;
-    if (specifications) updateData['specifications'] = specifications;
+    const updateData = validationResult.data;
     
-    // Le slug est géré par le hook pre-save du modèle, pas besoin de le manipuler ici.
+    // Logique de mise à jour spécifique si nécessaire...
+    // Exemple: si 'brand' ou 'category' sont des slugs, les convertir en ObjectId.
+    // Cette partie est à adapter en fonction des données réellement envoyées.
 
+    await dbConnect();
     const updatedProductModel = await ProductModel.findByIdAndUpdate(
-      id,
-      { $set: updateData }, // Utilise l'objet nettoyé et validé
+      productId, // Utiliser l'ID numérique parsé
+      { $set: updateData },
       { new: true, runValidators: true }
-    ).lean<PopulatedScrapedProduct | null>();
+    ).lean();
 
     if (!updatedProductModel) {
-      return NextResponse.json({ message: 'ProductModel non trouvé pour la mise à jour.' }, { status: 404 });
+      return NextResponse.json({ success: false, message: 'ProductModel non trouvé.' }, { status: 404 });
     }
 
-    // Créer une réponse sécurisée, ne retournant que les champs nécessaires
-    const responseData = {
-      _id: updatedProductModel._id.toString(),
-      slug: updatedProductModel.slug,
-      title: updatedProductModel.product.title,
-      brand: updatedProductModel.brand, // Peut nécessiter une population si seuls les IDs sont retournés
-      category: updatedProductModel.category, // Idem
-      standardDescription: updatedProductModel.product.description,
-      standardImageUrls: updatedProductModel.product.images,
-      specifications: updatedProductModel.specifications,
-    };
-
-    return NextResponse.json(responseData, { status: 200 });
+    return NextResponse.json(updatedProductModel, { status: 200 });
   } catch (error) {
+    console.error(`Erreur API PUT /api/product-models/${id}:`, error);
     const errorMessage = error instanceof Error ? error.message : 'Erreur serveur inconnue.';
-    if (error instanceof mongoose.Error.ValidationError) {
-        return NextResponse.json({ message: 'Erreur de validation des données.', errorDetails: error.errors }, { status: 400 });
-    }
-    return NextResponse.json({ message: 'Erreur serveur lors de la mise à jour du ProductModel.', errorDetails: errorMessage }, { status: 500 });
+    return NextResponse.json({ success: false, message: 'Erreur serveur lors de la mise à jour du ProductModel.', errorDetails: errorMessage }, { status: 500 });
   }
 }
 
@@ -310,8 +294,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  if (!id || !Types.ObjectId.isValid(id)) {
-    return NextResponse.json({ message: 'ID du ProductModel invalide.' }, { status: 400 });
+  const productId = parseInt(id, 10);
+
+  if (isNaN(productId)) {
+    return NextResponse.json({ message: 'ID du ProductModel doit être un nombre valide.' }, { status: 400 });
   }
 
   // La vérification des droits admin doit être implémentée ici si nécessaire
@@ -325,7 +311,7 @@ export async function DELETE(
     // const offerCount = await ProductOfferModel.countDocuments({ productModel: id });
     // if (offerCount > 0) { ... }
 
-    const deletedProductModel = await ProductModel.findByIdAndDelete(id).lean();
+    const deletedProductModel = await ProductModel.findByIdAndDelete(productId).lean();
 
     if (!deletedProductModel) {
       return NextResponse.json({ message: 'ProductModel non trouvé pour la suppression.' }, { status: 404 });

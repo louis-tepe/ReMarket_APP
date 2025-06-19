@@ -2,8 +2,20 @@ import { Schema, model, models, Document, Model, Types } from 'mongoose';
 import './BrandModel';
 import './CategoryModel';
 
+// Interface pour les données du produit de base scrapées
+interface IProductData {
+    id: number; // ID numérique provenant de la source
+    title: string;
+    brand: string;
+    url: string;
+    image_url?: string;
+    images?: string[];
+    description?: string;
+}
+
 // Sous-schémas
-const ProductSchema = new Schema({
+const ProductSchema = new Schema<IProductData>({
+    id: { type: Number, required: true },
     title: { type: String, required: true },
     brand: { type: String, required: true, index: true },
     url: { type: String, required: true, unique: true, index: true },
@@ -31,19 +43,13 @@ interface IPriceAnalysisPeriod {
 
 // Interface principale pour le document
 export interface IScrapedProduct {
+  _id: number; // Utilisation de l'ID numérique du produit comme clé primaire
   source_name: string;
   product_search_name: string;
   category: Types.ObjectId; // ID de la catégorie ReMarket
   brand?: Types.ObjectId; // ID de la marque ReMarket
   slug?: string;
-  product: {
-    title: string;
-    brand: string;
-    url: string;
-    image_url?: string;
-    images?: string[];
-    description?: string;
-  };
+  product: IProductData;
   options?: Record<string, string[]>;
   specifications: Record<string, unknown>;
   price_analysis?: {
@@ -53,10 +59,18 @@ export interface IScrapedProduct {
   };
 }
 
-export interface IScrapedProductDocument extends IScrapedProduct, Document {}
+export interface IScrapedProductDocument extends IScrapedProduct, Document {
+    _id: number; // Spécifier explicitement que _id est un nombre
+}
 
 // Schéma principal
 const ScrapingProductSchema = new Schema<IScrapedProductDocument>({
+    _id: { 
+        type: Number,
+        required: true,
+        // Ne pas utiliser `unique: true` ici car Mongoose gère l'unicité de `_id`
+        // et cela peut causer des problèmes avec certains pilotes.
+    },
     source_name: { type: String, required: true, default: 'ledenicheur' },
     product_search_name: { type: String, required: true, index: true },
     slug: { type: String, unique: true, sparse: true },

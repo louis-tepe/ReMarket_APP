@@ -1,7 +1,7 @@
 import { Types } from "mongoose";
 
 export interface LeanProduct {
-    _id: Types.ObjectId | string;
+    _id: number;
     title: string;
     slug: string;
     standardImageUrls?: string[];

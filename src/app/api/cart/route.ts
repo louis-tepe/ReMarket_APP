@@ -29,7 +29,7 @@ interface PopulatedOfferForCartItem {
 }
 
 interface PopulatedProductModelForCartItem {
-    _id: Types.ObjectId | string;
+    _id: number;
     title: string;
     standardImageUrls: string[];
     slug: string;
@@ -47,7 +47,7 @@ interface LeanCart extends Omit<GlobalLeanCart, 'items'> {
 interface CartActionPayload {
     action?: 'add' | 'remove' | 'update' | 'clear'; // 'add' est par défaut
     offerId?: string; // Requis pour action: 'add'
-    productModelId?: string; // Requis pour action: 'add'
+    productModelId?: string | number; // Requis pour action: 'add'
     cartItemId?: string; // Requis pour action: 'remove' ou 'update'
     quantity?: number; // Requis pour action: 'add' ou 'update' (pour 'add', 1 par défaut)
 }
@@ -146,7 +146,9 @@ export async function POST(request: NextRequest) {
 
         switch (action) {
             case 'add':
-                if (!offerId || !Types.ObjectId.isValid(offerId) || !productModelId || !Types.ObjectId.isValid(productModelId)) {
+                const productModelIdNum = typeof productModelId === 'string' ? parseInt(productModelId, 10) : productModelId;
+
+                if (!offerId || !Types.ObjectId.isValid(offerId) || !productModelIdNum || isNaN(productModelIdNum)) {
                     return NextResponse.json({ success: false, message: 'ID offre ou produit manquant/invalide.' }, { status: 400 });
                 }
                 const addQuantity = quantity === undefined ? 1 : quantity;
@@ -156,7 +158,7 @@ export async function POST(request: NextRequest) {
 
                 const offerToAdd = await ProductOfferModel.findById(offerId)
                     .select('_id transactionStatus productModel price stockQuantity')
-                    .lean<{ _id: Types.ObjectId, transactionStatus: string, productModel: Types.ObjectId, price: number, stockQuantity: number } | null>();
+                    .lean<{ _id: Types.ObjectId, transactionStatus: string, productModel: number, price: number, stockQuantity: number } | null>();
 
                 if (!offerToAdd) {
                     return NextResponse.json({ success: false, message: 'Offre introuvable.' }, { status: 404 });
@@ -164,10 +166,10 @@ export async function POST(request: NextRequest) {
                 if (offerToAdd.transactionStatus !== 'available' || offerToAdd.stockQuantity < 1) {
                     return NextResponse.json({ success: false, message: 'Cette offre n\'est plus disponible.' }, { status: 404 });
                 }
-                if (offerToAdd.productModel.toString() !== productModelId) {
+                if (offerToAdd.productModel !== productModelIdNum) {
                     return NextResponse.json({ success: false, message: 'L\'offre ne correspond pas au produit.' }, { status: 400 });
                 }
-                await cart.addItem({ offerId, productModelId, quantity: addQuantity });
+                await cart.addItem({ offerId, productModelId: productModelIdNum, quantity: addQuantity });
                 message = 'Article ajouté/mis à jour.';
                 break;
 

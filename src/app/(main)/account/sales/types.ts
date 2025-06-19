@@ -50,7 +50,7 @@ export interface ProductModelReMarketSelectItem {
 }
 
 // Represents a product model with all its details for display on the sell page.
-export type DisplayableProductModel = IProductModelReMarketType & { _id: string };
+export type DisplayableProductModel = Omit<IProductModelReMarketType, '_id'> & { _id: string };
 
 // Structure for scraped product attributes (can be from various sources).
 export interface ScrapedProductAttribute {
