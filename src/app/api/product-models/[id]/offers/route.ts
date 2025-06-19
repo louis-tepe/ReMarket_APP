@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/authOptions';
 import ProductOfferModel, { IProductBase } from '@/lib/mongodb/models/SellerProduct';
 import ProductModel from '@/lib/mongodb/models/ScrapingProduct';
 import UserModel from '@/lib/mongodb/models/User';
@@ -59,6 +61,13 @@ interface FormattedOffer {
   updatedAt?: Date;
 }
 
+interface MongoQuery {
+    productModel: Types.ObjectId;
+    listingStatus: 'active';
+    transactionStatus: 'available';
+    seller?: { $ne: Types.ObjectId };
+}
+
 export async function GET(
   request: NextRequest, // request n'est pas utilisé, mais conservé pour la signature
   { params }: { params: Promise<{ id: string }> }
@@ -71,6 +80,8 @@ export async function GET(
 
   try {
     await dbConnect();
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.id;
 
     // Vérifier d'abord si le ProductModel existe pour éviter des requêtes inutiles
     const productModelExists = await ProductModel.findById(productModelId).select('_id').lean();
@@ -78,11 +89,17 @@ export async function GET(
       return NextResponse.json({ message: 'ProductModel non trouvé.' }, { status: 404 });
     }
 
-    const offersFromDB = await ProductOfferModel.find({
+    const query: MongoQuery = {
       productModel: new Types.ObjectId(productModelId),
       listingStatus: 'active',
       transactionStatus: 'available'
-    })
+    };
+
+    if (userId) {
+        query.seller = { $ne: new Types.ObjectId(userId) };
+    }
+
+    const offersFromDB = await ProductOfferModel.find(query)
     .populate<{ seller: { _id: Types.ObjectId; name?: string; username?: string } }>(
       { path: 'seller', select: 'name username _id', model: UserModel }
     )

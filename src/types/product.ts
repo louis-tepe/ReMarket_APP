@@ -1,4 +1,5 @@
 import { Types } from "mongoose";
+import { z } from "zod";
 
 export interface LeanProduct {
     _id: number;
@@ -12,18 +13,37 @@ export interface LeanProduct {
     minPrice?: number;
 }
 
-export interface SearchFilters {
-    searchQuery?: string;
-    categorySlug?: string;
-    brandSlugs?: string[];
-    sort?: 'relevance' | 'price-asc' | 'price-desc';
-    limit?: number;
-    page?: number;
-    includeOffers?: boolean;
-    isFeatured?: boolean;
-}
+export const productSearchFiltersSchema = z.object({
+  searchQuery: z.string().optional(),
+  categorySlug: z.string().optional(),
+  brandSlugs: z.array(z.string()).optional(),
+  sort: z.enum(['relevance', 'price-asc', 'price-desc']).optional(),
+  limit: z.number().optional(),
+  page: z.number().optional(),
+  includeOffers: z.boolean().optional(),
+  isFeatured: z.boolean().optional(),
+  userId: z.string().optional(),
+});
+
+export type ProductSearchFilters = z.infer<typeof productSearchFiltersSchema>;
+
+export interface SearchFilters extends ProductSearchFilters {}
 
 export interface ProductSearchServiceResult {
     products: LeanProduct[];
     totalProducts: number;
-} 
+}
+
+export type ProductSearchServerResult =
+  | {
+      success: true;
+      products: LeanProduct[];
+      totalProducts: number;
+    }
+  | {
+      success: false;
+      error: string;
+      errorDetails?: any;
+      products: [];
+      totalProducts: 0;
+    }; 

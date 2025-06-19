@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/authOptions';
 import dbConnect from '@/lib/mongodb/dbConnect';
 // Importé pour enregistrement Mongoose, nécessaire pour les opérations .populate()
 import '@/lib/mongodb/models/BrandModel'; 
@@ -27,8 +29,8 @@ interface IOfferWithPopulatedSeller extends Omit<IProductBase, 'seller' | '_id'>
 }
 
 // Interface pour ProductModel avec brand et category peuplés
-interface IProductModelPopulated extends Omit<IProductModel, 'brand' | 'category' | '_id'> {
-  _id: number; // L'_id est maintenant un nombre
+interface IProductModelPopulated extends Omit<IProductModel, 'brand' | 'category'> {
+  _id: Types.ObjectId; // L'_id est un ObjectId
   brand: { _id?: Types.ObjectId; name: string; slug: string; };
   category: { _id?: Types.ObjectId; name: string; slug: string; };
 }
@@ -38,6 +40,8 @@ export async function GET(
     { params }: { params: Promise<{ productslug: string }> } 
 ) {
     await dbConnect();
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.id;
     const { productslug } = await params; 
 
     try {
@@ -45,8 +49,10 @@ export async function GET(
         const potentialId = parseInt(productslug, 10);
 
         if (!isNaN(potentialId)) {
-            query = { _id: potentialId };
+            // Recherche par l'ID numérique externe si c'est un nombre
+            query = { "product.id": potentialId };
         } else {
+            // Sinon, recherche par le slug
             query = { slug: productslug };
         }
 
@@ -59,11 +65,17 @@ export async function GET(
             return NextResponse.json({ message: "Produit modèle non trouvé" }, { status: 404 });
         }
 
-        const offersFromDB = await ProductOfferModel.find({ 
-            productModel: productModel._id, 
+        const offersQuery: FilterQuery<IProductBase> = { 
+            productModel: productModel._id, // Utilise le vrai _id de MongoDB
             transactionStatus: 'available',
             listingStatus: 'active' 
-        })
+        };
+
+        if (userId) {
+            offersQuery.seller = { $ne: new Types.ObjectId(userId) };
+        }
+
+        const offersFromDB = await ProductOfferModel.find(offersQuery)
         .populate<{ seller: PopulatedSellerType }>({
             path: 'seller',
             select: 'name username _id', 
@@ -92,7 +104,7 @@ export async function GET(
         const priceNewLedenicheur = productModel.price_analysis?.['3_months']?.average_price;
 
         const productData = {
-            _id: productModel._id.toString(),
+            _id: productModel._id.toString(), // Assure-toi que c'est le _id de MongoDB
             slug: productModel.slug || productModel._id.toString(), 
             title: productModel.product.title,
             brand: {

@@ -15,11 +15,16 @@ export interface FeaturedProductData {
   price: number | null;
 }
 
-export async function fetchFeaturedProductData(): Promise<FeaturedProductData[]> {
+export async function fetchFeaturedProductData(userId?: string): Promise<FeaturedProductData[]> {
   await dbConnect();
 
+  const offerMatch: FilterQuery<any> = { transactionStatus: "available" };
+  if (userId) {
+    offerMatch.seller = { $ne: new Types.ObjectId(userId) };
+  }
+
   const products: FeaturedProductData[] = await ProductModel.aggregate([
-    { $sample: { size: FEATURED_PRODUCTS_LIMIT } },
+    { $sample: { size: FEATURED_PRODUCTS_LIMIT * 2 } },
     {
       $lookup: {
         from: "productoffers",
@@ -27,13 +32,14 @@ export async function fetchFeaturedProductData(): Promise<FeaturedProductData[]>
         foreignField: "productModel",
         as: "offers",
         pipeline: [
-          { $match: { transactionStatus: "available" } },
+          { $match: offerMatch },
           { $sort: { price: 1 } },
           { $limit: 1 }
         ],
       },
     },
     { $match: { "offers.0": { $exists: true } } },
+    { $limit: FEATURED_PRODUCTS_LIMIT },
     {
       $project: {
         _id: 0,
@@ -94,6 +100,7 @@ export async function searchProducts(filters: SearchFilters): Promise<ProductSea
     limit = 12,
     page = 1,
     includeOffers = false,
+    userId,
   } = filters;
 
   const query: FilterQuery<any> = {};
@@ -131,6 +138,11 @@ export async function searchProducts(filters: SearchFilters): Promise<ProductSea
 
   const skip = (page - 1) * limit;
 
+  const offerMatch: FilterQuery<any> = { transactionStatus: "available" };
+  if (userId) {
+    offerMatch.seller = { $ne: new Types.ObjectId(userId) };
+  }
+
   const aggregationPipeline: any[] = [
     { $match: query },
     {
@@ -140,7 +152,7 @@ export async function searchProducts(filters: SearchFilters): Promise<ProductSea
         foreignField: "productModel",
         as: "sellerOffers",
         pipeline: [
-          { $match: { transactionStatus: "available" } },
+          { $match: offerMatch },
           { $sort: { price: 1 } },
         ],
       },

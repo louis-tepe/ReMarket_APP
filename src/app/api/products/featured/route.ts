@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/authOptions";
 import { fetchFeaturedProductData } from "@/services/core/product-service";
 
 export async function GET() {
   try {
-    const productsWithPrice = await fetchFeaturedProductData();
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.id;
+    const productsWithPrice = await fetchFeaturedProductData(userId);
     return NextResponse.json({ success: true, products: productsWithPrice }, { status: 200 });
   } catch (error) {
     // console.error("[API_PRODUCTS_FEATURED_GET]", error); // Log optionnel

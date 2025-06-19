@@ -231,10 +231,10 @@ export default function ProductPage({ params }: ProductPageProps) {
 
                     <ProductOffersList
                         offers={product.offers}
-                        onAddToCart={handleAddToCart}
-                        addingToCartOfferId={isAddingToCartOfferId}
-                        isUserLoggedIn={sessionStatus === 'authenticated'}
-                        sessionLoading={sessionStatus === 'loading'}
+                        isLoading={isLoading}
+                        handleAddToCart={handleAddToCart}
+                        isAddingToCartOfferId={isAddingToCartOfferId}
+                        sessionStatus={sessionStatus}
                     />
 
                     <Separator className="my-8" />
