@@ -24,6 +24,7 @@ import {
     Tag,
     Package,
     DollarSign,
+    Star,
 } from "lucide-react";
 import Image from "next/image";
 import { useCategoriesNavigation } from "@/hooks/useCategoriesNavigation";
@@ -125,6 +126,12 @@ export default function Header() {
                             <Link href="/account/settings">
                                 <Settings className="mr-2 h-4 w-4" />
                                 Paramètres
+                            </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                            <Link href="/account/feedback">
+                                <Star className="mr-2 h-4 w-4" />
+                                Donner mon avis
                             </Link>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
