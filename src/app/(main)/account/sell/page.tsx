@@ -37,6 +37,7 @@ import type {
 import { NOT_LISTED_ID } from './types';
 import Link from 'next/link';
 import { IShippingAddress } from '@/lib/mongodb/models/User';
+import imageCompression from 'browser-image-compression';
 
 interface ScrapeCandidate {
     title: string;
@@ -90,6 +91,7 @@ export default function SellPage() {
     const [isLoadingProductModels, setIsLoadingProductModels] = useState(false);
     const [isLoadingFullProduct, setIsLoadingFullProduct] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submissionStatus, setSubmissionStatus] = useState('');
     const [isUpdatingPrice, setIsUpdatingPrice] = useState(false);
 
     const [jobId, setJobId] = useState<string | null>(null);
@@ -376,70 +378,125 @@ export default function SellPage() {
     };
 
     const onOfferSubmit = async (formData: TOfferFormSchema) => {
-        if (!finalSelectedLeafCategory || !selectedProductModel) {
-            toast.error("Erreur", { description: "Catégorie ou modèle de produit manquant." });
-            return;
-        }
-
-        const userId = (session?.user as { id?: string })?.id;
-        if (!userId) {
-            toast.error("Erreur", { description: "Identifiant de session manquant." });
+        if (!selectedProductModel || !finalSelectedLeafCategory) {
+            toast.error("Erreur", { description: "Le modèle de produit ou la catégorie finale n'est pas sélectionné." });
             return;
         }
 
         setIsSubmitting(true);
-        
+        setSubmissionStatus('Compression des images...');
+        toast.info("Compression des images en cours...", { description: "Cela peut prendre un moment." });
+
+        const imageFiles = formData.images ? Array.from(formData.images) : [];
+        const compressedImageFiles: File[] = [];
+
         try {
-            const uploadedImageUrls: string[] = [];
-            if (formData.images) {
-                for (const imageFile of Array.from(formData.images)) {
-                    const formImageData = new FormData();
-                    formImageData.append('file', imageFile);
-                    const res = await fetch('/api/services/media/upload/images', { method: 'POST', body: formImageData });
-                    const result = await res.json();
-                    if (!res.ok || !result.success) throw new Error(result.message || "Échec de l'upload d'image.");
-                    uploadedImageUrls.push(result.url);
-                }
+            for (const imageFile of imageFiles) {
+                const options = {
+                    maxSizeMB: 1,
+                    maxWidthOrHeight: 1920,
+                    useWebWorker: true,
+                };
+                const compressedFile = await imageCompression(imageFile, options);
+                compressedImageFiles.push(new File([compressedFile], imageFile.name, { type: compressedFile.type }));
             }
+        } catch (error) {
+            console.error("Erreur de compression d'image:", error);
+            toast.error("Erreur de compression", { description: "Impossible de compresser les images." });
+            setIsSubmitting(false);
+            setSubmissionStatus('');
+            return;
+        }
+        
+        setSubmissionStatus('Téléversement des images...');
+        toast.info("Téléversement des images en cours...");
 
-            const specificFieldsPayload: Record<string, unknown> = {};
-            Object.entries(offerSpecificFieldValues).forEach(([key, value]) => {
-                if (value !== '') {
-                    specificFieldsPayload[key] = value;
-                }
-            });
+        const imageUploadFormData = new FormData();
+        compressedImageFiles.forEach(file => {
+            imageUploadFormData.append('images', file);
+        });
 
-            const payload: Omit<TNewOfferSchema, 'productModelId'> & { productModelId: string } & Record<string, unknown> = {
-                price: parseFloat(formData.price),
-                stockQuantity: parseInt(formData.stockQuantity, 10),
-                condition: formData.condition,
-                images: uploadedImageUrls,
-                productModelId: selectedProductModel._id,
-                kind: finalSelectedLeafCategory.slug,
-                currency: 'EUR',
-                ...specificFieldsPayload,
-            };
-
-            if (formData.description && formData.description.trim().length > 0) {
-                payload.description = formData.description;
+        let uploadedImageUrls: string[] = [];
+        try {
+            const uploadResponse = await fetch('/api/services/media/upload/images', { method: 'POST', body: imageUploadFormData });
+            if (!uploadResponse.ok) {
+                const errorData = await uploadResponse.json().catch(() => ({}));
+                throw new Error(errorData.message || 'Échec du téléversement des images.');
             }
+            const uploadResult = await uploadResponse.json();
+            if (!uploadResult.success || !uploadResult.files) {
+                throw new Error(uploadResult.message || 'Les URLs des images téléversées sont manquantes.');
+            }
+            uploadedImageUrls = uploadResult.files.map((file: any) => file.url);
+        } catch (error) {
+            const typedError = error as Error;
+            toast.error("Erreur de téléversement", { description: typedError.message });
+            setIsSubmitting(false);
+            setSubmissionStatus('');
+            return;
+        }
 
-            const response = await fetch('/api/offers', {
+        setSubmissionStatus("Analyse par l'IA en cours...");
+        toast.info("Analyse par l'IA en cours...", { description: "Nous vérifions vos photos." });
+
+        const offerPayload = {
+            productModelId: selectedProductModel._id,
+            price: parseFloat(formData.price),
+            condition: formData.condition,
+            description: formData.description,
+            images: uploadedImageUrls,
+            ...offerSpecificFieldValues,
+            kind: finalSelectedLeafCategory.slug,
+            stock: parseInt(formData.stockQuantity, 10)
+        };
+
+        try {
+            const offerResponse = await fetch('/api/offers', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
+                body: JSON.stringify(offerPayload),
             });
 
-            const creationResult = await response.json();
-            if (!response.ok) throw new Error(creationResult.message || "La création de l'offre a échoué.");
+            if (!offerResponse.ok) {
+                const errorData = await offerResponse.json().catch(() => ({ message: 'Impossible de lire la réponse du serveur.' }));
+                
+                if (errorData.errorType === 'IMAGE_MISMATCH') {
+                    const filename = errorData.culprit ? errorData.culprit.split('/').pop() : 'inconnue';
+                    toast.error("Image non conforme", {
+                        description: `${errorData.message} (Fichier: ${filename})`,
+                        duration: 8000,
+                    });
+                    setIsSubmitting(false);
+                    setSubmissionStatus('');
+                    return; 
+                }
+                 if (errorData.errorType === 'AI_ANALYSIS_FAILED') {
+                    const filename = errorData.culprit ? errorData.culprit.split('/').pop() : 'inconnue';
+                    toast.error("Analyse IA échouée", {
+                        description: `${errorData.message} (Fichier: ${filename})`,
+                        duration: 8000,
+                    });
+                    setIsSubmitting(false);
+                    setSubmissionStatus('');
+                    return;
+                }
+                
+                throw new Error(errorData.message || "La création de l'offre a échoué.");
+            }
 
-            toast.success("Offre publiée !");
-            router.push(`/account/sales`);
-
+            const offerResult = await offerResponse.json();
+            if (offerResult.success) {
+                toast.success("Offre créée avec succès!", { description: "Votre article est maintenant en vente." });
+                router.push('/account/sales');
+            } else {
+                throw new Error(offerResult.message || "La création de l'offre a renvoyé un statut d'échec.");
+            }
         } catch (error) {
-            toast.error("Erreur", { description: (error as Error).message });
+            const typedError = error as Error;
+            toast.error("Échec de la création", { description: typedError.message });
         } finally {
             setIsSubmitting(false);
+            setSubmissionStatus('');
         }
     };
 
@@ -929,10 +986,19 @@ export default function SellPage() {
                 <CardFooter className="flex justify-between">
                     <Button type="button" variant="outline" onClick={() => setStep(2)}><ArrowLeft className="mr-2 h-4 w-4" /> Retour</Button>
                     <Button type="submit" disabled={isSubmitting || !isValid || sessionStatus !== 'authenticated'}>
-                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-                        Publier l&apos;offre
-                        </Button>
-                    </CardFooter>
+                        {isSubmitting ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                {submissionStatus || "Publication..."}
+                            </>
+                        ) : (
+                            <>
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Publier l'offre
+                            </>
+                        )}
+                    </Button>
+                </CardFooter>
             </form>
                 </Card>
     );

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth/next';
 import type { Session } from "next-auth";
 import { authOptions } from '@/lib/authOptions';
 import { Types } from 'mongoose';
@@ -8,7 +8,8 @@ import ProductOfferModel, { IProductBase } from '@/lib/mongodb/models/SellerProd
 import CategoryModel, { ICategory } from '@/lib/mongodb/models/CategoryModel';
 import ProductModel from '@/lib/mongodb/models/ScrapingProduct';
 import User from '@/lib/mongodb/models/User';
-import { analyzeImageCondition, ImagePart } from '@/services/ai/geminiService';
+import { ImagePart } from '@/services/ai/geminiService';
+import { analyzeImageCondition } from '@/services/ai/productAnalysisService';
 import { OfferCreationSchema } from '@/lib/validators/offer';
 import { ZodError } from 'zod';
 import mongoose from 'mongoose';
@@ -143,107 +144,132 @@ import '@/lib/mongodb/models/discriminators/TabletModel';
  *           format: date-time
  */
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    await dbConnect();
-    const session: Session | null = await getServerSession(authOptions);
-
+    const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ success: false, message: "Authentification requise." }, { status: 401 });
-    }
-    const userId = session.user.id;
-    const seller = await User.findById(userId).lean(); // .lean() pour performance
-    if (!seller) {
-      return NextResponse.json({ success: false, message: "Vendeur non trouvé." }, { status: 404 });
+      return new Response(JSON.stringify({ success: false, message: 'Non autorisé' }), { status: 401 });
     }
 
-    const body = await request.json();
-    const { productModelId, images, price, condition, kind, stockQuantity, currency, ...specificFields } = OfferCreationSchema.parse(body);
+    await dbConnect();
 
-    const categoryDoc = await CategoryModel.findOne({ slug: kind }).lean<ICategory | null>();
-    if (!categoryDoc || !categoryDoc.isLeafNode) {
-      return NextResponse.json({ success: false, message: "Catégorie feuille invalide ou non spécifiée par 'kind'." }, { status: 400 });
-    }
+    const body = await req.json();
 
-    const DiscriminatorModel = mongoose.models[kind] || ProductOfferModel;
-    
-    const productModelDoc = await ProductModel.findById(productModelId).lean(); // .lean() pour performance
-    if (!productModelDoc) {
-      return NextResponse.json({ success: false, message: "Modèle de produit ReMarket non trouvé." }, { status: 404 });
-    }
-
-    let visualConditionScore: number | null = null;
-    let visualConditionRawResponse: string | undefined = undefined;
-
-    if (categoryDoc.imageAnalysisPrompt && images.length > 0) {
-      try {
-        const host = request.headers.get('host') || 'localhost:3000';
-        const protocol = request.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
-        const mainImageUrl = `${protocol}://${host}${images[0]}`;
-        
-        const imageResponse = await fetch(mainImageUrl);
-        if (imageResponse.ok) {
-            const imageBuffer = await imageResponse.arrayBuffer();
-            const imageBase64 = Buffer.from(imageBuffer).toString('base64');
-            const mimeType = imageResponse.headers.get('content-type');
-            
-            if (mimeType && mimeType.startsWith('image/')){
-                const imagePartForAnalysis: ImagePart = { 
-                    data: imageBase64, 
-                    mimeType: mimeType as ImagePart['mimeType'] 
-                }; 
-                const analysisResult = await analyzeImageCondition(imagePartForAnalysis, categoryDoc.imageAnalysisPrompt);
-                visualConditionScore = analysisResult?.score ?? null;
-                visualConditionRawResponse = analysisResult?.rawResponse;
-            } else {
-                visualConditionRawResponse = "Type MIME de l'image invalide pour l'analyse.";
-            }
-        } else {
-            visualConditionRawResponse = `Impossible de récupérer l'image ${mainImageUrl} (statut: ${imageResponse.status}).`;
+    // 1. Valider le corps de la requête
+    try {
+        OfferCreationSchema.parse(body);
+    } catch (error) {
+        if (error instanceof ZodError) {
+            return new Response(JSON.stringify({ success: false, message: 'Validation des données échouée', errors: error.errors }), { status: 400 });
         }
-      } catch (analysisError) {
-        console.warn("[API_OFFERS_POST] Erreur analyse Gemini (non bloquant):", analysisError); // Log non critique
-        visualConditionRawResponse = `Erreur analyse Gemini: ${analysisError instanceof Error ? analysisError.message : 'Erreur inconnue'}`;
+    }
+
+    const { kind, images: uploadedImageUrls, productModelId } = body;
+
+    // Récupérer le ProductModel pour obtenir sa catégorie
+    const productModelDoc = await ProductModel.findById(productModelId);
+    if (!productModelDoc) {
+      return new Response(JSON.stringify({ success: false, message: 'Modèle de produit ReMarket non trouvé.' }), { status: 404 });
+    }
+
+    // Récupérer le prompt d'analyse pour la catégorie
+    const categoryDoc = await CategoryModel.findOne({ slug: kind }).select('imageAnalysisPrompt').lean();
+    if (!categoryDoc || !('imageAnalysisPrompt' in categoryDoc) || !categoryDoc.imageAnalysisPrompt) {
+      return new Response(JSON.stringify({ success: false, message: 'Catégorie non trouvée ou sans prompt pour analyse.' }), { status: 400 });
+    }
+
+    // 3. Analyser chaque image et stocker les résultats
+    const analyzedImages: { url: string; visualConditionScore: number | null; visualConditionRawResponse: string }[] = [];
+    const host = req.headers.get('host') || 'localhost:3000';
+    const protocol = req.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
+    const baseUrl = `${protocol}://${host}`;
+
+    if (uploadedImageUrls && uploadedImageUrls.length > 0) {
+      for (const imageUrl of uploadedImageUrls) {
+        try {
+          const absoluteImageUrl = imageUrl.startsWith('http') ? imageUrl : new URL(imageUrl, baseUrl).toString();
+          const response = await fetch(absoluteImageUrl);
+          if (!response.ok) {
+            console.warn(`Impossible de récupérer l'image depuis l'URL: ${absoluteImageUrl}. Statut: ${response.status}`);
+            analyzedImages.push({ url: imageUrl, visualConditionScore: null, visualConditionRawResponse: `Failed to fetch image: ${response.statusText}` });
+            continue;
+          }
+
+          let mimeType: "image/jpeg" | "image/png" | "image/webp" = 'image/jpeg';
+          const contentType = response.headers.get('content-type');
+          if (contentType === 'image/png' || imageUrl.endsWith('.png')) mimeType = 'image/png';
+          else if (contentType === 'image/webp' || imageUrl.endsWith('.webp')) mimeType = 'image/webp';
+          
+          const imageBuffer = await response.arrayBuffer();
+          const imageBase64 = Buffer.from(imageBuffer).toString('base64');
+          
+          const imagePartForAnalysis: ImagePart = {
+            mimeType: mimeType,
+            data: imageBase64,
+          };
+
+          const analysisResult = await analyzeImageCondition(
+            imagePartForAnalysis,
+            categoryDoc.imageAnalysisPrompt,
+            productModelDoc.product.title,
+            { modelName: 'gemini-2.5-pro' }
+          );
+
+          // Vérification #1: L'analyse a-t-elle échoué (réponse vide/invalide) ?
+          if (analysisResult.score === null) {
+            return new Response(JSON.stringify({ 
+                success: false, 
+                message: `L'analyse par l'IA de l'image a échoué. Veuillez réessayer. Si le problème persiste, l'image pourrait être refusée par le service d'analyse.`,
+                errorType: "AI_ANALYSIS_FAILED",
+                culprit: imageUrl
+            }), { status: 500 });
+          }
+
+          // Vérification #2: L'image ne correspond-elle pas au produit ?
+          if (analysisResult.score === -1) {
+            return new Response(JSON.stringify({ 
+                success: false, 
+                message: `L'image ne semble pas correspondre au produit. Veuillez fournir une photo de l'article que vous vendez.`,
+                errorType: "IMAGE_MISMATCH",
+                culprit: imageUrl
+            }), { status: 400 });
+          }
+          
+          analyzedImages.push({
+            url: imageUrl,
+            visualConditionScore: analysisResult.score,
+            visualConditionRawResponse: analysisResult.rawResponse
+          });
+
+        } catch (error) {
+            console.error(`Erreur lors de l'analyse de l'image ${imageUrl}:`, error);
+            throw new Error(`L'analyse d'une des images a échoué. ${error instanceof Error ? error.message : ''}`);
+        }
       }
     }
 
-    const newOfferData: Partial<IProductBase> & { category: Types.ObjectId, productModel: number, seller: Types.ObjectId, kind: string } = {
-      productModel: productModelDoc._id,
-      seller: seller._id as Types.ObjectId,
-      category: productModelDoc.category as Types.ObjectId, // Utiliser la catégorie du ProductModel
-      kind: categoryDoc.slug, // kind est le slug de la catégorie feuille
-      price,
-      currency,
-      condition,
-      images,
-      stockQuantity,
-      listingStatus: 'active',
-      transactionStatus: 'available',
-      ...specificFields,
-      ...(visualConditionScore !== null && { visualConditionScore }),
-      ...(visualConditionRawResponse && { visualConditionRawResponse }),
+    // 4. Préparer les données de l'offre pour la création
+    const offerData: Partial<IProductBase> = {
+      ...body,
+      seller: new Types.ObjectId(session.user.id),
+      productModel: body.productModelId,
+      category: productModelDoc.category as Types.ObjectId,
+      images: analyzedImages,
     };
 
-    const newOffer = new DiscriminatorModel(newOfferData);
-    await newOffer.save();
+    // Assurer la cohérence des statuts
+    offerData.listingStatus = 'active';
+    offerData.transactionStatus = 'available';
 
-    return NextResponse.json({ success: true, message: "Offre créée avec succès.", data: newOffer.toObject() }, { status: 201 });
+    // 5. Créer l'offre avec les attributs spécifiques à la catégorie (discriminator)
+    const newOffer = await ProductOfferModel.create(offerData);
+    
+    return NextResponse.json({ success: true, offer: newOffer }, { status: 201 });
 
-  } catch (error: unknown) {
-    if (error instanceof ZodError) {
-        return NextResponse.json({ success: false, message: error.errors.map(e => e.message).join(', ') }, { status: 400 });
-    }
-    // console.error("[API_OFFERS_POST] Erreur création offre:", error); // Log serveur optionnel
-    if (error instanceof Error && error.name === 'ValidationError') {
-        interface ValidationError {
-            errors: Record<string, { message: string }>;
-        }
-        const validationError = error as unknown as ValidationError;
-        const messages = Object.values(validationError.errors).map((val) => val.message).join(', ');
-        return NextResponse.json({ success: false, message: `Erreur de validation: ${messages}`, errors: validationError.errors }, { status: 400 });
-    }
-    const errorMessage = error instanceof Error ? error.message : "Erreur serveur inconnue.";
-    return NextResponse.json({ success: false, message: "Erreur lors de la création de l'offre.", errorDetails: errorMessage }, { status: 500 });
+  } catch (error) {
+    console.error('[API_OFFERS_POST]', error);
+    const errorMessage = error instanceof Error ? error.message : 'Une erreur inconnue est survenue';
+    return new Response(JSON.stringify({ success: false, message: errorMessage }), { status: 500 });
   }
 }
 

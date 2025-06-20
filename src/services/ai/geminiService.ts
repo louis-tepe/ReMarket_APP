@@ -22,14 +22,11 @@ export interface ImagePart {
 export interface GeminiOptions {
   modelName?: string;         // Nom spécifique du modèle à utiliser (ex: "gemini-1.5-pro-latest")
   apiKey?: string;            // Clé API Gemini (peut aussi être fournie via les variables d'environnement)
-  useThinkingMode?: boolean;  // Si vrai, suggère d'utiliser un modèle plus capable par défaut.
-                              // Pour les fonctionnalités spécifiques de "thinking" de Gemini 2.5 Flash,
-                              // vous devrez fournir le nom exact du modèle via modelName.
   temperature?: number;       // Contrôle le caractère aléatoire de la sortie.
   maxOutputTokens?: number;   // Nombre maximum de tokens à générer.
   topP?: number;              // Probabilité cumulée pour le filtrage des tokens.
   topK?: number;              // Nombre de tokens les plus probables à considérer.
-  history?: Content[];         // Ajout pour l'historique de conversation
+  responseMimeType?: "text/plain" | "application/json";
 }
 
 /**
@@ -39,20 +36,17 @@ export type PromptItem = string | ImagePart;
 
 /**
  * Récupère la clé API Gemini depuis les options ou les variables d'environnement.
- * @param optionsApiKey Clé API fournie dans les options (optionnel).
+ * @param apiKey Clé API fournie dans les options (optionnel).
  * @returns La clé API Gemini.
  * @throws Error si la clé API n'est pas trouvée.
  */
-const getApiKey = (optionsApiKey?: string): string => {
-  // Priorité : clé dans les options, puis variable d'environnement serveur
-  const apiKey = optionsApiKey || process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      "Clé API Gemini non trouvée. Veuillez la définir dans vos variables d'environnement (GEMINI_API_KEY) ou la passer en option."
-    );
+function getApiKey(apiKey?: string): string {
+  const key = apiKey || process.env.GEMINI_API_KEY;
+  if (!key) {
+    throw new Error("Clé API Gemini non fournie.");
   }
-  return apiKey;
-};
+  return key;
+}
 
 /**
  * Détermine le nom du modèle Gemini à utiliser en fonction des options fournies.
@@ -63,44 +57,7 @@ function determineModelName(options: GeminiOptions): string {
   if (options.modelName) {
     return options.modelName;
   }
-  if (options.useThinkingMode) {
-    // Pour les capacités spécifiques de "thinking" de Gemini 2.5 Flash (ou modèles futurs),
-    // l'utilisateur devra spécifier le nom exact du modèle via options.modelName
-    // lorsque ce nom sera officiellement disponible et qu'ils y auront accès.
-    console.warn(
-      "L\'option 'useThinkingMode' est activée. Utilisation du modèle : gemini-1.5-pro-latest. " +
-      "Pour les fonctionnalités spécifiques de 'thinking' de Gemini 2.5 Flash (ou équivalent), " +
-      "veuillez fournir le nom exact du modèle via 'options.modelName'."
-    );
-    return "gemini-1.5-pro-latest";
-  }
   return "gemini-1.5-flash-latest"; // Modèle par défaut rapide et économique
-}
-
-/**
- * Construit les 'parts' du SDK GoogleGenerativeAI à partir des éléments du prompt.
- * @param promptItems Les éléments du prompt (texte ou image).
- * @returns Un tableau de 'Part' pour l'API Gemini.
- * @throws Error si le prompt est vide.
- */
-function buildPromptParts(promptItems: PromptItem | PromptItem[]): Part[] {
-  const itemsArray = Array.isArray(promptItems) ? promptItems : [promptItems];
-  if (itemsArray.length === 0) {
-    throw new Error("Le prompt ne peut pas être vide.");
-  }
-
-  return itemsArray.map(item => {
-    if (typeof item === "string") {
-      return { text: item };
-    }
-    // C'est une ImagePart
-    return {
-      inlineData: {
-        mimeType: item.mimeType,
-        data: item.data,
-      },
-    };
-  });
 }
 
 /**
@@ -113,60 +70,55 @@ function buildPromptParts(promptItems: PromptItem | PromptItem[]): Part[] {
  * @throws Error en cas d'échec de la génération ou de configuration invalide.
  */
 export async function generateGeminiContent(
-  promptItems: PromptItem | PromptItem[],
+  promptItems: (string | ImagePart)[],
   options: GeminiOptions = {}
 ): Promise<string> {
   try {
     const apiKey = getApiKey(options.apiKey);
     const genAI = new GoogleGenerativeAI(apiKey);
-    const activeModelName = determineModelName(options);
+    const modelName = options.modelName || 'gemini-1.5-flash-latest';
 
     const model = genAI.getGenerativeModel({
-      model: activeModelName,
-      safetySettings: [ 
-        { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-        { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-        { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-        { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+      model: modelName,
+      safetySettings: [
+        { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+        { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
       ],
     });
 
     const generationConfig: GenerationConfig = {
-      temperature: options.temperature ?? 0.7,
+      temperature: options.temperature ?? 0.2,
       topK: options.topK,
       topP: options.topP,
       maxOutputTokens: options.maxOutputTokens ?? 2048,
+      responseMimeType: options.responseMimeType,
     };
 
-    const currentSdkParts = buildPromptParts(promptItems);
-
-    const requestContents: Content[] = options.history ? [...options.history] : [];
-    requestContents.push({ role: "user", parts: currentSdkParts });
-
-    const result = await model.generateContent({
-      contents: requestContents,
-      generationConfig,
+    const parts: Part[] = promptItems.map(item => {
+      if (typeof item === 'string') {
+        return { text: item };
+      }
+      return { inlineData: { mimeType: item.mimeType, data: item.data } };
     });
 
-    return result.response.text();
+    const result = await model.generateContent({ contents: [{ role: "user", parts }], generationConfig });
 
+    const response = result.response;
+    const candidate = response.candidates?.[0];
+
+    if (candidate?.finishReason && candidate.finishReason !== 'STOP') {
+      throw new Error(`La génération s'est terminée prématurément pour la raison suivante : ${candidate.finishReason}.`);
+    }
+
+    if (!candidate?.content?.parts?.[0]?.text) {
+      throw new Error("La réponse de l'API Gemini est vide ou malformée.");
+    }
+
+    return candidate.content.parts[0].text;
   } catch (error) {
     console.error("Erreur lors de la génération de contenu avec Gemini:", error);
-    if (error instanceof Error) {
-      if (error.message.includes("API key not valid") || error.message.includes("provide an API key")) {
-        throw new Error("Clé API Gemini invalide ou non fournie. Veuillez vérifier votre configuration.");
-      }
-      if (error.message.toLowerCase().includes("permission denied") || error.message.includes("access to model")) {
-        throw new Error(`Accès refusé. Vérifiez que votre clé API a la permission d\'utiliser le modèle spécifié (${determineModelName(options)}).`);
-      }
-      if (error.message.includes("billing account")) {
-        throw new Error("Problème de facturation lié à votre projet Google Cloud. Veuillez vérifier votre compte de facturation.");
-      }
-       if (error.message.includes("quota")) {
-        throw new Error("Quota d'utilisation de l'API Gemini dépassé. Veuillez vérifier vos limites de quota.");
-      }
-    }
-    // Propager l'erreur pour que l'appelant puisse la gérer
     throw error;
   }
 }

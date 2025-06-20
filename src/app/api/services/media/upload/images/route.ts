@@ -13,26 +13,32 @@ export async function POST(request: NextRequest) {
 
   try {
     const formData = await request.formData();
-    const file = formData.get('file') as File | null;
+    const files = formData.getAll('images') as File[];
 
-    if (!file) {
+    if (!files || files.length === 0) {
       return NextResponse.json({ success: false, message: 'Aucun fichier reçu.' }, { status: 400 });
     }
 
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'images');
     await fs.mkdir(uploadDir, { recursive: true });
 
-    const uniqueFileName = `${Date.now()}-${file.name.replace(/\s+/g, '_')}`;
-    const filePath = path.join(uploadDir, uniqueFileName);
-    const publicUrl = `/uploads/images/${uniqueFileName}`;
+    const uploadedFileUrls = [];
 
-    const fileBuffer = Buffer.from(await file.arrayBuffer());
-    await fs.writeFile(filePath, fileBuffer);
+    for (const file of files) {
+        const uniqueFileName = `${Date.now()}-${file.name.replace(/\s+/g, '_')}`;
+        const filePath = path.join(uploadDir, uniqueFileName);
+        const publicUrl = `/uploads/images/${uniqueFileName}`;
 
-    return NextResponse.json({ success: true, url: publicUrl }, { status: 200 });
+        const fileBuffer = Buffer.from(await file.arrayBuffer());
+        await fs.writeFile(filePath, fileBuffer);
+
+        uploadedFileUrls.push({ url: publicUrl });
+    }
+    
+    return NextResponse.json({ success: true, files: uploadedFileUrls }, { status: 200 });
 
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue lors de l\'upload.';
-    return NextResponse.json({ success: false, message: 'Erreur serveur lors de l\'upload de l\'image.', error: errorMessage }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : "Erreur inconnue lors de l'upload.";
+    return NextResponse.json({ success: false, message: "Erreur serveur lors de l'upload des images.", error: errorMessage }, { status: 500 });
   }
 } 

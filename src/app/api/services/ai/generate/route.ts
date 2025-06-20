@@ -68,10 +68,7 @@ export async function POST(request: Request) {
     }
 
     const result = await generateGeminiContent(promptItems, {
-      useThinkingMode: !!useThinking, // Convertit en booléen
-      history: history, // Passer l'historique au service
-        // Vous pouvez ajouter d'autres options ici si nécessaire
-        // modelName: useThinking ? "gemini-1.5-pro-latest" : "gemini-1.5-flash-latest",
+      modelName: useThinking ? "gemini-1.5-pro-latest" : "gemini-1.5-flash-latest",
     });
 
     return NextResponse.json({ response: result });

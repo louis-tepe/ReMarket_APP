@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import Link from 'next/link';
 import Image from 'next/image';
-import { Edit3, Trash2, PlusCircle, AlertTriangle, Info, Package, Loader2 } from 'lucide-react';
+import { Edit3, Trash2, PlusCircle, AlertTriangle, Info, Package, Loader2, Star } from 'lucide-react';
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from 'sonner';
 import type { SellerOffer, OfferCondition, TransactionStatus } from './types';
@@ -304,6 +304,7 @@ export default function SellerDashboardPage() {
                                     <TableHead className="hidden sm:table-cell w-[80px]">Image</TableHead>
                                     <TableHead>Produit</TableHead>
                                     <TableHead className="hidden md:table-cell">Prix</TableHead>
+                                    <TableHead className="hidden lg:table-cell">Note IA</TableHead>
                                     <TableHead className="hidden md:table-cell">État</TableHead>
                                     <TableHead>Statut</TableHead>
                                     <TableHead className="hidden lg:table-cell">Date Création</TableHead>
@@ -314,9 +315,21 @@ export default function SellerDashboardPage() {
                                 {offers.map((offer) => {
                                     const isDeleting = deletingOffers[offer._id.toString()];
                                     const product = offer.productModel?.product;
-                                    const imageUrl = product?.images?.[0] || product?.image_url || '/images/placeholder-product.webp';
+                                    const imageUrl = offer.images?.[0]?.url || product?.images?.[0] || product?.image_url || '/images/placeholder-product.webp';
                                     const productTitle = product?.title || 'Produit sans nom';
                                     const offerIdStr = offer._id.toString();
+
+                                    const validScores: number[] = [];
+                                    if (offer.images) {
+                                        for (const img of offer.images) {
+                                            const score = img.visualConditionScore;
+                                            if (typeof score === 'number' && score >= 0) {
+                                                validScores.push(score);
+                                            }
+                                        }
+                                    }
+                                        
+                                    const averageScore = validScores.length > 0 ? (validScores.reduce((a, b) => a + b, 0) / validScores.length) : null;
 
                                     return (
                                         <TableRow key={offerIdStr}>
@@ -336,6 +349,16 @@ export default function SellerDashboardPage() {
                                                 <div className="text-xs text-muted-foreground sm:hidden">{offer.price} €</div>
                                             </TableCell>
                                             <TableCell className="hidden md:table-cell">{offer.price} €</TableCell>
+                                            <TableCell className="hidden lg:table-cell">
+                                                {averageScore !== null ? (
+                                                    <div className="flex items-center gap-1">
+                                                        <Star className="h-4 w-4 text-yellow-400" />
+                                                        <span>{averageScore.toFixed(1)} / 4</span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-muted-foreground">N/A</span>
+                                                )}
+                                            </TableCell>
                                             <TableCell className="hidden md:table-cell">
                                                 {CONDITIONS_MAP[offer.condition as OfferCondition] || offer.condition}
                                             </TableCell>

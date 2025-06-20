@@ -76,6 +76,12 @@ export type Specifications = AttributeItem[];
 // Constant for the special ID used when a product is not listed.
 export const NOT_LISTED_ID = "---PRODUCT_NOT_LISTED---"; 
 
+export interface AnalyzedImage {
+    url: string;
+    visualConditionScore: number | null;
+    visualConditionRawResponse: string;
+}
+
 export interface CategorySpecificField {
     label: string;
     // ... existing code ...
@@ -95,6 +101,7 @@ export type OfferCondition = 'new' | 'like-new' | 'good' | 'fair' | 'poor';
 // which is a populated version of the IProductBase from Mongoose.
 export type SellerOffer = Omit<IProductBase, '_id' | 'productModel' | 'seller' | 'soldTo' | 'orderId'> & {
     _id: Types.ObjectId;
+    images: AnalyzedImage[];
     productModel: Pick<IScrapedProduct, 'product' | 'slug' | 'brand' | 'category'> & {
         brand?: { name: string, slug: string };
         category?: { name: string, slug: string };

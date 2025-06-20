@@ -2,6 +2,13 @@ import { Schema, model, models, Document, Types, Model as MongooseModel } from '
 import { ICategory } from './CategoryModel';
 import CategoryModel from './CategoryModel'; // Import direct pour la validation
 
+// Interface pour une image avec son analyse de condition
+export interface IImageInfo {
+  url: string;
+  visualConditionScore?: number;
+  visualConditionRawResponse?: string;
+}
+
 // Interface pour les informations d'expédition
 export interface IShippingInfo {
   trackingNumber?: string;
@@ -21,12 +28,8 @@ export interface IProductBase extends Document {
   currency: string;                     // Devise (ex: "EUR")
   condition: 'new' | 'like-new' | 'good' | 'fair' | 'poor'; // État du produit
   description: string;                  // Description par le vendeur
-  images: string[];                     // URLs des images de l'offre (au moins une)
+  images: IImageInfo[];                     // URLs des images de l'offre, incluant l'analyse
   stockQuantity: number;                // Quantité disponible (0 si plus en stock)
-  
-  // Analyse IA (optionnelle)
-  visualConditionScore?: number;        // Score (0-4) de l'analyse visuelle par IA
-  visualConditionRawResponse?: string;  // Réponse brute de l'IA (pour debug/référence)
 
   // Statuts de l'offre
   listingStatus: 'active' | 'inactive' | 'rejected' | 'sold'; // Statut de visibilité de l'annonce
@@ -42,6 +45,12 @@ export interface IProductBase extends Document {
   createdAt: Date;
   updatedAt: Date;
 }
+
+const ImageInfoSchema = new Schema<IImageInfo>({
+  url: { type: String, required: true },
+  visualConditionScore: { type: Number, min: -1, max: 4, required: false },
+  visualConditionRawResponse: { type: String, trim: true, required: false },
+}, { _id: false });
 
 const ShippingInfoSchema = new Schema<IShippingInfo>({
   trackingNumber: { type: String, trim: true },
@@ -93,10 +102,10 @@ const ProductBaseSchema = new Schema<IProductBase>(
       minlength: [10, "La description doit comporter au moins 10 caractères si elle est fournie."],
     },
     images: {
-      type: [String],
+      type: [ImageInfoSchema],
       validate: {
-        validator: (v: string[]) => Array.isArray(v) && v.length > 0 && v.every(url => typeof url === 'string'),
-        message: "Au moins une URL d'image valide est requise pour l'offre.",
+        validator: (v: IImageInfo[]) => Array.isArray(v) && v.length > 0 && v.every(img => typeof img.url === 'string'),
+        message: "Au moins une image valide est requise pour l'offre.",
       },
     },
     stockQuantity: {
@@ -108,17 +117,6 @@ const ProductBaseSchema = new Schema<IProductBase>(
         validator: Number.isInteger,
         message: "La quantité en stock doit être un nombre entier."
       }
-    },
-    visualConditionScore: {
-      type: Number,
-      min: 0,
-      max: 4,
-      required: false,
-    },
-    visualConditionRawResponse: {
-        type: String,
-        trim: true,
-        required: false,
     },
     listingStatus: {
         type: String,
@@ -191,7 +189,7 @@ ProductBaseSchema.pre('validate', async function (this: IProductBase, next) {
       if (!categoryDoc) {
         this.invalidate('category', 'Catégorie non trouvée.', this.category.toString());
       } else if (!categoryDoc.isLeafNode) {
-        this.invalidate('category', "La catégorie spécifiée doit être une catégorie feuille (sans sous-catégories). Les offres ne peuvent être associées qu\'aux catégories terminales.", this.category.toString());
+        this.invalidate('category', "La catégorie spécifiée doit être une catégorie feuille (sans sous-catégories). Les offres ne peuvent être associées qu'aux catégories terminales.", this.category.toString());
       }
     } catch (error) {
       console.error("Erreur lors de la validation de la catégorie (isLeafNode):", error);

@@ -124,7 +124,7 @@ export async function GET(
             stockQuantity: offer.stockQuantity,
             condition: offer.condition,
             description: offer.description,
-            images: offer.images,
+            images: offer.images?.map(img => img.url),
             createdAt: offer.createdAt,
             updatedAt: offer.updatedAt,
         };
