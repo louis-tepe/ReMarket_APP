@@ -1,5 +1,7 @@
 import React from 'react';
 import Image from 'next/image';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
@@ -29,7 +31,15 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({ messages, isLo
                     className="max-w-xs max-h-48 rounded-md mb-2 object-contain"
                 />
             )}
-            <p className="text-sm whitespace-pre-wrap break-words">{msg.text}</p>
+            {msg.sender === 'gemini' ? (
+                <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {msg.text}
+                    </ReactMarkdown>
+                </div>
+            ) : (
+                <p className="text-sm whitespace-pre-wrap break-words">{msg.text}</p>
+            )}
             {msg.timestamp && (
                 <p className="text-xs text-muted-foreground/70 mt-1 text-right">
                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

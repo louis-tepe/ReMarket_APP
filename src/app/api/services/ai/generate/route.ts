@@ -11,14 +11,15 @@ interface GenerateApiRequestBody {
   prompt?: string;
   imageBase64?: string;
   mimeType?: string; // Pourrait être requis si imageBase64 est présent
-  useThinking?: boolean;
   history?: Content[];
 }
+
+const systemInstruction = "Vous êtes un conseiller expert pour ReMarket. Votre objectif est d'aider les utilisateurs à trouver le produit d'occasion idéal. Allez droit au but avec des réponses concises, simples et efficaces. Restez objectif et factuel en vous basant sur les besoins de l'utilisateur sans donner d'opinion subjective. Si nécessaire, posez des questions pour clarifier. Guidez les utilisateurs dans le catalogue et aidez-les à comparer les offres de manière objective.";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json() as GenerateApiRequestBody; // Utilisation de l'interface
-    const { prompt, imageBase64, mimeType, useThinking, history } = body;
+    const { prompt, imageBase64, mimeType, history = [] } = body;
 
     if (!prompt && !imageBase64) {
       return NextResponse.json(
@@ -67,8 +68,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await generateGeminiContent(promptItems, {
-      modelName: useThinking ? "gemini-1.5-pro-latest" : "gemini-1.5-flash-latest",
+    const result = await generateGeminiContent(promptItems, history, {
+      modelName: "gemini-2.5-flash-lite-preview-06-17",
+      systemInstruction: systemInstruction,
     });
 
     return NextResponse.json({ response: result });

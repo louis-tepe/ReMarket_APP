@@ -27,6 +27,7 @@ export interface GeminiOptions {
   topP?: number;              // Probabilité cumulée pour le filtrage des tokens.
   topK?: number;              // Nombre de tokens les plus probables à considérer.
   responseMimeType?: "text/plain" | "application/json";
+  systemInstruction?: string; // Ajout de l'instruction système (simplifié à string)
 }
 
 /**
@@ -65,12 +66,14 @@ function determineModelName(options: GeminiOptions): string {
  * Peut prendre du texte et/ou des images en entrée.
  *
  * @param promptItems Un simple texte, une ImagePart, ou un tableau de PromptItem pour les requêtes multimodales.
+ * @param history Historique de conversation.
  * @param options Options de configuration pour la génération.
  * @returns Une promesse qui se résout avec le texte généré.
  * @throws Error en cas d'échec de la génération ou de configuration invalide.
  */
 export async function generateGeminiContent(
   promptItems: (string | ImagePart)[],
+  history: Content[],
   options: GeminiOptions = {}
 ): Promise<string> {
   try {
@@ -86,6 +89,7 @@ export async function generateGeminiContent(
         { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
         { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
       ],
+      systemInstruction: options.systemInstruction, // Passer l'instruction système ici
     });
 
     const generationConfig: GenerationConfig = {
@@ -103,20 +107,28 @@ export async function generateGeminiContent(
       return { inlineData: { mimeType: item.mimeType, data: item.data } };
     });
 
-    const result = await model.generateContent({ contents: [{ role: "user", parts }], generationConfig });
+    const chat = model.startChat({
+      history,
+      generationConfig,
+    });
 
-    const response = result.response;
-    const candidate = response.candidates?.[0];
+    const result = await chat.sendMessageStream(parts);
 
-    if (candidate?.finishReason && candidate.finishReason !== 'STOP') {
-      throw new Error(`La génération s'est terminée prématurément pour la raison suivante : ${candidate.finishReason}.`);
+    let text = '';
+    for await (const chunk of result.stream) {
+      const chunkText = chunk.text();
+      // En production, vous voudriez peut-être streamer cela directement vers le client.
+      // Pour cette fonction, nous accumulons le texte.
+      text += chunkText;
     }
 
-    if (!candidate?.content?.parts?.[0]?.text) {
-      throw new Error("La réponse de l'API Gemini est vide ou malformée.");
+    if (!text) {
+      // Vérification si la réponse est vide après le streaming
+      throw new Error("La réponse de l'API Gemini est vide.");
     }
+    
+    return text;
 
-    return candidate.content.parts[0].text;
   } catch (error) {
     console.error("Erreur lors de la génération de contenu avec Gemini:", error);
     throw error;
@@ -199,7 +211,7 @@ export async function analyzeImageCondition(
       temperature: options.temperature ?? 0.2,
     };
 
-    const rawResponse = await generateGeminiContent(promptItems, geminiOptions);
+    const rawResponse = await generateGeminiContent(promptItems, [], geminiOptions);
     const score = extractScoreFromGeminiResponse(rawResponse);
 
     return { score, rawResponse };
@@ -221,7 +233,7 @@ export async function analyzeImageCondition(
 // 1. Requête texte simple
 async function exempleTexteSimple() {
   try {
-    const reponse = await generateGeminiContent("Explique la relativité générale en une phrase.");
+    const reponse = await generateGeminiContent(["Explique la relativité générale en une phrase."], []);
     console.log("Réponse (texte simple):", reponse);
   } catch (e) {
     console.error("Erreur exempleTexteSimple:", e);
@@ -241,7 +253,7 @@ async function exempleMultimodal(imageBase64: string) {
     ];
     // Pour les requêtes multimodales, assurez-vous d'utiliser un modèle compatible "vision"
     // Gemini 1.5 Flash est multimodal par défaut. Gemini 1.0 Pro nécessitait 'gemini-pro-vision'.
-    const reponse = await generateGeminiContent(prompt, { modelName: "gemini-1.5-flash-latest" });
+    const reponse = await generateGeminiContent(prompt, [], { modelName: "gemini-1.5-flash-latest" });
     console.log("Réponse (multimodal):", reponse);
   } catch (e) {
     console.error("Erreur exempleMultimodal:", e);

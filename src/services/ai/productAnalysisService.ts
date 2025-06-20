@@ -65,6 +65,7 @@ export async function analyzeImageCondition(
 
     const resultJsonString = await generateGeminiContent(
       promptItems,
+      [],
       { ...options }
     );
 

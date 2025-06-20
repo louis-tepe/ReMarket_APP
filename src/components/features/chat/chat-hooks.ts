@@ -220,7 +220,6 @@ export const useChatLogic = ({ initialMessages = [], onMessagesChange, scrollAre
                     prompt: userMessageText,
                     imageBase64: imageBase64Data,
                     mimeType,
-                    useThinking: useThinkingMode,
                     history: apiHistoryForGemini,
                 }),
             });
