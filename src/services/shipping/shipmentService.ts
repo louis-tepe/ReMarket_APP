@@ -41,54 +41,88 @@ export async function createShipmentInTransaction(
     if (!sellerShippingAddress) throw new Error("Seller's shipping address is missing.");
     if (!buyerShippingAddress) throw new Error("Buyer's shipping address is missing.");
 
-    // Step 1: Get shipping methods for the service point
-    const shippingMethods = await sendcloudService.getShippingMethodsForServicePoint(servicePointId);
-    if (!shippingMethods || shippingMethods.length === 0) {
-        throw new Error('No shipping methods found for this service point.');
+    // Add robust validation to prevent API errors with incomplete addresses
+    if (!buyerShippingAddress.name || !buyerShippingAddress.address || !buyerShippingAddress.city || !buyerShippingAddress.country || !buyerShippingAddress.postalCode || !buyerShippingAddress.telephone) {
+      throw new Error(`Buyer's shipping address (ID: ${shippingAddressId}) is incomplete. Please update it in your account settings.`);
     }
-    const shippingMethodId = shippingMethods[0].id; // Use the first available method
+    if (!sellerShippingAddress.name || !sellerShippingAddress.address || !sellerShippingAddress.city || !sellerShippingAddress.country || !sellerShippingAddress.postalCode || !sellerShippingAddress.telephone) {
+      throw new Error(`The seller's shipping address is incomplete. This purchase cannot be completed at this time.`);
+    }
 
-    // Step 2: Create the parcel payload for Sendcloud
+    // Step 1: Get shipping methods available for the specific sender and service point
+    const shippingMethods = await sendcloudService.getShippingMethods({
+      servicePointId: servicePointId,
+      fromCountry: sellerShippingAddress.country,
+      fromPostalCode: sellerShippingAddress.postalCode,
+    });
+    if (!shippingMethods || shippingMethods.length === 0) {
+        throw new Error(`No shipping methods found for service point ${servicePointId} from postal code ${sellerShippingAddress.postalCode}.`);
+    }
+
+    // Step 2: Find a suitable shipping method based on weight
+    const parcelWeight = 1.0; // TODO: Get weight from product model, ensure it's a number
+    const suitableMethod = shippingMethods.find(method => {
+      const minWeight = parseFloat(method.min_weight);
+      const maxWeight = parseFloat(method.max_weight);
+      return parcelWeight >= minWeight && parcelWeight <= maxWeight;
+    });
+
+    if (!suitableMethod) {
+        console.error("Available methods:", JSON.stringify(shippingMethods, null, 2));
+        throw new Error(`No suitable shipping method found for a parcel of ${parcelWeight}kg for service point ${servicePointId}.`);
+    }
+
+    // Step 3: Create the parcel payload for Sendcloud
     const fromAddress = sellerShippingAddress as IShippingAddress;
     const toAddress = buyerShippingAddress as IShippingAddress;
 
     const parcelPayload = {
-        name: buyer.name || 'N/A',
-        email: buyer.email,
-        telephone: toAddress.telephone || '',
-        address: toAddress.address,
-        house_number: toAddress.houseNumber,
-        city: toAddress.city,
-        postal_code: toAddress.postalCode,
-        country: toAddress.country,
-        to_service_point: servicePointId,
-        from_address: {
-            from_name: fromAddress.name,
-            from_company_name: fromAddress.companyName || fromAddress.name,
-            from_street: fromAddress.address,
-            from_house_number: fromAddress.houseNumber,
-            from_city: fromAddress.city,
-            from_postal_code: fromAddress.postalCode,
-            from_country: fromAddress.country,
-            from_telephone: fromAddress.telephone || '',
-            from_email: offer.seller.email,
-        },
-        weight: "1", // TODO: Get weight from product model
-        request_label: true,
-        apply_shipping_rules: false,
-        shipment: { id: shippingMethodId },
-        parcel_items: [{
-            description: offer.description?.substring(0, 35) || 'Product',
-            quantity: 1,
-            weight: "1.0",
-            value: String(offer.price),
-        }],
+      // Recipient contact info & address
+      name: toAddress.name,
+      email: buyer.email,
+      telephone: toAddress.telephone!,
+      address: toAddress.address,
+      house_number: toAddress.houseNumber,
+      city: toAddress.city,
+      postal_code: toAddress.postalCode,
+      country: toAddress.country,
+      
+      // Destination is the service point
+      to_service_point: servicePointId,
+
+      from_address: {
+          from_name: fromAddress.name,
+          from_company_name: fromAddress.companyName || fromAddress.name,
+          from_street: fromAddress.address,
+          from_house_number: fromAddress.houseNumber,
+          from_city: fromAddress.city,
+          from_postal_code: fromAddress.postalCode,
+          from_country: fromAddress.country,
+          from_telephone: fromAddress.telephone,
+          from_email: offer.seller.email,
+      },
+      weight: String(parcelWeight),
+      request_label: true,
+      apply_shipping_rules: false,
+      shipment: { id: suitableMethod.id },
+      parcel_items: [{
+          description: offer.description?.substring(0, 35) || 'Product',
+          quantity: 1,
+          weight: String(parcelWeight), // TODO: Get weight from product model
+          value: String(offer.price),
+          // hs_code and origin_country might be needed for international shipping
+      }],
     };
 
-    // Step 3: Create the parcel via Sendcloud API
+    // --- DIAGNOSTIC LOGGING ---
+    console.log("[Webhook Diagnostic] Buyer's address object being used:", toAddress);
+    console.log("[Webhook Diagnostic] Final payload being sent to Sendcloud:", JSON.stringify(parcelPayload, null, 2));
+    // --- END DIAGNOSTIC LOGGING ---
+
+    // Step 4: Create the parcel via Sendcloud API
     const createdParcel = await sendcloudService.createParcel(parcelPayload);
 
-    // Step 4: Update the offer with shipping information
+    // Step 5: Update the offer with shipping information
     offer.shippingInfo = {
         trackingNumber: createdParcel.tracking_number,
         labelUrl: createdParcel.label.label_printer,

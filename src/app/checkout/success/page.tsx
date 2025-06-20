@@ -123,12 +123,18 @@ function ErrorState({ message }: { message: string }) {
     );
 }
 
+function CheckoutSuccessWrapper() {
+    return (
+        <Suspense fallback={<LoadingState />}>
+            <CheckoutSuccessContent />
+        </Suspense>
+    );
+}
+
 export default function CheckoutSuccessPage() {
     return (
         <div className="container mx-auto py-10 flex justify-center">
-            <Suspense fallback={<LoadingState />}>
-                <CheckoutSuccessContent />
-            </Suspense>
+            <CheckoutSuccessWrapper />
         </div>
     );
 } 

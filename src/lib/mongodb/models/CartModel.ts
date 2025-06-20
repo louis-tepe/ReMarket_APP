@@ -6,6 +6,7 @@ export interface ICartItem {
   _id?: Types.ObjectId; // ID unique de l'item dans le panier
   offer: Types.ObjectId | IProductBase; // Réf. à ProductOfferModel
   quantity: number; // Quantité de l'offre
+  price: number; // Prix de l'offre au moment de l'ajout
   productModel: number; // Réf. à ScrapingProduct (pour affichage)
   addedAt: Date; // Date d'ajout au panier
 }
@@ -22,7 +23,7 @@ export interface ICart extends Document {
   updatedAt: Date;
 
   // Déclaration des méthodes pour l'interface
-  addItem(itemDetails: { offerId: string | Types.ObjectId; productModelId: string | number; quantity?: number }): Promise<ICart>;
+  addItem(itemDetails: { offerId: string | Types.ObjectId; productModelId: string | number; quantity?: number; price: number }): Promise<ICart>;
   removeItem(cartItemId: string | Types.ObjectId): Promise<ICart>;
   updateItemQuantity(cartItemId: string | Types.ObjectId, newQuantity: number): Promise<ICart>;
   clearCart(): Promise<ICart>;
@@ -38,6 +39,11 @@ const CartItemSchema = new Schema<ICartItemDocument>({
     type: Number,
     ref: 'ScrapingProduct',
     required: true,
+  },
+  price: {
+    type: Number,
+    required: true,
+    min: [0, 'Le prix doit être une valeur positive.'],
   },
   quantity: {
     type: Number,
@@ -70,8 +76,8 @@ const CartSchema = new Schema<ICart>(
 
 // Méthode pour ajouter ou mettre à jour un article
 CartSchema.methods.addItem = async function (
-  { offerId, productModelId, quantity = 1 }: 
-  { offerId: string | Types.ObjectId; productModelId: string | number; quantity?: number }
+  { offerId, productModelId, quantity = 1, price }: 
+  { offerId: string | Types.ObjectId; productModelId: string | number; quantity?: number; price: number }
 ) {
   const offerObjectId = typeof offerId === 'string' ? new Types.ObjectId(offerId) : offerId;
   const productModelNumericId = typeof productModelId === 'string' ? parseInt(productModelId, 10) : productModelId;
@@ -103,6 +109,7 @@ CartSchema.methods.addItem = async function (
       offer: offerObjectId,
       productModel: productModelNumericId,
       quantity: quantity,
+      price: price,
       addedAt: new Date(),
     } as ICartItemDocument);
   }

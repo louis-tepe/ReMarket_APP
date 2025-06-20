@@ -23,7 +23,7 @@ const addressSchema = z.object({
   city: z.string().min(2, "La ville est requise"),
   postalCode: z.string().min(4, "Le code postal est requis"),
   country: z.string().length(2, "Le code pays doit faire 2 caractères (ex: FR)"),
-  telephone: z.string().optional(),
+  telephone: z.string().min(10, "Le numéro de téléphone est requis (au moins 10 chiffres)"),
 });
 
 type ShippingAddressFormData = z.infer<typeof addressSchema>;
@@ -90,7 +90,7 @@ function AddressForm({ currentAddress, onSave, onCancel }: {
       </div>
 
       <div>
-        <Label htmlFor="telephone">Téléphone (Optionnel)</Label>
+        <Label htmlFor="telephone">Téléphone</Label>
         <Input id="telephone" {...register("telephone")} />
         {errors.telephone && <p className="text-red-500 text-xs mt-1">{errors.telephone.message}</p>}
       </div>

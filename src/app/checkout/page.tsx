@@ -4,8 +4,14 @@ import { authOptions } from '@/lib/authOptions';
 import StripeCheckoutClient from './StripeCheckoutClient';
 import { Suspense } from 'react';
 
-// Ce composant serveur est maintenant un simple "contenant".
-// Il ne lit plus les searchParams, évitant ainsi le bug de Next.js.
+function CheckoutPageWrapper() {
+    return (
+        <Suspense fallback={<div className="text-center p-10">Chargement du module de paiement...</div>}>
+            <StripeCheckoutClient />
+        </Suspense>
+    );
+}
+
 export default async function CheckoutPage() {
     const session = await getServerSession(authOptions);
 
@@ -16,10 +22,5 @@ export default async function CheckoutPage() {
         return redirect(`/signin?callbackUrl=/cart`);
     }
 
-    // Il rend le composant client qui, lui, lira les paramètres de l'URL.
-    return (
-        <Suspense fallback={<div className="text-center p-10">Chargement du module de paiement...</div>}>
-            <StripeCheckoutClient />
-        </Suspense>
-    );
+    return <CheckoutPageWrapper />;
 } 

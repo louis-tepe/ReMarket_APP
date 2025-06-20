@@ -15,15 +15,30 @@ import { Button } from '@/components/ui/button';
 
 const PLACEHOLDER_IMAGE_URL = '/images/placeholder-product.webp';
 
+const getImageUrl = (item: ClientSafeCartItemPopulated): string => {
+    const offerImageUrl = item.offer?.images?.[0];
+    if (typeof offerImageUrl === 'string' && offerImageUrl.trim() !== '') {
+        return offerImageUrl;
+    }
+    const modelImageUrl = item.productModel?.standardImageUrls?.[0];
+    if (typeof modelImageUrl === 'string' && modelImageUrl.trim() !== '') {
+        return modelImageUrl;
+    }
+    return PLACEHOLDER_IMAGE_URL;
+};
+
 function CartItem({ item, onQuantityChange, onRemove, isUpdating }: { item: ClientSafeCartItemPopulated, onQuantityChange: (id: string, q: number) => void, onRemove: (id: string) => void, isUpdating: boolean }) {
+    const title = item.productModel?.title || 'Titre non disponible';
+    const slug = item.productModel?.slug;
+
     return (
         <div className="flex items-center p-4 border rounded-lg">
-            <Image src={item.offer?.images?.[0] || PLACEHOLDER_IMAGE_URL} alt={item.productModel?.title || 'Produit'} width={80} height={80} className="rounded-md" />
+            <Image src={getImageUrl(item)} alt={title} width={80} height={80} className="rounded-md" />
             <div className="ml-4 flex-grow">
-                {item.productModel?.slug ? (
-                    <Link href={`/${item.productModel.slug}`}><h3 className="font-semibold">{item.productModel.title}</h3></Link>
+                {slug ? (
+                    <Link href={`/${slug}`}><h3 className="font-semibold">{title}</h3></Link>
                 ) : (
-                    <h3 className="font-semibold">{item.productModel?.title || 'Titre non disponible'}</h3>
+                    <h3 className="font-semibold">{title}</h3>
                 )}
                 <p className="text-sm text-muted-foreground">Prix: {item.offer?.price ?? 'N/A'} €</p>
             </div>
@@ -39,7 +54,20 @@ function CartItem({ item, onQuantityChange, onRemove, isUpdating }: { item: Clie
 
 function CartDisplay({ cart, handleQuantityChange, handleRemoveItem, isUpdating }: { cart: ClientSafeCart, handleQuantityChange: (itemId: string, quantity: number) => void, handleRemoveItem: (itemId: string) => void, isUpdating: boolean }) {
     const router = useRouter();
-    const totalAmount = useMemo(() => cart?.total ?? 0, [cart]);
+    const totalAmount = useMemo(() => {
+        return cart.items.reduce((acc, item) => {
+            const price = item.offer?.price ?? 0;
+            return acc + (price * item.quantity);
+        }, 0);
+    }, [cart.items]);
+
+    const handleProceedToCheckout = () => {
+        if (!cart?._id || totalAmount <= 0) {
+            toast.error("Votre panier est vide ou le total est invalide.");
+            return;
+        }
+        router.push(`/checkout?cartId=${cart._id}&amount=${totalAmount}`);
+    };
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -74,8 +102,8 @@ function CartDisplay({ cart, handleQuantityChange, handleRemoveItem, isUpdating 
                     </div>
                     <Button 
                         className="w-full mt-6" 
-                        onClick={() => router.push('/checkout')}
-                        disabled={isUpdating}
+                        onClick={handleProceedToCheckout}
+                        disabled={isUpdating || totalAmount <= 0}
                     >
                         Passer la commande
                     </Button>

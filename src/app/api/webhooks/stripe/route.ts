@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { headers } from 'next/headers';
 import { stripe } from '@/lib/stripe';
 import dbConnect from '@/lib/mongodb/dbConnect';
 import OrderModel, { IOrderItem } from '@/lib/mongodb/models/OrderModel';
@@ -9,7 +10,7 @@ import { Types, ClientSession, startSession } from 'mongoose';
 import { createShipmentInTransaction } from '@/services/shipping/shipmentService';
 import { MongoError } from 'mongodb';
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 export const dynamic = 'force-dynamic';
 
 async function executeTransactionWithRetry(
@@ -194,67 +195,71 @@ async function createOrderFromCart(
     await CartModel.findByIdAndDelete(cartId, { session });
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+    if (!endpointSecret) {
+        console.error('STRIPE_WEBHOOK_SECRET is not set.');
+        return new NextResponse('Internal Server Error: Webhook secret not configured.', { status: 500 });
+    }
+
     const body = await req.text();
     const signature = req.headers.get('stripe-signature') as string;
 
     let event: Stripe.Event;
+
     try {
-        event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-    } catch (err) {
-        const message = err instanceof Error ? err.message : 'An unknown error occurred';
-        console.error(`Error verifying webhook signature: ${message}`);
-        return new NextResponse(`Webhook Error: ${message}`, { status: 400 });
+        event = stripe.webhooks.constructEvent(body, signature, endpointSecret);
+    } catch (err: any) {
+        console.error(`⚠️  Webhook signature verification failed: ${err.message}`);
+        return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 });
     }
 
-    const paymentIntent = event.data.object as Stripe.PaymentIntent;
-    console.log(`Stripe Webhook: Received event ${event.type}. Metadata:`, paymentIntent.metadata);
-    
-    await dbConnect();
-
     const transactionLogic = async (session: ClientSession) => {
+        const paymentIntent = event.data.object as Stripe.PaymentIntent;
         const { userId, cartId, offerId, servicePointId, shippingAddressId } = paymentIntent.metadata || {};
 
         if (!userId || !servicePointId || !shippingAddressId) {
-            console.error('Webhook received payment_intent.succeeded without userId, servicePointId, or shippingAddressId in metadata.');
-            // We cannot process this, but returning success to Stripe to avoid retries for a permanent failure.
+            console.error('Webhook received without required metadata.', paymentIntent.metadata);
+            // Non-recoverable error, so we don't throw to avoid retries from Stripe.
             return;
         }
 
         switch (event.type) {
             case 'payment_intent.succeeded':
-                console.log('PaymentIntent succeeded:', paymentIntent.id);
-                
-                if (offerId) {
-                    console.log(`Handling single offer purchase: offerId=${offerId}, userId=${userId}, servicePointId=${servicePointId}`);
-                    await createOrderFromSingleOffer(userId, offerId, servicePointId, shippingAddressId, paymentIntent, session);
+                console.log('✅ PaymentIntent Succeeded:', paymentIntent.id);
 
+                if (offerId) {
+                    await createOrderFromSingleOffer(userId, offerId, servicePointId, shippingAddressId, paymentIntent, session);
                 } else if (cartId) {
-                    console.log(`Handling cart purchase: cartId=${cartId}, userId=${userId}, servicePointId=${servicePointId}`);
                     await createOrderFromCart(userId, cartId, servicePointId, shippingAddressId, paymentIntent, session);
-                
                 } else {
                     console.warn('PaymentIntent succeeded but metadata was incomplete (missing offerId or cartId).', paymentIntent.metadata);
                 }
                 break;
-            
+
             case 'payment_intent.payment_failed':
                 console.log('Payment failed for intent:', paymentIntent.id);
+                // Note: Finding the order to update its status might need to be outside the main transaction logic
+                // if the order isn't created on failure, or handled differently.
+                // For now, we assume an order might exist.
                 await OrderModel.findOneAndUpdate(
                     { paymentIntentId: paymentIntent.id },
                     { status: 'payment_failed', paymentStatus: 'failed' },
                     { session }
-                );
+                ).exec();
                 break;
+
+            default:
+                console.log(`Unhandled event type ${event.type}`);
         }
     };
 
     try {
         await executeTransactionWithRetry(transactionLogic);
-        return NextResponse.json({ received: true });
-    } catch {
+        return new NextResponse(null, { status: 200 });
+    } catch (error) {
         // The transaction retry logic already logs the specific error.
-        // This is a final catch-all.
-        return new NextResponse('Server error processing webhook.', { status: 500 });
+        // This catch is for any error that escapes the retry mechanism.
+        const message = error instanceof Error ? error.message : 'Unknown server error';
+        return new NextResponse(`Server error processing webhook: ${message}`, { status: 500 });
     }
 } 

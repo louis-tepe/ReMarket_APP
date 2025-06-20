@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
                 if (offerToAdd.productModel !== productModelIdNum) {
                     return NextResponse.json({ success: false, message: 'L\'offre ne correspond pas au produit.' }, { status: 400 });
                 }
-                await cart.addItem({ offerId, productModelId: productModelIdNum, quantity: addQuantity });
+                await cart.addItem({ offerId, productModelId: productModelIdNum, quantity: addQuantity, price: offerToAdd.price });
                 message = 'Article ajouté/mis à jour.';
                 break;
 

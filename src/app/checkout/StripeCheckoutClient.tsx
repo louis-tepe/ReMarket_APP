@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { loadStripe, StripeElementsOptions } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,7 @@ interface ServicePoint {
 function CheckoutForm({ isReadyToPay }: { isReadyToPay: boolean }) {
   const stripe = useStripe();
   const elements = useElements();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -41,21 +42,31 @@ function CheckoutForm({ isReadyToPay }: { isReadyToPay: boolean }) {
     }
     setIsLoading(true);
 
-    const { error } = await stripe.confirmPayment({
+    const { error: submitError } = await elements.submit();
+    if (submitError) {
+      toast.error(submitError.message || 'Une erreur est survenue lors de la soumission.');
+      setIsLoading(false);
+      return;
+    }
+
+    const { error, paymentIntent } = await stripe.confirmPayment({
       elements,
       confirmParams: {
         return_url: `${window.location.origin}/checkout/success`,
       },
+      redirect: 'if_required',
     });
 
-    if (error.type === "card_error" || error.type === "validation_error") {
+    if (error) {
       toast.error(error.message || 'Une erreur de validation est survenue.');
+      setIsLoading(false);
+    } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+      router.push(`/checkout/success?payment_intent=${paymentIntent.id}`);
     } else {
-      toast.error('Une erreur inattendue est survenue.');
+      toast.info("En attente de la confirmation du paiement...");
     }
-    setIsLoading(false);
   };
-
+  
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
         <PaymentElement id="payment-element" options={{ layout: "tabs" }} />
@@ -74,7 +85,6 @@ function StripeCheckoutCore() {
 
     const isReadyToPay = !!selectedPoint && !!selectedAddressId;
     
-    // Read params inside the client component
     const offerId = searchParams.get('offerId');
     const cartId = searchParams.get('cartId');
     const amount = Number(searchParams.get('amount'));
@@ -90,7 +100,7 @@ function StripeCheckoutCore() {
                         amount,
                         offerId,
                         cartId,
-                        servicePointId: selectedPoint.id,
+                        servicePointId: selectedPoint!.id,
                         shippingAddressId: selectedAddressId,
                     }),
                 });
@@ -157,10 +167,5 @@ function StripeCheckoutCore() {
 }
 
 export default function StripeCheckoutClient() {
-    // Wrap the core logic in Suspense to handle useSearchParams
-    return (
-        <Suspense>
-            <StripeCheckoutCore />
-        </Suspense>
-    );
+    return <StripeCheckoutCore />;
 } 

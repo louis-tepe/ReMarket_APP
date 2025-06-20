@@ -24,6 +24,7 @@ interface SendcloudServicePoint {
   country: string;
   carrier: string;
   distance: number;
+  max_weight: string;
 }
 
 interface ShippingMethod {
@@ -32,6 +33,12 @@ interface ShippingMethod {
   carrier: string;
   min_weight: string;
   max_weight: string;
+}
+
+interface ShippingMethodParams {
+  servicePointId: number;
+  fromCountry: string;
+  fromPostalCode: string;
 }
 
 interface CreateParcelPayload {
@@ -103,10 +110,14 @@ class SendcloudService {
     });
   }
 
-  async getShippingMethodsForServicePoint(servicePointId: number): Promise<ShippingMethod[]> {
+  async getShippingMethods(params: ShippingMethodParams): Promise<ShippingMethod[]> {
     try {
       const response = await this.apiClient.get('/shipping_methods', {
-        params: { service_point_id: servicePointId },
+        params: { 
+          service_point_id: params.servicePointId,
+          from_country: params.fromCountry,
+          from_postal_code: params.fromPostalCode,
+        },
       });
       return response.data.shipping_methods;
     } catch (error) {
